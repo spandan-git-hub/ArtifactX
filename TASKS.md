@@ -2,93 +2,94 @@
 
 ## Foundation
 
-* [ ] Project Structure
-* [ ] React Setup
-* [ ] FastAPI Setup
-* [ ] SQLite Setup
+- [x] Project Structure
+- [x] React Setup
+- [x] FastAPI Setup
+- [x] SQLite Setup
 
 ## Case Management
 
-* [ ] Create Case
-* [ ] View Cases
-* [ ] Case Details
-* [ ] Delete Case
+- [ ] Create Case
+- [ ] View Cases
+- [ ] Case Details
+- [ ] Delete Case
 
 ## Evidence Management
 
-* [ ] Upload Evidence
-* [ ] File Inventory
-* [ ] Evidence Metadata
-* [ ] SHA256 Hashing
+- [ ] Upload Evidence
+- [ ] File Inventory
+- [ ] Evidence Metadata
+- [ ] SHA256 Hashing
 
 ## WhatsApp Analysis
 
-* [ ] Database Detection
-* [ ] Message Extraction
-* [ ] Contact Extraction
-* [ ] Group Extraction
-* [ ] Media Reference Extraction
+- [ ] Database Detection
+- [ ] Message Extraction
+- [ ] Contact Extraction
+- [ ] Group Extraction
+- [ ] Media Reference Extraction
 
 ## Telegram Analysis
 
-* [ ] Database Detection
-* [ ] Message Extraction
-* [ ] Contact Extraction
-* [ ] Group Extraction
-* [ ] Media Reference Extraction
+- [ ] Database Detection
+- [ ] Message Extraction
+- [ ] Contact Extraction
+- [ ] Group Extraction
+- [ ] Media Reference Extraction
 
 ## Timeline Reconstruction
 
-* [ ] Timestamp Normalization
-* [ ] Event Collection
-* [ ] Timeline Generation
-* [ ] Timeline Filtering
+- [ ] Timestamp Normalization
+- [ ] Event Collection
+- [ ] Timeline Generation
+- [ ] Timeline Filtering
 
 ## Deleted Message Detection
 
-* [ ] Sequence Gap Detection
-* [ ] Missing Record Detection
-* [ ] Confidence Scoring
+- [ ] Sequence Gap Detection
+- [ ] Missing Record Detection
+- [ ] Confidence Scoring
 
 ## Media Analysis
 
-* [ ] Image Detection
-* [ ] Video Detection
-* [ ] Audio Detection
-* [ ] Media Metadata
-* [ ] Orphan Media Detection
+- [ ] Image Detection
+- [ ] Video Detection
+- [ ] Audio Detection
+- [ ] Media Metadata
+- [ ] Orphan Media Detection
 
 ## Evidence Correlation
 
-* [ ] Message Contact Correlation
-* [ ] Message Media Correlation
-* [ ] Cross App Correlation
-* [ ] Evidence Graph
+- [ ] Message Contact Correlation
+- [ ] Message Media Correlation
+- [ ]dlar Correlation
+- [ ] Cross App Correlation
+- [ ] Evidence Graph
 
 ## Search
 
-* [ ] Message Search
-* [ ] Contact Search
-* [ ] Media Search
-* [ ] Date Filter
-* [ ] App Filter
+- [ ] Message Search
+- [ ] Contact Search
+- [ ] Media Search
+- [ ] Date Filter
+- [ ] App Filter
 
 ## Dashboard
 
-* [ ] Case Overview
-* [ ] Statistics
-* [ ] Timeline View
-* [ ] Evidence Graph View
+- [ ] Case Overview
+- [ ] Statistics
+- [ ] Timeline View
+- [ ] Evidence Graph View
 
 ## Reporting
 
-* [ ] PDF Reports
-* [ ] Evidence Summary
-* [ ] Timeline Summary
-* [ ] Deleted Message Summary
+- [ ] PDF Reports
+- [ ] Evidence Summary
+- [ ] Timeline Summary
+- [ ] Deleted Message Summary
 
 ## Logging
 
-* [ ] Analysis Logs
-* [ ] Error Logs
-* [ ] Activity Logs
+- [ ] Analysis Logs
+- [ ] Error Logs
+- [ ] Activity Logs
