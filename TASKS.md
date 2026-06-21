@@ -9,17 +9,17 @@
 
 ## Case Management
 
-- [ ] Create Case
-- [ ] View Cases
-- [ ] Case Details
-- [ ] Delete Case
+- [x] Create Case
+- [x] View Cases
+- [x] Case Details
+- [x] Delete Case
 
 ## Evidence Management
 
-- [ ] Upload Evidence
-- [ ] File Inventory
-- [ ] Evidence Metadata
-- [ ] SHA256 Hashing
+- [x] Upload Evidence
+- [x] File Inventory
+- [x] Evidence Metadata
+- [x] SHA256 Hashing
 
 ## WhatsApp Analysis
 

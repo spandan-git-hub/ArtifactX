@@ -1,4 +1,7 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom';
+import CaseListPage from './pages/CaseListPage';
+import CaseDetailPage from './pages/CaseDetailPage';
+import CaseForm from './components/cases/CaseForm';
 
 function App() {
   return (
@@ -20,9 +23,14 @@ function App() {
             </div>
           }
         />
+        {/* Case Management Routes */}
+        <Route path="/cases" element={<CaseListPage />} />
+        <Route path="/cases/create" element={<CaseForm />} />
+        <Route path="/cases/:id" element={<CaseDetailPage />} />
+        <Route path="/cases/:id/edit" element={<CaseForm />} />
       </Routes>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

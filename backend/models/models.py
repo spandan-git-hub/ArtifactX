@@ -33,7 +33,7 @@ class Case(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     evidence_items = relationship(
-        "Evidence", back_populates="case", cascade="all, delete-orphan"
+        "Evidence", back_populates="case", cascade="all, delete"
     )
     timeline_events = relationship("TimelineEvent", back_populates="case")
     deleted_messages = relationship("DeletedMessage", back_populates="case")
@@ -53,13 +53,13 @@ class Evidence(Base):
     sha256 = Column(String(64), nullable=False, index=True)
     content_type = Column(String(255))
     evidence_type = Column(String(50))
-    metadata = Column(JSON, default=dict)
+    metadata_ = Column("metadata_", JSON, default=dict)
     extracted_path = Column(String(1024))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime)
 
     case = relationship("Case", back_populates="evidence_items")
-    files = relationship("EvidenceFile", back_populates="evidence")
+    files = relationship("EvidenceFile", back_populates="evidence", cascade="all, delete-orphan")
     analysis_results = relationship("AnalysisResult", back_populates="evidence")
 
 
@@ -74,7 +74,7 @@ class EvidenceFile(Base):
     sha256 = Column(String(64), nullable=False)
     file_size = Column(Integer)
     mime_type = Column(String(255))
-    metadata = Column(JSON, default=dict)
+    metadata_ = Column("metadata_", JSON, default=dict)
     is_media = Column(Boolean, default=False)
     media_type = Column(String(50))
 
@@ -177,7 +177,7 @@ class TelegramGroup(Base):
 class TimelineEvent(Base):
     __tablename__ = "timeline_events"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
     case_id = Column(Integer, ForeignKey("cases.id"))
     evidence_id = Column(Integer, ForeignKey("evidence.id"))
     event_type = Column(String(50), index=True)
@@ -187,7 +187,7 @@ class TimelineEvent(Base):
     entity_id = Column(String(255))
     entity_type = Column(String(50))
     description = Column(Text)
-    metadata = Column(JSON, default=dict)
+    metadata_ = Column("metadata_", JSON, default=dict)
 
     case = relationship("Case", back_populates="timeline_events")
 
@@ -241,7 +241,7 @@ class CorrelationEdge(Base):
     source_id = Column(String(255))
     target_id = Column(String(255))
     relation_type = Column(String(50))
-    metadata = Column(JSON, default=dict)
+    metadata_ = Column("metadata_", JSON, default=dict)
 
 
 class AnalysisLog(Base):

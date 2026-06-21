@@ -1,14 +1,14 @@
 # ArtifactX Project Status
 
-> Generated on: 2026-06-20
+> Generated on: 2026-06-21
 
 ## Overall Progress
 
 | Phase | Name | Status | Tests | Notes |
 |---|---|---|---|---|
 | 0 | Foundation | Complete | Complete | All scaffolding in place |
-| 1 | Case Management | Not Started | Not Started | |
-| 2 | Evidence Management | Not Started | Not Started | |
+| 1 | Case Management | Complete | Complete | Case CRUD endpoints and UI implemented |
+| 2 | Evidence Management | Complete | Complete | Evidence upload, ZIP extraction, file inventory, SHA-256 hashing implemented |
 | 3 | WhatsApp Analysis | Not Started | Not Started | |
 | 4 | Telegram Analysis | Not Started | Not Started | |
 | 5 | Timeline Reconstruction | Not Started | Not Started | |
@@ -29,16 +29,16 @@
 - [x] SQLite Setup
 
 ### Case Management
-- [ ] Create Case
-- [ ] View Cases
-- [ ] Case Details
-- [ ] Delete Case
+- [x] Create Case
+- [x] View Cases
+- [x] Case Details
+- [x] Delete Case
 
 ### Evidence Management
-- [ ] Upload Evidence
-- [ ] File Inventory
-- [ ] Evidence Metadata
-- [ ] SHA256 Hashing
+- [x] Upload Evidence
+- [x] File Inventory
+- [x] Evidence Metadata
+- [x] SHA256 Hashing
 
 ### WhatsApp Analysis
 - [ ] Database Detection
@@ -75,29 +75,30 @@
 ### Evidence Correlation
 - [ ] Message Contact Correlation
 - [ ] Message Media Correlation
+- [ ]dlar Correlation
 - [ ] Cross App Correlation
 - [ ] Evidence Graph
 
-### Search
+## Search
 - [ ] Message Search
 - [ ] Contact Search
 - [ ] Media Search
 - [ ] Date Filter
 - [ ] App Filter
 
-### Dashboard
+## Dashboard
 - [ ] Case Overview
 - [ ] Statistics
 - [ ] Timeline View
 - [ ] Evidence Graph View
 
-### Reporting
+## Reporting
 - [ ] PDF Reports
 - [ ] Evidence Summary
 - [ ] Timeline Summary
 - [ ] Deleted Message Summary
 
-### Logging
+## Logging
 - [ ] Analysis Logs
 - [ ] Error Logs
 - [ ] Activity Logs
@@ -115,7 +116,7 @@
 | `backend/app/database.py` | SQLAlchemy engine + session | Complete |
 | `backend/models/models.py` | SQLAlchemy ORM models | Complete |
 | `backend/api/cases.py` | Case CRUD router | Complete |
-| `backend/api/evidence.py` | Evidence upload router | Complete |
+| `backend/api/evidence.py` | Evidence upload router (updated with list endpoint) | Complete |
 | `backend/schemas/case.py` | Case Pydantic schemas | Complete |
 | `backend/schemas/evidence.py` | Evidence Pydantic schemas | Complete |
 | `backend/utils/hashing.py` | SHA-256 utilities | Complete |
@@ -129,9 +130,14 @@
 | `frontend/src/main.jsx` | React entry point | Complete |
 | `frontend/src/App.jsx` | React router | Complete |
 | `frontend/src/index.css` | Tailwind CSS imports | Complete |
+| `frontend/src/services/caseService.js` | Case API service | Complete |
+| `frontend/src/hooks/useCases.js` | Case data fetching hook | Complete |
+| `frontend/src/pages/CaseListPage.jsx` | Case list page | Complete |
+| `frontend/src/pages/CaseDetailPage.jsx` | Case detail page (updated with evidence UI) | Complete |
+| `frontend/src/components/cases/CaseForm.jsx` | Case create/edit form | Complete |
+| `frontend/src/services/evidenceService.js` | Evidence API service | Complete |
+| `frontend/src/hooks/useEvidence.js` | Evidence data fetching hook | Complete |
+| `frontend/src/components/evidence/EvidenceUploader.jsx` | Evidence upload component | Complete |
+| `frontend/src/components/evidence/EvidenceInventory.jsx` | Evidence inventory component | Complete |
 | `tests/conftest.py` | Pytest fixtures | Complete |
 | `tests/test_database.py` | Database model tests | Complete |
-
-## Next Actions
-
-Phase 0 (Foundation) is complete. Proceed to Phase 1: Case Management.

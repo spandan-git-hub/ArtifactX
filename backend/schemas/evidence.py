@@ -21,7 +21,7 @@ class EvidenceRead(EvidenceBase):
     sha256: str
     content_type: Optional[str] = None
     evidence_type: Optional[str] = None
-    metadata: dict = Field(default_factory=dict)
+    metadata: dict = Field(default_factory=dict, alias="metadata_")
     extracted_path: Optional[str] = None
     uploaded_at: datetime
     analyzed_at: Optional[datetime] = None
