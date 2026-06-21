@@ -13,7 +13,7 @@
 | 4 | Telegram Analysis | Complete | Complete | |
 | 5 | Timeline Reconstruction | Complete | Complete | |
 | 6 | Deleted Message Detection | Complete | Complete | |
-| 7 | Media Analysis | Not Started | Not Started | |
+| 7 | Media Analysis | Complete | Not Started | Media analysis service, detectors, and orphan detection implemented |
 | 8 | Evidence Correlation | Not Started | Not Started | |
 | 9 | Search & Filtering | Not Started | Not Started | |
 | 10 | Dashboard | Not Started | Not Started | |

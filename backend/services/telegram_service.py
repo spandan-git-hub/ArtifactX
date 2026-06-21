@@ -139,19 +139,28 @@ class TelegramService:
                 else:
                     media_type = "other"
 
-            # Build MediaItem record
+            # Get the actual file path
+            file_path = Path(evidence.extracted_path or evidence.storage_path) / ef.relative_path
+
+            # Detect media type more accurately using file content
+            detected_media_type = detect_media_type(file_path) or media_type
+
+            # Extract metadata from the file
+            metadata = extract_media_metadata(file_path, detected_media_type)
+
+            # Build MediaItem record with actual metadata
             media_item = MediaItem(
                 case_id=evidence.case_id,
                 evidence_id=evidence_id,
-                file_path=str(Path(evidence.extracted_path or evidence.storage_path) / ef.relative_path),
+                file_path=str(file_path),
                 sha256=ef.sha256,
                 mime_type=ef.mime_type,
-                media_type=media_type,
+                media_type=detected_media_type,
                 file_size=ef.file_size,
-                width=None,  # To be filled by media analysis phase
-                height=None,
-                duration=None,
-                exif_data={},  # To be filled by media analysis phase
+                width=metadata.get("width"),
+                height=metadata.get("height"),
+                duration=metadata.get("duration"),
+                exif_data=metadata.get("exif_data", {}),
                 is_orphan=False,  # Will be determined by correlation phase
                 linked_message_id=ref["message_id"],
             )

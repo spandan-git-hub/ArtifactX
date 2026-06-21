@@ -52,11 +52,11 @@
 
 ## Media Analysis
 
-- [ ] Image Detection
-- [ ] Video Detection
-- [ ] Audio Detection
-- [ ] Media Metadata
-- [ ] Orphan Media Detection
+- [x] Image Detection
+- [x] Video Detection
+- [x] Audio Detection
+- [x] Media Metadata
+- [x] Orphan Media Detection
 
 ## Evidence Correlation
 

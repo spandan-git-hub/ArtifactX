@@ -12,8 +12,10 @@ from forensic.whatsapp.message_parser import extract_messages
 from forensic.whatsapp.contact_parser import extract_contacts
 from forensic.whatsapp.group_parser import extract_groups
 from forensic.whatsapp.media_parser import extract_media_references
+from forensic.media.detector import detect_media_type
+from forensic.media.metadata import extract_media_metadata
 from backend.repositories.whatsapp_repo import WhatsAppRepository
-from backend.models.models import Evidence, WhatsAppMessage, WhatsAppContact, WhatsAppGroup, EvidenceFile
+from backend.models.models import Evidence, WhatsAppMessage, WhatsAppContact, WhatsAppGroup, EvidenceFile, MediaItem
 from datetime import datetime
 
 
