@@ -6,7 +6,8 @@
       "Bash(npm test *)",
       "Bash(npx vitest *)",
       "Bash(python *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(git checkout *)"
     ]
   }
 }
