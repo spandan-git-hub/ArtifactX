@@ -13,7 +13,7 @@
 | 4 | Telegram Analysis | Complete | Complete | |
 | 5 | Timeline Reconstruction | Complete | Complete | |
 | 6 | Deleted Message Detection | Complete | Complete | |
-| 7 | Media Analysis | Complete | Not Started | Media analysis service, detectors, and orphan detection implemented |
+| 7 | Media Analysis | Complete | Complete | Media analysis service, detectors, and orphan detection implemented |
 | 8 | Evidence Correlation | Not Started | Not Started | |
 | 9 | Search & Filtering | Not Started | Not Started | |
 | 10 | Dashboard | Not Started | Not Started | |
@@ -66,11 +66,11 @@
 - [x] Confidence Scoring
 
 ### Media Analysis
-- [ ] Image Detection
-- [ ] Video Detection
-- [ ] Audio Detection
-- [ ] Media Metadata
-- [ ] Orphan Media Detection
+- [x] Image Detection
+- [x] Video Detection
+- [x] Audio Detection
+- [x] Media Metadata
+- [x] Orphan Media Detection
 
 ### Evidence Correlation
 - [ ] Message Contact Correlation
