@@ -46,9 +46,9 @@
 
 ## Deleted Message Detection
 
-- [ ] Sequence Gap Detection
-- [ ] Missing Record Detection
-- [ ] Confidence Scoring
+- [x] Sequence Gap Detection
+- [x] Missing Record Detection
+- [x] Confidence Scoring
 
 ## Media Analysis
 

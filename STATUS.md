@@ -12,7 +12,7 @@
 | 3 | WhatsApp Analysis | Complete | Complete | |
 | 4 | Telegram Analysis | Complete | Complete | |
 | 5 | Timeline Reconstruction | Complete | Complete | |
-| 6 | Deleted Message Detection | Not Started | Not Started | |
+| 6 | Deleted Message Detection | Complete | Complete | |
 | 7 | Media Analysis | Not Started | Not Started | |
 | 8 | Evidence Correlation | Not Started | Not Started | |
 | 9 | Search & Filtering | Not Started | Not Started | |
@@ -61,9 +61,9 @@
 - [x] Timeline Filtering
 
 ### Deleted Message Detection
-- [ ] Sequence Gap Detection
-- [ ] Missing Record Detection
-- [ ] Confidence Scoring
+- [x] Sequence Gap Detection
+- [x] Missing Record Detection
+- [x] Confidence Scoring
 
 ### Media Analysis
 - [ ] Image Detection
