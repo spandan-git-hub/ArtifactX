@@ -7,9 +7,10 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.app.database import Base, get_db
 from backend.app.main import app
+from backend import models
 
-# In-memory database for testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
+# In-memory shared database for testing to persist across connections
+TEST_DATABASE_URL = "sqlite:///file::memory:?cache=shared"
 
 engine = create_engine(
     TEST_DATABASE_URL,
@@ -20,7 +21,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_database():
+    print("Tables before create_all:", list(Base.metadata.tables.keys()))
     Base.metadata.create_all(bind=engine)
+    print("Tables after create_all:", list(Base.metadata.tables.keys()))
     yield
     Base.metadata.drop_all(bind=engine)
 

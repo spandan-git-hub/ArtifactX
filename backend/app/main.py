@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.config import settings
 from backend.app.database import Base, engine
-from backend.api import cases, evidence, whatsapp, telegram
+from backend.api import cases, evidence, whatsapp, telegram, timeline
 
 
 @asynccontextmanager
@@ -36,7 +36,8 @@ app.add_middleware(
 app.include_router(cases.router, prefix="/api/cases", tags=["cases"])
 app.include_router(evidence.router, prefix="/api/evidence", tags=["evidence"])
 app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["whatsapp"])
-# app.include_router(telegram.router, prefix="/api/telegram", tags=["telegram"])
+app.include_router(telegram.router, prefix="/api/telegram", tags=["telegram"])
+app.include_router(timeline.router, prefix="/api/timeline", tags=["timeline"])
 
 
 @app.get("/api/health")

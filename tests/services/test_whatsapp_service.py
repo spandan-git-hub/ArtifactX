@@ -186,6 +186,12 @@ def test_perform_analysis():
     # Mock database session
     mock_db = MagicMock()
 
+    # Mock evidence
+    mock_evidence = MagicMock()
+    mock_evidence.case_id = 1
+    mock_evidence.extracted_path = None
+    mock_evidence.storage_path = "/tmp/test.db"
+
     # Mock parsers return values
     mock_messages = [{"evidence_id": 1, "message_id": "msg_1"}]
     mock_contacts = [{"evidence_id": 1, "jid": "contact_1"}]
@@ -205,7 +211,7 @@ def test_perform_analysis():
              patch.object(service.repository, 'save_groups') as mock_save_groups:
 
             # Call the method
-            service._perform_analysis(1, Path("/tmp/test.db"), mock_db)
+            service._perform_analysis(1, Path("/tmp/test.db"), mock_evidence, mock_db)
 
             # Verify parsers were called
             mock_extract_messages.assert_called_once_with(Path("/tmp/test.db"), 1)

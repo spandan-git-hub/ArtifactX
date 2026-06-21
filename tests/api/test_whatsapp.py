@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from backend.app.main import app
 from backend.models.models import Case, Evidence
@@ -30,9 +30,9 @@ def test_analyze_whatsapp_endpoint(db_session: Session):
     db_session.commit()
     db_session.refresh(evidence)
 
-    # Mock the WhatsApp service to avoid actual file processing
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
-        mock_service.analyze_evidence.return_value = True
+    # Mock the Whatsap service in the API module
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
+        mock_service.analyze_evidence = AsyncMock(return_value=True)
 
         response = client.post(
             f"/api/whatsapp/evidence/{evidence.id}/analyze/whatsapp",
@@ -42,13 +42,19 @@ def test_analyze_whatsapp_endpoint(db_session: Session):
         data = response.json()
         assert data["message"] == "WhatsApp analysis started"
         assert data["evidence_id"] == evidence.id
-        mock_service.analyze_evidence.assert_called_once_with(evidence.id, db_session)
+        mock_service.analyze_evidence.assert_called_once()
+        # Check that the first argument is the evidence ID
+        args, kwargs = mock_service.analyze_evidence.call_args
+        assert args[0] == evidence.id
+        # The second argument is a session; we can't guarantee it's the same
+        # as db_session due to dependency overrides, but we can check it's a Session
+        assert isinstance(args[1], Session)
 
 
 def test_analyze_whatsapp_endpoint_not_found(db_session: Session):
     """Test WhatsApp analysis endpoint with non-existent evidence."""
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
-        mock_service.analyze_evidence.return_value = False
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
+        mock_service.analyze_evidence = AsyncMock(return_value=False)
 
         response = client.post(
             "/api/whatsapp/evidence/999/analyze/whatsapp",
@@ -79,7 +85,7 @@ def test_get_wa_messages_endpoint(db_session: Session):
     db_session.refresh(evidence)
 
     # Mock the WhatsApp service
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_messages = [
             {
                 "id": 1,
@@ -105,12 +111,15 @@ def test_get_wa_messages_endpoint(db_session: Session):
         assert len(data) == 1
         assert data[0]["message_id"] == "msg_1"
         assert data[0]["body"] == "Test message"
-        mock_service.get_messages.assert_called_once_with(evidence.id, db_session)
+        mock_service.get_messages.assert_called_once()
+        args, kwargs = mock_service.get_messages.call_args
+        assert args[0] == evidence.id
+        assert isinstance(args[1], Session)
 
 
 def test_get_wa_messages_endpoint_not_found(db_session: Session):
     """Test getting WhatsApp messages endpoint with non-existent evidence."""
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_service.get_messages.return_value = None
 
         response = client.get("/api/whatsapp/evidence/999/wa-messages")
@@ -140,7 +149,7 @@ def test_get_wa_contacts_endpoint(db_session: Session):
     db_session.refresh(evidence)
 
     # Mock the WhatsApp service
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_contacts = [
             {
                 "id": 1,
@@ -159,7 +168,10 @@ def test_get_wa_contacts_endpoint(db_session: Session):
         data = response.json()
         assert len(data) == 1
         assert data[0]["display_name"] == "Test Contact"
-        mock_service.get_contacts.assert_called_once_with(evidence.id, db_session)
+        mock_service.get_contacts.assert_called_once()
+        args, kwargs = mock_service.get_contacts.call_args
+        assert args[0] == evidence.id
+        assert isinstance(args[1], Session)
 
 
 def test_get_wa_groups_endpoint(db_session: Session):
@@ -182,7 +194,7 @@ def test_get_wa_groups_endpoint(db_session: Session):
     db_session.refresh(evidence)
 
     # Mock the WhatsApp service
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_groups = [
             {
                 "id": 1,
@@ -201,7 +213,10 @@ def test_get_wa_groups_endpoint(db_session: Session):
         data = response.json()
         assert len(data) == 1
         assert data[0]["subject"] == "Test Group"
-        mock_service.get_groups.assert_called_once_with(evidence.id, db_session)
+        mock_service.get_groups.assert_called_once()
+        args, kwargs = mock_service.get_groups.call_args
+        assert args[0] == evidence.id
+        assert isinstance(args[1], Session)
 
 
 def test_get_wa_media_endpoint(db_session: Session):
@@ -224,7 +239,7 @@ def test_get_wa_media_endpoint(db_session: Session):
     db_session.refresh(evidence)
 
     # Mock the WhatsApp service
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_media = [
             {
                 "message_id": "msg_1",
@@ -245,12 +260,15 @@ def test_get_wa_media_endpoint(db_session: Session):
         assert len(data) == 1
         assert data[0]["media_type"] == "image"
         assert data[0]["file_size"] == 1024
-        mock_service.get_media_references.assert_called_once_with(evidence.id, db_session)
+        mock_service.get_media_references.assert_called_once()
+        args, kwargs = mock_service.get_media_references.call_args
+        assert args[0] == evidence.id
+        assert isinstance(args[1], Session)
 
 
 def test_get_wa_media_endpoint_not_found(db_session: Session):
     """Test getting WhatsApp media endpoint with non-existent evidence."""
-    with patch('backend.services.whatsapp_service.whatsapp_service') as mock_service:
+    with patch('backend.api.whatsapp.whatsapp_service') as mock_service:
         mock_service.get_media_references.return_value = None
 
         response = client.get("/api/whatsapp/evidence/999/wa-media")

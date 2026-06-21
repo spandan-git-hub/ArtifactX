@@ -39,10 +39,10 @@
 
 ## Timeline Reconstruction
 
-- [ ] Timestamp Normalization
-- [ ] Event Collection
-- [ ] Timeline Generation
-- [ ] Timeline Filtering
+- [x] Timestamp Normalization
+- [x] Event Collection
+- [x] Timeline Generation
+- [x] Timeline Filtering
 
 ## Deleted Message Detection
 
