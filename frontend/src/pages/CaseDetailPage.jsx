@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { caseService } from '../services/caseService';
 import EvidenceUploader from '../components/evidence/EvidenceUploader';
 import EvidenceInventory from '../components/evidence/EvidenceInventory';
+import WhatsAppAnalysis from '../components/whatsapp/WhatsAppAnalysis';
 
 const CaseDetailPage = () => {
   const { id } = useParams();
@@ -74,6 +75,19 @@ const CaseDetailPage = () => {
         <div className="bg-white p-4 rounded-lg shadow">
           <EvidenceUploader caseId={caseData.id} />
           <EvidenceInventory caseId={caseData.id} />
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h2 className="font-semibold mb-2">WhatsApp Analysis</h2>
+          <p className="text-sm text-gray-500">
+            Analyze WhatsApp databases extracted from evidence to retrieve messages, contacts, groups, and media.
+          </p>
+          {/* We'll need to select evidence for analysis - for now, we'll show a placeholder */}
+          <div className="mt-4 p-4 bg-gray-50 rounded">
+            <p className="text-gray-500">
+              Select evidence from the inventory above to analyze WhatsApp data.
+            </p>
+          </div>
         </div>
       </div>
 

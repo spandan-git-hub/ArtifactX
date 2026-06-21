@@ -9,8 +9,8 @@
 | 0 | Foundation | Complete | Complete | All scaffolding in place |
 | 1 | Case Management | Complete | Complete | Case CRUD endpoints and UI implemented |
 | 2 | Evidence Management | Complete | Complete | Evidence upload, ZIP extraction, file inventory, SHA-256 hashing implemented |
-| 3 | WhatsApp Analysis | Not Started | Not Started | |
-| 4 | Telegram Analysis | Not Started | Not Started | |
+| 3 | WhatsApp Analysis | Complete | Complete | |
+| 4 | Telegram Analysis | Complete | Complete | |
 | 5 | Timeline Reconstruction | Not Started | Not Started | |
 | 6 | Deleted Message Detection | Not Started | Not Started | |
 | 7 | Media Analysis | Not Started | Not Started | |
@@ -41,18 +41,18 @@
 - [x] SHA256 Hashing
 
 ### WhatsApp Analysis
-- [ ] Database Detection
-- [ ] Message Extraction
-- [ ] Contact Extraction
-- [ ] Group Extraction
-- [ ] Media Reference Extraction
+- [x] Database Detection
+- [x] Message Extraction
+- [x] Contact Extraction
+- [x] Group Extraction
+- [x] Media Reference Extraction
 
 ### Telegram Analysis
-- [ ] Database Detection
-- [ ] Message Extraction
-- [ ] Contact Extraction
-- [ ] Group Extraction
-- [ ] Media Reference Extraction
+- [x] Database Detection
+- [x] Message Extraction
+- [x] Contact Extraction
+- [x] Group Extraction
+- [x] Media Reference Extraction
 
 ### Timeline Reconstruction
 - [ ] Timestamp Normalization

@@ -13,7 +13,7 @@ def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
         return []
     try:
         conn = sqlite3.connect(str(db_path))
-        conn.row_factor = sqlite3.Row  # to access columns by name
+        conn.row_factory = sqlite3.Row  # to access columns by name
         cursor = conn.cursor()
         # Try to get messages; adjust table and column names as needed
         # Common WhatsApp msgstore.db schema:
@@ -25,10 +25,13 @@ def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
             SELECT
                 msg.key_id AS message_id,
                 msg.key_remote_jid AS key_remote_jid,
-                msg.key_from_me AS sender_jid,  -- Simplified: if from_me then sender is our number, else participant?
                 CASE
                     WHEN msg.key_from_me = 1 THEN ?  -- Our number (we don't have it, use placeholder)
                     ELSE msg.key_remote_jid
+                END AS sender_jid,
+                CASE
+                    WHEN msg.key_from_me = 1 THEN msg.key_remote_jid
+                    ELSE ?  -- Our number (we don't have it, use placeholder)
                 END AS participant_jid,
                 msg.data AS body,
                 msg.timestamp AS timestamp,
@@ -46,7 +49,7 @@ def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
                 END AS message_type,
                 msg.status AS status
             FROM messages msg
-        """, (evidence_id,))  # placeholder for our number
+        """, (evidence_id, evidence_id))  # placeholders for our number
         rows = cursor.fetchall()
         messages = []
         for row in rows:

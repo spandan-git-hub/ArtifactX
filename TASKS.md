@@ -23,19 +23,19 @@
 
 ## WhatsApp Analysis
 
-- [ ] Database Detection
-- [ ] Message Extraction
-- [ ] Contact Extraction
-- [ ] Group Extraction
-- [ ] Media Reference Extraction
+- [x] Database Detection
+- [x] Message Extraction
+- [x] Contact Extraction
+- [x] Group Extraction
+- [x] Media Reference Extraction
 
 ## Telegram Analysis
 
-- [ ] Database Detection
-- [ ] Message Extraction
-- [ ] Contact Extraction
-- [ ] Group Extraction
-- [ ] Media Reference Extraction
+- [x] Database Detection
+- [x] Message Extraction
+- [x] Contact Extraction
+- [x] Group Extraction
+- [x] Media Reference Extraction
 
 ## Timeline Reconstruction
 
