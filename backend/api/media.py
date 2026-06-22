@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from backend.app.database import get_db
 from backend.services.media_service import media_service
+from backend.services.log_service import get_log_service
 # Note: MediaItemRead schema would need to be created, but for now we'll return dicts
 
 router = APIRouter()
@@ -17,13 +18,59 @@ async def analyze_media(
     db: Session = Depends(get_db)
 ):
     """Trigger media analysis on evidence."""
-    result = await media_service.analyze_media_for_evidence(evidence_id, db)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Evidence not found or analysis failed"
+    try:
+        # Verify evidence exists
+        from backend.app.database import get_db
+        from backend.models.models import Evidence
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Evidence not found"
+            )
+
+        # Log activity
+        log_service = get_log_service(db)
+        log_service.log_activity(
+            case_id=evidence.case_id,
+            action="media_analysis_start",
+            description=f"Media analysis started for evidence {evidence_id}"
         )
-    return {"message": "Media analysis started", "evidence_id": evidence_id}
+
+        result = await media_service.analyze_media_for_evidence(evidence_id, db)
+        if not result:
+            # Log activity failure
+            log_service.log_activity(
+                case_id=evidence.case_id,
+                action="media_analysis_failed",
+                description=f"Media analysis failed for evidence {evidence_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Evidence not found or analysis failed"
+            )
+
+        # Log activity success
+        log_service.log_activity(
+            case_id=evidence.case_id,
+            action="media_analysis_complete",
+            description=f"Media analysis completed successfully for evidence {evidence_id}"
+        )
+
+        return {"message": "Media analysis started", "evidence_id": evidence_id}
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="media_analysis_error",
+            message=f"Error during media analysis: {str(e)}",
+            case_id=evidence.case_id if 'evidence' in locals() else None,
+            evidence_id=evidence_id,
+            stack_trace=str(e.__traceback__),
+            endpoint=f"/api/evidence/{evidence_id}/analyze/media",
+            method="POST"
+        )
+        raise
 
 
 @router.get("/evidence/{evidence_id}/media")

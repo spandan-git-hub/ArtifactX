@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.repositories.media_repo import MediaRepository
 from forensic.media.orphan import find_orphan_media_items, find_orphan_files, mark_media_orphan_status
 from backend.models.models import MediaItem, EvidenceFile, Evidence, Case
+from backend.services.log_service import get_log_service
 
 
 class MediaService:
@@ -35,10 +36,42 @@ class MediaService:
         if not case:
             return False
 
-        # Run media analysis (for now, we'll run it synchronously)
-        self._perform_media_analysis(evidence_id, case.id, db)
+        # Get log service
+        log_service = get_log_service(db)
 
-        return True
+        # Log analysis start
+        log_service.log_analysis(
+            evidence_id=evidence_id,
+            log_type="media_analysis_start",
+            message="Starting media analysis for evidence",
+            details={"evidence_id": evidence_id}
+        )
+
+        try:
+            # Run media analysis (for now, we'll run it synchronously)
+            self._perform_media_analysis(evidence_id, case.id, db)
+
+            # Log analysis success
+            log_service.log_analysis(
+                evidence_id=evidence_id,
+                log_type="media_analysis_completed",
+                message="Media analysis completed successfully",
+                details={"evidence_id": evidence_id}
+            )
+
+            return True
+        except Exception as e:
+            # Log error
+            log_service.log_error(
+                error_type="media_analysis_error",
+                message=f"Error during media analysis: {str(e)}",
+                case_id=evidence.case_id,
+                evidence_id=evidence_id,
+                stack_trace=str(e.__traceback__),
+                endpoint="/api/evidence/{evidence_id}/analyze/media",
+                method="POST"
+            )
+            return False
 
     def _perform_media_analysis(self, evidence_id: int, case_id: int, db: Session):
         """

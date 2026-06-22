@@ -7,7 +7,10 @@
       "Bash(npx vitest *)",
       "Bash(python *)",
       "Bash(python3 *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Skill(run)",
+      "Bash(npm run *)",
+      "Bash(npm install *)"
     ]
   }
 }

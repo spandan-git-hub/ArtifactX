@@ -9,6 +9,7 @@ from backend.repositories.whatsapp_repo import WhatsAppRepository
 from backend.repositories.telegram_repo import TelegramRepository
 from backend.models.models import WhatsAppMessage, TelegramMessage, Evidence
 from forensic.deleted.detector import DeletedDetector
+from backend.services.log_service import get_log_service
 
 
 class DeletedService:
@@ -28,45 +29,77 @@ class DeletedService:
         Returns:
             Number of deleted message records created.
         """
-        # Delete existing deleted message records for this case
-        db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete()
-        db.commit()
+        # Get log service
+        log_service = get_log_service(db)
 
-        # Get all evidence IDs for this case
-        evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
-        evidence_ids = [e.id for e in evidences]
+        # Log analysis start
+        log_service.log_analysis(
+            evidence_id=0,  # Case-level analysis
+            log_type="deleted_detection_start",
+            message="Starting deleted message detection for case",
+            details={"case_id": case_id}
+        )
 
-        all_detected_deletions = []
+        try:
+            # Delete existing deleted message records for this case
+            db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete()
+            db.commit()
 
-        # Process WhatsApp messages
-        for evidence_id in evidence_ids:
-            wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence_id)
-            if wa_messages:
-                deletions = self.detector.detect_deletions(
-                    messages=wa_messages,
-                    source_app="whatsapp",
-                    evidence_id=evidence_id,
-                    case_id=case_id
-                )
-                all_detected_deletions.extend(deletions)
+            # Get all evidence IDs for this case
+            evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+            evidence_ids = [e.id for e in evidences]
 
-        # Process Telegram messages
-        for evidence_id in evidence_ids:
-            tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence_id)
-            if tg_messages:
-                deletions = self.detector.detect_deletions(
-                    messages=tg_messages,
-                    source_app="telegram",
-                    evidence_id=evidence_id,
-                    case_id=case_id
-                )
-                all_detected_deletions.extend(deletions)
+            all_detected_deletions = []
 
-        # Save detected deletions
-        if all_detected_deletions:
-            self.deleted_repo.save_deleted_messages(db, all_detected_deletions)
+            # Process WhatsApp messages
+            for evidence_id in evidence_ids:
+                wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence_id)
+                if wa_messages:
+                    deletions = self.detector.detect_deletions(
+                        messages=wa_messages,
+                        source_app="whatsapp",
+                        evidence_id=evidence_id,
+                        case_id=case_id
+                    )
+                    all_detected_deletions.extend(deletions)
 
-        return len(all_detected_deletions)
+            # Process Telegram messages
+            for evidence_id in evidence_ids:
+                tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence_id)
+                if tg_messages:
+                    deletions = self.detector.detect_deletions(
+                        messages=tg_messages,
+                        source_app="telegram",
+                        evidence_id=evidence_id,
+                        case_id=case_id
+                    )
+                    all_detected_deletions.extend(deletions)
+
+            # Save detected deletions
+            if all_detected_deletions:
+                self.deleted_repo.save_deleted_messages(db, all_detected_deletions)
+
+            # Log analysis success
+            log_service.log_analysis(
+                evidence_id=0,
+                log_type="deleted_detection_completed",
+                message="Deleted message detection completed successfully",
+                details={"case_id": case_id, "deletions_detected": len(all_detected_deletions)}
+            )
+
+            return len(all_detected_deletions)
+        except Exception as e:
+            # Log error
+            log_service.log_error(
+                error_type="deleted_detection_error",
+                message=f"Error during deleted message detection: {str(e)}",
+                case_id=case_id,
+                evidence_id=None,
+                stack_trace=str(e.__traceback__),
+                endpoint="/api/cases/{case_id}/deleted/detect",
+                method="POST"
+            )
+            return 0
 
     def get_deleted_messages_for_case(self, db: Session, case_id: int) -> List[dict]:
         """Get deleted messages for a case."""

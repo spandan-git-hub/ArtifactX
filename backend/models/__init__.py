@@ -17,4 +17,5 @@ from .models import (
     CorrelationEdge,
     AnalysisLog,
     ActivityLog,
+    ErrorLog,
 )

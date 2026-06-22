@@ -89,6 +89,6 @@
 
 ## Logging
 
-- [ ] Analysis Logs
-- [ ] Error Logs
-- [ ] Activity Logs
+- [x] Analysis Logs
+- [x] Error Logs
+- [x] Activity Logs

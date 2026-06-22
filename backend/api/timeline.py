@@ -8,6 +8,7 @@ from datetime import datetime
 from backend.app.database import get_db
 from backend.services.timeline_service import timeline_service
 from backend.schemas.timeline import TimelineEventRead, TimelineEventFilter
+from backend.services.log_service import get_log_service
 
 router = APIRouter()
 

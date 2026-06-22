@@ -9,6 +9,7 @@ from backend.repositories.correlation_repo import CorrelationRepository
 from backend.repositories.search_repo import SearchRepository
 from backend.repositories.dashboard_repo import DashboardRepository
 from backend.repositories.report_repo import ReportRepository
+from backend.repositories.log_repo import LogRepository
 
 __all__ = [
     "WhatsAppRepository",
@@ -20,4 +21,5 @@ __all__ = [
     "SearchRepository",
     "DashboardRepository",
     "ReportRepository",
+    "LogRepository",
 ]

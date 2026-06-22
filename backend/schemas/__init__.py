@@ -31,6 +31,13 @@ from backend.schemas.report import (
     FullReportData, ReportGenerateRequest, ReportGenerateResponse,
     ReportInfo, ReportDownloadResponse,
 )
+from backend.schemas.log import (
+    AnalysisLogEntry,
+    ErrorLogEntry,
+    ActivityLogEntry,
+    LogFilter,
+    LogSummary,
+)
 
 __all__ = [
     "CaseCreate", "CaseRead",
@@ -58,4 +65,6 @@ __all__ = [
     "DeletedMessageSummary", "DeletedMessageReportData",
     "FullReportData", "ReportGenerateRequest", "ReportGenerateResponse",
     "ReportInfo", "ReportDownloadResponse",
+    "AnalysisLogEntry", "ErrorLogEntry", "ActivityLogEntry",
+    "LogFilter", "LogSummary",
 ]

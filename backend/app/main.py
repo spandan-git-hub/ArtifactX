@@ -7,12 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.config import settings
 from backend.app.database import Base, engine
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports
+from backend.utils.logging_config import configure_logging
+from backend.middleware import ErrorLoggingMiddleware
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create database tables on startup."""
+    configure_logging(settings.log_level)
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -32,6 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Error logging middleware (added after CORS so it wraps all requests)
+app.add_middleware(ErrorLoggingMiddleware)
+
 # Routers
 app.include_router(cases.router, prefix="/api/cases", tags=["cases"])
 app.include_router(evidence.router, prefix="/api/evidence", tags=["evidence"])
@@ -44,6 +50,7 @@ app.include_router(correlation.router, prefix="/api/correlation", tags=["correla
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 
 
 @app.get("/api/health")

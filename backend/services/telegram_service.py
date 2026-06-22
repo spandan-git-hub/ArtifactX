@@ -10,10 +10,11 @@ from backend.app.config import UPLOADS_DIR
 from forensic.telegram.detector import is_telegram_database
 from forensic.telegram.message_parser import extract_messages
 from forensic.telegram.contact_parser import extract_contacts
-from forensic.telegram.group_parser import extract_groups
-from forensic.telegram.media_parser import extract_media_references
+from forensic.telegram.group_parser = extract_groups
+from forensic.telegram.media_parser = extract_media_references
 from backend.repositories.telegram_repo import TelegramRepository
 from backend.models.models import Evidence, TelegramMessage, TelegramContact, TelegramGroup, EvidenceFile, MediaItem
+from backend.services.log_service import get_log_service
 from datetime import datetime
 
 
@@ -39,43 +40,89 @@ class TelegramService:
         if not evidence:
             return False
 
-        # Check if evidence has extracted path (for ZIP files)
-        if not evidence.extracted_path:
-            # For non-ZIP evidence, check if the storage file itself is a Telegram DB
-            db_path = Path(evidence.storage_path)
-        else:
-            # For ZIP evidence, we need to find Telegram database in extracted files
-            # For now, we'll look for any .db files in the extracted path
-            # In a more sophisticated implementation, we'd scan for Telegram-specific files
-            db_path = None
-            extracted_dir = Path(evidence.extracted_path)
-            if extracted_dir.exists():
-                # Look for Telegram database files
-                for db_file in extracted_dir.rglob("*.db"):
-                    if is_telegram_database(db_file):
-                        db_path = db_file
-                        break
-                # If no specific Telegram DB found, try the first .db file
-                if not db_path:
-                    db_files = list(extracted_dir.rglob("*.db"))
-                    if db_files:
-                        db_path = db_files[0]
+        # Get log service
+        log_service = get_log_service(db)
 
-        if not db_path or not db_path.exists():
+        # Log analysis start
+        log_service.log_analysis(
+            evidence_id=evidence_id,
+            log_type="telegram_analysis_start",
+            message="Starting Telegram analysis",
+            details={"evidence_id": evidence_id}
+        )
+
+        try:
+            # Check if evidence has extracted path (for ZIP files)
+            if not evidence.extracted_path:
+                # For non-ZIP evidence, check if the storage file itself is a Telegram DB
+                db_path = Path(evidence.storage_path)
+            else:
+                # For ZIP evidence, we need to find Telegram database in extracted files
+                # For now, we'll look for any .db files in the extracted path
+                # In a more sophisticated implementation, we'd scan for Telegram-specific files
+                db_path = None
+                extracted_dir = Path(evidence.extracted_path)
+                if extracted_dir.exists():
+                    # Look for Telegram database files
+                    for db_file in extracted_dir.rglob("*.db"):
+                        if is_telegram_database(db_file):
+                            db_path = db_file
+                            break
+                    # If no specific Telegram DB found, try the first .db file
+                    if not db_path:
+                        db_files = list(extracted_dir.rglob("*.db"))
+                        if db_files:
+                            db_path = db_files[0]
+
+            if not db_path or not db_path.exists():
+                # Log analysis failure
+                log_service.log_analysis(
+                    evidence_id=evidence_id,
+                    log_type="telegram_analysis_failed",
+                    message="Telegram analysis failed: No database file found",
+                    details={"evidence_id": evidence_id, "reason": "no_db_file"}
+                )
+                return False
+
+            # Verify it's a Telegram database
+            if not is_telegram_database(db_path):
+                # Log analysis failure
+                log_service.log_analysis(
+                    evidence_id=evidence_id,
+                    log_type="telegram_analysis_failed",
+                    message="Telegram analysis failed: Not a Telegram database",
+                    details={"evidence_id": evidence_id, "reason": "not_telegram_db"}
+                )
+                return False
+
+            # Run analysis (for now, we'll run it synchronously)
+            self._perform_analysis(evidence_id, db_path, evidence, db)
+
+            # Update evidence analyzed timestamp
+            evidence.analyzed_at = datetime.utcnow()
+            db.commit()
+
+            # Log analysis success
+            log_service.log_analysis(
+                evidence_id=evidence_id,
+                log_type="telegram_analysis_completed",
+                message="Telegram analysis completed successfully",
+                details={"evidence_id": evidence_id}
+            )
+
+            return True
+        except Exception as e:
+            # Log error
+            log_service.log_error(
+                error_type="telegram_analysis_error",
+                message=f"Error during Telegram analysis: {str(e)}",
+                case_id=evidence.case_id if evidence else None,
+                evidence_id=evidence_id,
+                stack_trace=str(e.__traceback__),
+                endpoint="/api/evidence/{evidence_id}/analyze/telegram",
+                method="POST"
+            )
             return False
-
-        # Verify it's a Telegram database
-        if not is_telegram_database(db_path):
-            return False
-
-        # Run analysis (for now, we'll run it synchronously)
-        self._perform_analysis(evidence_id, db_path, evidence, db)
-
-        # Update evidence analyzed timestamp
-        evidence.analyzed_at = datetime.utcnow()
-        db.commit()
-
-        return True
 
     def _perform_analysis(self, evidence_id: int, db_path: Path, evidence: Evidence, db: Session):
         """

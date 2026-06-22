@@ -9,6 +9,7 @@ from backend.services.correlation_service import CorrelationService
 from backend.services.search_service import SearchService, get_search_service
 from backend.services.dashboard_service import DashboardService, get_dashboard_service
 from backend.services.report_service import ReportService, get_report_service
+from backend.services.log_service import LogService, get_log_service
 
 __all__ = [
     "WhatsAppService",
@@ -23,4 +24,6 @@ __all__ = [
     "get_dashboard_service",
     "ReportService",
     "get_report_service",
+    "LogService",
+    "get_log_service",
 ]

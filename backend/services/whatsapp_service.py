@@ -16,6 +16,7 @@ from forensic.media.detector import detect_media_type
 from forensic.media.metadata import extract_media_metadata
 from backend.repositories.whatsapp_repo import WhatsAppRepository
 from backend.models.models import Evidence, WhatsAppMessage, WhatsAppContact, WhatsAppGroup, EvidenceFile, MediaItem
+from backend.services.log_service import get_log_service
 from datetime import datetime
 
 
@@ -41,43 +42,89 @@ class WhatsAppService:
         if not evidence:
             return False
 
-        # Check if evidence has extracted path (for ZIP files)
-        if not evidence.extracted_path:
-            # For non-ZIP evidence, check if the storage file itself is a WhatsApp DB
-            db_path = Path(evidence.storage_path)
-        else:
-            # For ZIP evidence, we need to find WhatsApp database in extracted files
-            # For now, we'll look for any .db files in the extracted path
-            # In a more sophisticated implementation, we'd scan for WhatsApp-specific files
-            db_path = None
-            extracted_dir = Path(evidence.extracted_path)
-            if extracted_dir.exists():
-                # Look for WhatsApp database files
-                for db_file in extracted_dir.rglob("*.db"):
-                    if is_whatsapp_database(db_file):
-                        db_path = db_file
-                        break
-                # If no specific WhatsApp DB found, try the first .db file
-                if not db_path:
-                    db_files = list(extracted_dir.rglob("*.db"))
-                    if db_files:
-                        db_path = db_files[0]
+        # Get log service
+        log_service = get_log_service(db)
 
-        if not db_path or not db_path.exists():
+        # Log analysis start
+        log_service.log_analysis(
+            evidence_id=evidence_id,
+            log_type="whatsapp_analysis_start",
+            message="Starting WhatsApp analysis",
+            details={"evidence_id": evidence_id}
+        )
+
+        try:
+            # Check if evidence has extracted path (for ZIP files)
+            if not evidence.extracted_path:
+                # For non-ZIP evidence, check if the storage file itself is a WhatsApp DB
+                db_path = Path(evidence.storage_path)
+            else:
+                # For ZIP evidence, we need to find WhatsApp database in extracted files
+                # For now, we'll look for any .db files in the extracted path
+                # In a more sophisticated implementation, we'd scan for WhatsApp-specific files
+                db_path = None
+                extracted_dir = Path(evidence.extracted_path)
+                if extracted_dir.exists():
+                    # Look for WhatsApp database files
+                    for db_file in extracted_dir.rglob("*.db"):
+                        if is_whatsapp_database(db_file):
+                            db_path = db_file
+                            break
+                    # If no specific WhatsApp DB found, try the first .db file
+                    if not db_path:
+                        db_files = list(extracted_dir.rglob("*.db"))
+                        if db_files:
+                            db_path = db_files[0]
+
+            if not db_path or not db_path.exists():
+                # Log analysis failure
+                log_service.log_analysis(
+                    evidence_id=evidence_id,
+                    log_type="whatsapp_analysis_failed",
+                    message="WhatsApp analysis failed: No database file found",
+                    details={"evidence_id": evidence_id, "reason": "no_db_file"}
+                )
+                return False
+
+            # Verify it's a WhatsApp database
+            if not is_whatsapp_database(db_path):
+                # Log analysis failure
+                log_service.log_analysis(
+                    evidence_id=evidence_id,
+                    log_type="whatsapp_analysis_failed",
+                    message="WhatsApp analysis failed: Not a WhatsApp database",
+                    details={"evidence_id": evidence_id, "reason": "not_whatsapp_db"}
+                )
+                return False
+
+            # Run analysis (for now, we'll run it synchronously)
+            self._perform_analysis(evidence_id, db_path, evidence, db)
+
+            # Update evidence analyzed timestamp
+            evidence.analyzed_at = datetime.utcnow()
+            db.commit()
+
+            # Log analysis success
+            log_service.log_analysis(
+                evidence_id=evidence_id,
+                log_type="whatsapp_analysis_completed",
+                message="WhatsApp analysis completed successfully",
+                details={"evidence_id": evidence_id}
+            )
+
+            return True
+        except Exception as e:
+            # Log error
+            log_service.log_error(
+                error_type="whatsapp_analysis_error",
+                message=f"Error during WhatsApp analysis: {str(e)}",
+                case_id=evidence.case_id if evidence else None,
+                evidence_id=evidence_id,
+                stack_trace=str(e.__traceback__),
+                endpoint="/api/evidence/{evidence_id}/analyze/whatsapp",
+                method="POST"
+            )
             return False
-
-        # Verify it's a WhatsApp database
-        if not is_whatsapp_database(db_path):
-            return False
-
-        # Run analysis (for now, we'll run it synchronously)
-        self._perform_analysis(evidence_id, db_path, evidence, db)
-
-        # Update evidence analyzed timestamp
-        evidence.analyzed_at = datetime.utcnow()
-        db.commit()
-
-        return True
 
     def _perform_analysis(self, evidence_id: int, db_path: Path, evidence: Evidence, db: Session):
         """

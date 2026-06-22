@@ -14,6 +14,7 @@ from backend.utils.hashing import compute_sha256_bytes, compute_sha256
 from backend.utils.file_storage import save_upload, delete_file
 from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
+from backend.services.log_service import get_log_service
 
 router = APIRouter()
 
@@ -82,219 +83,321 @@ def upload_evidence(
     db: Session = Depends(get_db),
 ):
     """Upload evidence file (ZIP or regular) for a case."""
-    # Read file data
-    file_data = file.file.read()
+    try:
+        # Read file data
+        file_data = file.file.read()
 
-    # Compute SHA-256 of the uploaded file
-    sha256 = compute_sha256_bytes(file_data)
+        # Compute SHA-256 of the uploaded file
+        sha256 = compute_sha256_bytes(file_data)
 
-    # Determine if it's a ZIP
-    is_zip = _is_zip_file(file.filename, file.content_type)
+        # Determine if it's a ZIP
+        is_zip = _is_zip_file(file.filename, file.content_type)
 
-    storage_path = None
-    extracted_path = None
-    evidence_type = "zip" if is_zip else "file"
-
-    if is_zip:
-        # Create a subdirectory for extracted files under UPLOADS_DIR
-        # Use a unique directory name based on hash or timestamp
-        import uuid
-        extract_dir_name = f"extract_{uuid.uuid4().hex}"
-        extract_dir = UPLOADS_DIR / extract_dir_name
-        extract_dir.mkdir(parents=True, exist_ok=True)
-
-        # Extract ZIP
-        extracted_files = _extract_zip(file_data, extract_dir)
-        extracted_path = str(extract_dir)
-
-        # Save the ZIP file itself as evidence
-        zip_filename = file.filename or "unnamed.zip"
-        zip_storage_path = save_upload(zip_filename, file_data)
-        storage_path = str(zip_storage_path)
-    else:
-        # Regular file: save directly
-        filename = file.filename or "unnamed"
-        storage_path = save_upload(filename, file_data)
+        storage_path = None
         extracted_path = None
+        evidence_type = "zip" if is_zip else "file"
 
-    # Prepare metadata for evidence (uploaded file)
-    evidence_metadata = {
-        "original_content_type": file.content_type,
-        "upload_size": len(file_data),
-        "is_zip": is_zip,
-    }
+        if is_zip:
+            # Create a subdirectory for extracted files under UPLOADS_DIR
+            # Use a unique directory name based on hash or timestamp
+            import uuid
+            extract_dir_name = f"extract_{uuid.uuid4().hex}"
+            extract_dir = UPLOADS_DIR / extract_dir_name
+            extract_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create evidence record
-    evidence = Evidence(
-        case_id=case_id,
-        original_filename=file.filename or "unnamed",
-        storage_path=storage_path,
-        sha256=sha256,
-        content_type=file.content_type,
-        evidence_type=evidence_type,
-        metadata_=evidence_metadata,
-        extracted_path=extracted_path,
-    )
-    db.add(evidence)
-    db.commit()
-    db.refresh(evidence)
+            # Extract ZIP
+            extracted_files = _extract_zip(file_data, extract_dir)
+            extracted_path = str(extract_dir)
 
-    # If ZIP, create EvidenceFile records for each extracted file
-    if is_zip and extracted_path:
-        extract_dir = Path(extracted_path)
-        for file_info in extracted_files:
-            # Build absolute path to the extracted file
-            abs_path = extract_dir / file_info["relative_path"]
-            # Determine mime type (simple extension mapping)
-            mime_type = None
-            if abs_path.suffix:
-                # Very basic mapping; could be improved
-                ext = abs_path.suffix.lower()
-                if ext in [".jpg", ".jpeg"]:
-                    mime_type = "image/jpeg"
-                elif ext == ".png":
-                    mime_type = "image/png"
-                elif ext == ".gif":
-                    mime_type = "image/gif"
-                elif ext == ".pdf":
-                    mime_type = "application/pdf"
-                elif ext == ".txt":
-                    mime_type = "text/plain"
-                # else leave as None
-            file_metadata = {
-                "size": file_info["size"],
-                "mime_type": mime_type,
-                "extracted_path": str(abs_path),
-            }
-            evidence_file = EvidenceFile(
-                evidence_id=evidence.id,
-                relative_path=file_info["relative_path"],
-                sha256=file_info["sha256"],
-                file_size=file_info["size"],
-                mime_type=mime_type,
-                metadata_=file_metadata,
-                is_media=mime_type and mime_type.startswith("image/") or mime_type and mime_type.startswith("video/"),
-                media_type=(
-                    "image"
-                    if mime_type and mime_type.startswith("image/")
-                    else "video"
-                    if mime_type and mime_type.startswith("video/")
-                    else "audio"
-                    if mime_type and mime_type.startswith("audio/")
-                    else None
-                ),
-            )
-            db.add(evidence_file)
+            # Save the ZIP file itself as evidence
+            zip_filename = file.filename or "unnamed.zip"
+            zip_storage_path = save_upload(zip_filename, file_data)
+            storage_path = str(zip_storage_path)
+        else:
+            # Regular file: save directly
+            filename = file.filename or "unnamed"
+            storage_path = save_upload(filename, file_data)
+            extracted_path = None
+
+        # Prepare metadata for evidence (uploaded file)
+        evidence_metadata = {
+            "original_content_type": file.content_type,
+            "upload_size": len(file_data),
+            "is_zip": is_zip,
+            "original_filename": file.filename or "unnamed"
+        }
+
+        # Create evidence record
+        evidence = Evidence(
+            case_id=case_id,
+            original_filename=file.filename or "unnamed",
+            storage_path=storage_path,
+            sha256=sha256,
+            content_type=file.content_type,
+            evidence_type=evidence_type,
+            metadata_=evidence_metadata,
+            extracted_path=extracted_path,
+        )
+        db.add(evidence)
         db.commit()
+        db.refresh(evidence)
 
-    # Return response
-    return {
-        "id": evidence.id,
-        "filename": evidence.original_filename,
-        "sha256": evidence.sha256,
-        "size": len(file_data),
-        "evidence_type": evidence.evidence_type,
-        "is_zip": is_zip,
-        "extracted_files_count": len(extracted_files) if is_zip else 0,
-    }
+        # If ZIP, create EvidenceFile records for each extracted file
+        if is_zip and extracted_path:
+            extract_dir = Path(extracted_path)
+            for file_info in extracted_files:
+                # Build absolute path to the extracted file
+                abs_path = extract_dir / file_info["relative_path"]
+                # Determine mime type (simple extension mapping)
+                mime_type = None
+                if abs_path.suffix:
+                    # Very basic mapping; could be improved
+                    ext = abs_path.suffix.lower()
+                    if ext in [".jpg", ".jpeg"]:
+                        mime_type = "image/jpeg"
+                    elif ext == ".png":
+                        mime_type = "image/png"
+                    elif ext == ".gif":
+                        mime_type = "image/gif"
+                    elif ext == ".pdf":
+                        mime_type = "application/pdf"
+                    elif ext == ".txt":
+                        mime_type = "text/plain"
+                    # else leave as None
+                file_metadata = {
+                    "size": file_info["size"],
+                    "mime_type": mime_type,
+                    "extracted_path": str(abs_path),
+                }
+                evidence_file = EvidenceFile(
+                    evidence_id=evidence.id,
+                    relative_path=file_info["relative_path"],
+                    sha256=file_info["sha256"],
+                    file_size=file_info["size"],
+                    mime_type=mime_type,
+                    metadata_=file_metadata,
+                    is_media=mime_type and mime_type.startswith("image/") or mime_type and mime_type.startswith("video/"),
+                    media_type=(
+                        "image"
+                        if mime_type and mime_type.startswith("image/")
+                        else "video"
+                        if mime_type and mime_type.startswith("video/")
+                        else "audio"
+                        if mime_type and mime_type.startswith("audio/")
+                        else None
+                    ),
+                )
+                db.add(evidence_file)
+            db.commit()
+
+        # Log activity
+        log_service = get_log_service(db)
+        log_service.log_activity(
+            case_id=case_id,
+            action="upload_evidence",
+            description=f"Evidence uploaded: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)"
+        )
+
+        # Return response
+        return {
+            "id": evidence.id,
+            "filename": evidence.original_filename,
+            "sha256": evidence.sha256,
+            "size": len(file_data),
+            "evidence_type": evidence.evidence_type,
+            "is_zip": is_zip,
+            "extracted_files_count": len(extracted_files) if is_zip else 0,
+        }
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_upload_error",
+            message=f"Error uploading evidence: {str(e)}",
+            case_id=case_id,
+            evidence_id=None,
+            stack_trace=str(e.__traceback__),
+            endpoint="/api/evidence/upload",
+            method="POST"
+        )
+        raise
 
 
 @router.get("/", response_model=List[EvidenceRead])
 def list_evidences(case_id: int, db: Session = Depends(get_db)):
     """List evidences for a specific case."""
-    evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
-    return evidences
+    try:
+        evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+        return evidences
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_list_error",
+            message=f"Error listing evidences: {str(e)}",
+            case_id=case_id,
+            evidence_id=None,
+            stack_trace=str(e.__traceback__),
+            endpoint="/api/evidence",
+            method="GET"
+        )
+        raise
 
 
 @router.get("/{evidence_id}")
 def get_evidence(evidence_id: int, db: Session = Depends(get_db)):
-    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-    if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
-    return evidence
+    try:
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        return evidence
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_retrieval_error",
+            message=f"Error retrieving evidence: {str(e)}",
+            case_id=None,  # We don't have the case_id easily without another query
+            evidence_id=evidence_id,
+            stack_trace=str(e.__traceback__),
+            endpoint=f"/api/evidence/{evidence_id}",
+            method="GET"
+        )
+        raise
 
 
 @router.get("/{evidence_id}/files")
 def list_evidence_files(evidence_id: int, db: Session = Depends(get_db)):
     """List files contained within the evidence (if ZIP)."""
-    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-    if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
-    files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).all()
-    return [
-        {
-            "id": f.id,
-            "relative_path": f.relative_path,
-            "sha256": f.sha256,
-            "size": f.file_size,
-            "mime_type": f.mime_type,
-            "is_media": f.is_media,
-            "media_type": f.media_type,
-            "metadata": f.metadata_,
-        }
-        for f in files
-    ]
+    try:
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).all()
+        return [
+            {
+                "id": f.id,
+                "relative_path": f.relative_path,
+                "sha256": f.sha256,
+                "size": f.file_size,
+                "mime_type": f.mime_type,
+                "is_media": f.is_media,
+                "media_type": f.media_type,
+                "metadata": f.metadata_,
+            }
+            for f in files
+        ]
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_files_list_error",
+            message=f"Error listing evidence files: {str(e)}",
+            case_id=None,
+            evidence_id=evidence_id,
+            stack_trace=str(e.__traceback__),
+            endpoint=f"/api/evidence/{evidence_id}/files",
+            method="GET"
+        )
+        raise
 
 
 @router.get("/{evidence_id}/files/{file_id}")
 def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_db)):
     """Download a specific file from the evidence inventory."""
-    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-    if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
-    evidence_file = (
-        db.query(EvidenceFile)
-        .filter(EvidenceFile.id == file_id, EvidenceFile.evidence_id == evidence_id)
-        .first()
-    )
-    if not evidence_file:
-        raise HTTPException(status_code=404, detail="File not found in evidence")
-    # Build absolute path to the stored file
-    if evidence.evidence_type == "zip" and evidence.extracted_path:
-        base_path = Path(evidence.extracted_path)
-    else:
-        # For non-ZIP, the file is the evidence itself? We'll treat the evidence file as the only file.
-        # But EvidenceFile may not exist for non-ZIP; we'll handle by serving the evidence storage.
-        # For simplicity, if evidence_type is file, we return the evidence storage.
-        if evidence_file:
-            # This case shouldn't happen, but if it does, use evidence storage
-            base_path = Path(evidence.storage_path)
-            relative_path = Path(evidence_file.relative_path)
+    try:
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        evidence_file = (
+            db.query(EvidenceFile)
+            .filter(EvidenceFile.id == file_id, EvidenceFile.evidence_id == evidence_id)
+            .first()
+        )
+        if not evidence_file:
+            raise HTTPException(status_code=404, detail="File not found in evidence")
+        # Build absolute path to the stored file
+        if evidence.evidence_type == "zip" and evidence.extracted_path:
+            base_path = Path(evidence.extracted_path)
         else:
-            # No EvidenceFile record, treat the whole evidence as the file
-            base_path = Path(evidence.storage_path)
-            relative_path = Path(evidence.original_filename)
-    file_path = base_path / relative_path
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Stored file not found")
-    # Return file as streaming response
-    from fastapi.responses import FileResponse
+            # For non-ZIP, the file is the evidence itself? We'll treat the evidence file as the only file.
+            # But EvidenceFile may not exist for non-ZIP; we'll handle by serving the evidence storage.
+            # For simplicity, if evidence_type is file, we return the evidence storage.
+            if evidence_file:
+                # This case shouldn't happen, but if it does, use evidence storage
+                base_path = Path(evidence.storage_path)
+                relative_path = Path(evidence_file.relative_path)
+            else:
+                # No EvidenceFile record, treat the whole evidence as the file
+                base_path = Path(evidence.storage_path)
+                relative_path = Path(evidence.original_filename)
+        file_path = base_path / relative_path
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Stored file not found")
+        # Return file as streaming response
+        from fastapi.responses import FileResponse
 
-    return FileResponse(
-        path=file_path,
-        filename=evidence_file.original_filename if hasattr(evidence_file, "original_filename") else evidence.original_filename,
-        media_type=evidence_file.mime_type or "application/octet-stream",
-    )
+        return FileResponse(
+            path=file_path,
+            filename=evidence_file.original_filename if hasattr(evidence_file, "original_filename") else evidence.original_filename,
+            media_type=evidence_file.mime_type or "application/octet-stream",
+        )
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_file_retrieval_error",
+            message=f"Error retrieving evidence file: {str(e)}",
+            case_id=None,
+            evidence_id=evidence_id,
+            stack_trace=str(e.__traceback__),
+            endpoint=f"/api/evidence/{evidence_id}/files/{file_id}",
+            method="GET"
+        )
+        raise
 
 
 @router.delete("/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     """Delete evidence and its associated files."""
-    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-    if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
-    # Delete storage files
-    if evidence.storage_path:
-        try:
-            delete_file(Path(evidence.storage_path))
-        except Exception:
-            pass  # Best effort
-    if evidence.evidence_type == "zip" and evidence.extracted_path:
-        try:
-            delete_file(Path(evidence.extracted_path))
-        except Exception:
-            pass
-    # Delete database records (cascade will delete EvidenceFile and AnalysisResult)
-    db.delete(evidence)
-    db.commit()
-    return None
+    try:
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+
+        # Log activity before deletion
+        log_service = get_log_service(db)
+        log_service.log_activity(
+            case_id=evidence.case_id,
+            action="delete_evidence",
+            description=f"Evidence deleted: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)"
+        )
+
+        # Delete storage files
+        if evidence.storage_path:
+            try:
+                delete_file(Path(evidence.storage_path))
+            except Exception:
+                pass  # Best effort
+        if evidence.evidence_type == "zip" and evidence.extracted_path:
+            try:
+                delete_file(Path(evidence.extracted_path))
+            except Exception:
+                pass
+        # Delete database records (cascade will delete EvidenceFile and AnalysisResult)
+        db.delete(evidence)
+        db.commit()
+        return None
+    except Exception as e:
+        # Log error
+        log_service = get_log_service(db)
+        log_service.log_error(
+            error_type="evidence_deletion_error",
+            message=f"Error deleting evidence: {str(e)}",
+            case_id=evidence.case_id if evidence else None,
+            evidence_id=evidence_id,
+            stack_trace=str(e.__traceback__),
+            endpoint=f"/api/evidence/{evidence_id}",
+            method="DELETE"
+        )
+        raise

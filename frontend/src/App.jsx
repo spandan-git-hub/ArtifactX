@@ -4,6 +4,7 @@ import CaseDetailPage from './pages/CaseDetailPage';
 import SearchPage from './pages/SearchPage';
 import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
+import LogsPage from './pages/LogsPage';
 import CaseForm from './components/cases/CaseForm';
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <Route path="/cases/:caseId/search" element={<SearchPage />} />
         <Route path="/cases/:caseId/dashboard" element={<DashboardPage />} />
         <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
+        <Route path="/cases/:caseId/logs" element={<LogsPage />} />
       </Routes>
     </div>
   );

@@ -265,3 +265,22 @@ class ActivityLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     case = relationship("Case", back_populates="activity_logs")
+
+
+class ErrorLog(Base):
+    """Error/exception logs for audit trail."""
+
+    __tablename__ = "error_logs"
+
+    id = Column(Integer, primary_key=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=True)
+    error_type = Column(String(255))
+    message = Column(Text)
+    stack_trace = Column(Text)
+    endpoint = Column(String(512))
+    method = Column(String(10))
+    client_ip = Column(String(50))
+    user_agent = Column(String(512))
+    metadata_ = Column("metadata_", JSON, default=dict)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)

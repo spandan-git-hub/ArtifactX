@@ -21,6 +21,7 @@ from forensic.correlation.matcher import (
     TelegramContact,
     MediaItem,
 )
+from backend.services.log_service import get_log_service
 
 
 class CorrelationService:
@@ -43,110 +44,140 @@ class CorrelationService:
         Returns:
             Number of correlation edges created.
         """
-        # Delete existing correlation edges for this case
-        self.correlation_repo.delete_edges_by_case_id(db, case_id)
+        # Get log service
+        log_service = get_log_service(db)
 
-        # Get all evidences for the case
-        evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
-        if not evidences:
-            return 0
-
-        # Collect data from all evidences
-        all_wa_messages: List[WhatsAppMessage] = []
-        all_wa_contacts: List[WhatsAppContact] = []
-        all_tg_messages: List[TelegramMessage] = []
-        all_tg_contacts: List[TelegramContact] = []
-        all_media_items: List[MediaItem] = []
-
-        for evidence in evidences:
-            # WhatsApp data
-            wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence.id)
-            wa_contacts = self.whatsapp_repo.get_contacts_by_evidence_id(db, evidence.id)
-            # Convert ORM objects to forensic dataclasses
-            for msg in wa_messages:
-                all_wa_messages.append(WhatsAppMessage(
-                    evidence_id=msg.evidence_id,
-                    message_id=msg.message_id,
-                    key_remote_jid=msg.key_remote_jid,
-                    sender_jid=msg.sender_jid,
-                    participant_jid=msg.participant_jid,
-                    body=msg.body,
-                    timestamp=msg.timestamp,
-                    media_type=msg.media_type,
-                    media_path=msg.media_path,
-                    message_type=msg.message_type,
-                    status=msg.status,
-                ))
-            for contact in wa_contacts:
-                all_wa_contacts.append(WhatsAppContact(
-                    evidence_id=contact.evidence_id,
-                    jid=contact.jid,
-                    display_name=contact.display_name,
-                    phone_number=contact.phone_number,
-                    status=contact.status,
-                ))
-
-            # Telegram data
-            tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence.id)
-            tg_contacts = self.telegram_repo.get_contacts_by_evidence_id(db, evidence.id)
-            for msg in tg_messages:
-                all_tg_messages.append(TelegramMessage(
-                    evidence_id=msg.evidence_id,
-                    message_id=msg.message_id,
-                    dialog_id=msg.dialog_id,
-                    sender_id=msg.sender_id,
-                    body=msg.body,
-                    timestamp=msg.timestamp,
-                    media_type=msg.media_type,
-                    media_path=msg.media_path,
-                    message_type=msg.message_type,
-                ))
-            for contact in tg_contacts:
-                all_tg_contacts.append(TelegramContact(
-                    evidence_id=contact.evidence_id,
-                    user_id=contact.user_id,
-                    first_name=contact.first_name,
-                    last_name=contact.last_name,
-                    username=contact.username,
-                    phone=contact.phone,
-                ))
-
-            # Media items
-            media_items = self.media_repo.get_media_items_by_evidence_id(db, evidence.id)
-            for media in media_items:
-                all_media_items.append(MediaItem(
-                    evidence_id=media.evidence_id,
-                    file_path=media.file_path,
-                    sha256=media.sha256,
-                    mime_type=media.mime_type,
-                    media_type=media.media_type,
-                    file_size=media.file_size,
-                    width=media.width,
-                    height=media.height,
-                    duration=media.duration,
-                    exif_data=media.exif_data or {},
-                    is_orphan=media.is_orphan,
-                    linked_message_id=media.linked_message_id,
-                ))
-
-        # Run correlation
-        print(f"DEBUG: all_wa_messages={len(all_wa_messages)}, all_wa_contacts={len(all_wa_contacts)}, all_tg_messages={len(all_tg_messages)}, all_tg_contacts={len(all_tg_contacts)}, all_media_items={len(all_media_items)}")
-        edges = correlate_all(
-            all_wa_messages,
-            all_wa_contacts,
-            all_tg_messages,
-            all_tg_contacts,
-            all_media_items,
+        # Log analysis start
+        log_service.log_analysis(
+            evidence_id=0,  # Case-level analysis
+            log_type="correlation_start",
+            message="Starting correlation for case",
+            details={"case_id": case_id}
         )
-        print(f"DEBUG: correlate_all returned {len(edges)} edges")
 
-        # Add case_id to each edge and save
-        for edge in edges:
-            edge["case_id"] = case_id
+        try:
+            # Delete existing correlation edges for this case
+            self.correlation_repo.delete_edges_by_case_id(db, case_id)
 
-        self.correlation_repo.save_edges(db, edges)
+            # Get all evidences for the case
+            evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+            if not evidences:
+                return 0
 
-        return len(edges)
+            # Collect data from all evidences
+            all_wa_messages: List[WhatsAppMessage] = []
+            all_wa_contacts: List[WhatsAppContact] = []
+            all_tg_messages: List[TelegramMessage] = []
+            all_tg_contacts: List[TelegramContact] = []
+            all_media_items: List[MediaItem] = []
+
+            for evidence in evidences:
+                # WhatsApp data
+                wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence.id)
+                wa_contacts = self.whatsapp_repo.get_contacts_by_evidence_id(db, evidence.id)
+                # Convert ORM objects to forensic dataclasses
+                for msg in wa_messages:
+                    all_wa_messages.append(WhatsAppMessage(
+                        evidence_id=msg.evidence_id,
+                        message_id=msg.message_id,
+                        key_remote_jid=msg.key_remote_jid,
+                        sender_jid=msg.sender_jid,
+                        participant_jid=msg.participant_jid,
+                        body=msg.body,
+                        timestamp=msg.timestamp,
+                        media_type=msg.media_type,
+                        media_path=msg.media_path,
+                        message_type=msg.message_type,
+                        status=msg.status,
+                    ))
+                for contact in wa_contacts:
+                    all_wa_contacts.append(WhatsAppContact(
+                        evidence_id=contact.evidence_id,
+                        jid=contact.jid,
+                        display_name=contact.display_name,
+                        phone_number=contact.phone_number,
+                        status=contact.status,
+                    ))
+
+                # Telegram data
+                tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence.id)
+                tg_contacts = self.telegram_repo.get_contacts_by_evidence_id(db, evidence.id)
+                for msg in tg_messages:
+                    all_tg_messages.append(TelegramMessage(
+                        evidence_id=msg.evidence_id,
+                        message_id=msg.message_id,
+                        dialog_id=msg.dialog_id,
+                        sender_id=msg.sender_id,
+                        body=msg.body,
+                        timestamp=msg.timestamp,
+                        media_type=msg.media_type,
+                        media_path=msg.media_path,
+                        message_type=msg.message_type,
+                    ))
+                for contact in tg_contacts:
+                    all_tg_contacts.append(TelegramContact(
+                        evidence_id=contact.evidence_id,
+                        user_id=contact.user_id,
+                        first_name=contact.first_name,
+                        last_name=contact.last_name,
+                        username=contact.username,
+                        phone=contact.phone,
+                    ))
+
+                # Media items
+                media_items = self.media_repo.get_media_items_by_evidence_id(db, evidence.id)
+                for media in media_items:
+                    all_media_items.append(MediaItem(
+                        evidence_id=media.evidence_id,
+                        file_path=media.file_path,
+                        sha256=media.sha256,
+                        mime_type=media.mime_type,
+                        media_type=media.media_type,
+                        file_size=media.file_size,
+                        width=media.width,
+                        height=media.height,
+                        duration=media.duration,
+                        exif_data=media.exif_data or {},
+                        is_orphan=media.is_orphan,
+                        linked_message_id=media.linked_message_id,
+                    ))
+
+            # Run correlation
+            edges = correlate_all(
+                all_wa_messages,
+                all_wa_contacts,
+                all_tg_messages,
+                all_tg_contacts,
+                all_media_items,
+            )
+
+            # Add case_id to each edge and save
+            for edge in edges:
+                edge["case_id"] = case_id
+
+            self.correlation_repo.save_edges(db, edges)
+
+            # Log analysis success
+            log_service.log_analysis(
+                evidence_id=0,
+                log_type="correlation_completed",
+                message="Correlation completed successfully",
+                details={"case_id": case_id, "edges_created": len(edges)}
+            )
+
+            return len(edges)
+        except Exception as e:
+            # Log error
+            log_service.log_error(
+                error_type="correlation_error",
+                message=f"Error during correlation: {str(e)}",
+                case_id=case_id,
+                evidence_id=None,
+                stack_trace=str(e.__traceback__),
+                endpoint="/api/cases/{case_id}/correlate",
+                method="POST"
+            )
+            return 0
 
     def get_edges_for_case(self, db: Session, case_id: int) -> List[dict]:
         """Get correlation edges for a case as dictionaries."""
