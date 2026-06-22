@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import CaseListPage from './pages/CaseListPage';
 import CaseDetailPage from './pages/CaseDetailPage';
+import SearchPage from './pages/SearchPage';
 import CaseForm from './components/cases/CaseForm';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
         <Route path="/cases/create" element={<CaseForm />} />
         <Route path="/cases/:id" element={<CaseDetailPage />} />
         <Route path="/cases/:id/edit" element={<CaseForm />} />
+        <Route path="/cases/:caseId/search" element={<SearchPage />} />
       </Routes>
     </div>
   );

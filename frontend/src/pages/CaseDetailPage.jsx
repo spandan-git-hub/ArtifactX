@@ -4,6 +4,7 @@ import { caseService } from '../services/caseService';
 import EvidenceUploader from '../components/evidence/EvidenceUploader';
 import EvidenceInventory from '../components/evidence/EvidenceInventory';
 import WhatsAppAnalysis from '../components/whatsapp/WhatsAppAnalysis';
+import { Search } from 'lucide-react';
 
 const CaseDetailPage = () => {
   const { id } = useParams();
@@ -93,6 +94,13 @@ const CaseDetailPage = () => {
 
       <Link to="/cases" className="mt-6 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
         Back to Cases List
+      </Link>
+      <Link
+        to={`/cases/${caseData.id}/search`}
+        className="mt-6 ml-3 inline-block bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+      >
+        <Search className="inline h-4 w-4 mr-1" />
+        Search
       </Link>
     </div>
   );

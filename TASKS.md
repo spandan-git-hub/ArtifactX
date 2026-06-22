@@ -67,11 +67,11 @@
 
 ## Search
 
-- [ ] Message Search
-- [ ] Contact Search
-- [ ] Media Search
-- [ ] Date Filter
-- [ ] App Filter
+- [x] Message Search
+- [x] Contact Search
+- [x] Media Search
+- [x] Date Filter
+- [x] App Filter
 
 ## Dashboard
 

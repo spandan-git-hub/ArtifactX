@@ -15,7 +15,7 @@
 | 6 | Deleted Message Detection | Complete | Complete | |
 | 7 | Media Analysis | Complete | Complete | Media analysis service, detectors, and orphan detection implemented |
 | 8 | Evidence Correlation | Complete | Complete | All correlation features implemented and tested |
-| 9 | Search & Filtering | Not Started | Not Started | |
+| 9 | Search & Filtering | Complete | Complete | Message, contact, media search with filters |
 | 10 | Dashboard | Not Started | Not Started | |
 | 11 | Reporting | Not Started | Not Started | |
 | 12 | Logging & Audit | Not Started | Not Started | |
@@ -79,11 +79,11 @@
 - [x] Evidence Graph
 
 ## Search
-- [ ] Message Search
-- [ ] Contact Search
-- [ ] Media Search
-- [ ] Date Filter
-- [ ] App Filter
+- [x] Message Search
+- [x] Contact Search
+- [x] Media Search
+- [x] Date Filter
+- [x] App Filter
 
 ## Dashboard
 - [ ] Case Overview

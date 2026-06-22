@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.config import settings
 from backend.app.database import Base, engine
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(timeline.router, prefix="/api/timeline", tags=["timeline"])
 app.include_router(deleted.router, prefix="/api/deleted", tags=["deleted"])
 app.include_router(media.router, prefix="/api/media", tags=["media"])
 app.include_router(correlation.router, prefix="/api/correlation", tags=["correlation"])
+app.include_router(search.router, prefix="/api", tags=["search"])
 
 
 @app.get("/api/health")
