@@ -4,7 +4,7 @@ import { caseService } from '../services/caseService';
 import EvidenceUploader from '../components/evidence/EvidenceUploader';
 import EvidenceInventory from '../components/evidence/EvidenceInventory';
 import WhatsAppAnalysis from '../components/whatsapp/WhatsAppAnalysis';
-import { Search, LayoutDashboard } from 'lucide-react';
+import { Search, LayoutDashboard, FileText } from 'lucide-react';
 
 const CaseDetailPage = () => {
   const { id } = useParams();
@@ -108,6 +108,13 @@ const CaseDetailPage = () => {
       >
         <Search className="inline h-4 w-4 mr-1" />
         Search
+      </Link>
+      <Link
+        to={`/cases/${caseData.id}/reports`}
+        className="mt-6 ml-3 inline-block bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+      >
+        <FileText className="inline h-4 w-4 mr-1" />
+        Reports
       </Link>
     </div>
   );

@@ -17,7 +17,7 @@
 | 8 | Evidence Correlation | Complete | Complete | All correlation features implemented and tested |
 | 9 | Search & Filtering | Complete | Complete | Message, contact, media search with filters |
 | 10 | Dashboard | Complete | Complete | Stats, overview, recent events, correlation summary |
-| 11 | Reporting | Not Started | Not Started | |
+| 11 | Reporting | Complete | Complete | PDF generation, evidence/timeline/deleted summaries |
 | 12 | Logging & Audit | Not Started | Not Started | |
 
 ## Task Completion Tracker
@@ -92,10 +92,10 @@
 - [x] Evidence Graph View
 
 ## Reporting
-- [ ] PDF Reports
-- [ ] Evidence Summary
-- [ ] Timeline Summary
-- [ ] Deleted Message Summary
+- [x] PDF Reports
+- [x] Evidence Summary
+- [x] Timeline Summary
+- [x] Deleted Message Summary
 
 ## Logging
 - [ ] Analysis Logs

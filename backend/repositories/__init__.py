@@ -8,6 +8,7 @@ from backend.repositories.media_repo import MediaRepository
 from backend.repositories.correlation_repo import CorrelationRepository
 from backend.repositories.search_repo import SearchRepository
 from backend.repositories.dashboard_repo import DashboardRepository
+from backend.repositories.report_repo import ReportRepository
 
 __all__ = [
     "WhatsAppRepository",
@@ -18,4 +19,5 @@ __all__ = [
     "CorrelationRepository",
     "SearchRepository",
     "DashboardRepository",
+    "ReportRepository",
 ]

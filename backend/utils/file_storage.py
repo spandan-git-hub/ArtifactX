@@ -21,3 +21,9 @@ def delete_file(filepath: Path) -> None:
             shutil.rmtree(filepath)
         else:
             filepath.unlink()
+
+
+def ensure_directory(path: str) -> None:
+    """Ensure a directory exists, creating it if necessary."""
+    import os
+    os.makedirs(path, exist_ok=True)

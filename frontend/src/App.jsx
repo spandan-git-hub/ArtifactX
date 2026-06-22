@@ -3,6 +3,7 @@ import CaseListPage from './pages/CaseListPage';
 import CaseDetailPage from './pages/CaseDetailPage';
 import SearchPage from './pages/SearchPage';
 import DashboardPage from './pages/DashboardPage';
+import ReportsPage from './pages/ReportsPage';
 import CaseForm from './components/cases/CaseForm';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
         <Route path="/cases/:id/edit" element={<CaseForm />} />
         <Route path="/cases/:caseId/search" element={<SearchPage />} />
         <Route path="/cases/:caseId/dashboard" element={<DashboardPage />} />
+        <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
       </Routes>
     </div>
   );

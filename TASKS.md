@@ -82,10 +82,10 @@
 
 ## Reporting
 
-- [ ] PDF Reports
-- [ ] Evidence Summary
-- [ ] Timeline Summary
-- [ ] Deleted Message Summary
+- [x] PDF Reports
+- [x] Evidence Summary
+- [x] Timeline Summary
+- [x] Deleted Message Summary
 
 ## Logging
 
