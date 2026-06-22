@@ -60,11 +60,10 @@
 
 ## Evidence Correlation
 
-- [ ] Message Contact Correlation
-- [ ] Message Media Correlation
-- [ ]dlar Correlation
-- [ ] Cross App Correlation
-- [ ] Evidence Graph
+- [x] Message Contact Correlation
+- [x] Message Media Correlation
+- [x] Cross App Correlation
+- [x] Evidence Graph
 
 ## Search
 

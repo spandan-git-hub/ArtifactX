@@ -1,151 +1,122 @@
 """Service tests for correlation service."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from backend.services.correlation_service import correlation_service
-from forensic.correlation.matcher import (
-    WhatsAppMessage,
-    WhatsAppContact,
-    TelegramMessage,
-    TelegramContact,
-    MediaItem,
-)
+from backend.services.correlation_service import CorrelationService
 
 
 def test_correlation_service_init():
     """Test CorrelationService initialization."""
-    service = correlation_service
+    service = CorrelationService()
     assert service.correlation_repo is not None
     assert service.whatsapp_repo is not None
     assert service.telegram_repo is not None
     assert service.media_repo is not None
 
 
+class MockModel:
+    """Helper to create model-like mocks with specified attributes."""
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 def test_correlate_case_success():
     """Test successful correlation for a case."""
-    service = correlation_service
+    service = CorrelationService()
 
-    # Mock database session
+    # Mock database session - evidence query chain
+    mock_evidences = MagicMock()
+    mock_evidences.all.return_value = [
+        MockModel(id=1, case_id=1),
+    ]
+    mock_evidences.filter.return_value = mock_evidences
     mock_db = MagicMock()
+    mock_db.query.return_value = mock_evidences
 
-    # Mock case existence
-    mock_case = MagicMock()
-    mock_case.id = 1
-    mock_db.query.return_value.filter.return_value.first.return_value = mock_case
+    # Mock WhatsApp messages
+    wa_msg1 = MockModel(
+        evidence_id=1,
+        message_id="wa_msg_1",
+        key_remote_jid="user1@example.com",
+        sender_jid="user1@example.com",
+        participant_jid="",
+        body="Hello from WA",
+        timestamp=1000,
+        media_type=None,
+        media_path=None,
+        message_type="text",
+        status="read",
+    )
 
-    # Mock evidences for the case
-    mock_evidence1 = MagicMock()
-    mock_evidence1.id = 1
-    mock_evidence1.case_id = 1
-    mock_evidence2 = MagicMock()
-    mock_evidence2.id = 2
-    mock_evidence2.case_id = 1
+    # Mock WhatsApp contacts
+    wa_contact1 = MockModel(
+        evidence_id=1,
+        jid="user1@example.com",
+        display_name="User One",
+        phone_number="11111111111",
+        status="active",
+    )
 
-    # We need to mock the chain: db.query(Evidence).filter(Evidence.case_id == case_id).all()
-    # We'll set up the mock for the query to return a mock that when filtered returns a mock that when all() returns the list.
-    mock_query = MagicMock()
-    mock_filter = MagicMock()
-    mock_query.filter.return_value = mock_filter
-    mock_filter.all.return_value = [mock_evidence1, mock_evidence2]
-    mock_db.query.return_value = mock_query
+    # Mock Telegram messages
+    tg_msg1 = MockModel(
+        evidence_id=1,
+        message_id=200,
+        dialog_id="dialog1",
+        sender_id=22222,
+        body="Hello from TG",
+        timestamp=2000,
+        media_type=None,
+        media_path=None,
+        message_type="text",
+    )
 
-    # Mock WhatsApp repositories
-    with patch.object(service.whatsapp_repo, 'get_messages_by_evidence_id') as mock_wa_msgs, \
-         patch.object(service.whatsapp_repo, 'get_contacts_by_evidence_id') as mock_wa_contacts:
+    # Mock Telegram contacts
+    tg_contact1 = MockModel(
+        evidence_id=1,
+        user_id=22222,
+        first_name="User",
+        last_name="Two",
+        username="usertwo",
+        phone="11111111111",
+    )
 
-        # WhatsApp evidence 1
-        mock_wa_msgs.side_effect = lambda evidence_id: [
-            WhatsAppMessage(
-                evidence_id=evidence_id,
-                message_id=f"wa_msg{evidence_id}",
-                key_remote_jid=f"user{evidence_id}@example.com",
-                sender_jid=f"user{evidence_id}@example.com",
-                participant_jid=f"user{evidence_id+1}@example.com",
-                body="Hello",
-                timestamp=1000 * evidence_id,
-                media_type="image" if evidence_id == 1 else None,
-                media_path=f"/path/to/media/image{evidence_id}.jpg" if evidence_id == 1 else None,
-                message_type="image" if evidence_id == 1 else None,
-                status="read",
-            )
-        ] if evidence_id in [1, 2] else []
+    # Mock media items
+    media1 = MockModel(
+        evidence_id=1,
+        file_path="/path/to/image.jpg",
+        sha256="sha256abc",
+        mime_type="image/jpeg",
+        media_type="image",
+        file_size=1024,
+        width=800,
+        height=600,
+        duration=None,
+        exif_data={},
+        is_orphan=False,
+        linked_message_id=None,
+    )
 
-        mock_wa_contacts.side_effect = lambda evidence_id: [
-            WhatsAppContact(
-                evidence_id=evidence_id,
-                jid=f"user{evidence_id}@example.com",
-                display_name=f"User {evidence_id}",
-                phone_number=f"{evidence_id}111111111",
-                status="active",
-            ),
-            WhatsAppContact(
-                evidence_id=evidence_id,
-                jid=f"user{evidence_id+1}@example.com",
-                display_name=f"User {evidence_id+1}",
-                phone_number=f"{evidence_id+1}111111111",
-                status="active",
-            )
-        ] if evidence_id in [1, 2] else []
+    # Set up all patches to be active at the same time
+    with (patch.object(service.whatsapp_repo, 'get_messages_by_evidence_id') as mock_wa_msgs,
+         patch.object(service.whatsapp_repo, 'get_contacts_by_evidence_id') as mock_wa_contacts,
+         patch.object(service.telegram_repo, 'get_messages_by_evidence_id') as mock_tg_msgs,
+         patch.object(service.telegram_repo, 'get_contacts_by_evidence_id') as mock_tg_contacts,
+         patch.object(service.media_repo, 'get_media_items_by_evidence_id') as mock_media,
+         patch.object(service.correlation_repo, 'save_edges') as mock_save_edges,
+         patch.object(service.correlation_repo, 'delete_edges_by_case_id') as mock_delete_edges):
 
-    # Mock Telegram repositories
-    with patch.object(service.telegram_repo, 'get_messages_by_evidence_id') as mock_tg_msgs, \
-         patch.object(service.telegram_repo, 'get_contacts_by_evidence_id') as mock_tg_contacts:
-
-        mock_tg_msgs.side_effect = lambda evidence_id: [
-            TelegramMessage(
-                evidence_id=evidence_id,
-                message_id=evidence_id * 100,
-                dialog_id=f"dialog{evidence_id}",
-                sender_id=evidence_id * 11111,
-                body="Hi",
-                timestamp=2000 * evidence_id,
-                media_type=None,
-                media_path=None,
-                message_type=None,
-            )
-        ] if evidence_id in [1, 2] else []
-
-        mock_tg_contacts.side_effect = lambda evidence_id: [
-            TelegramContact(
-                evidence_id=evidence_id,
-                user_id=evidence_id * 11111,
-                first_name="Telegram",
-                last_name=f"User{evidence_id}",
-                username=f"tguser{evidence_id}",
-                phone=f"{evidence_id}111111111",  # Same as WhatsApp user
-            )
-        ] if evidence_id in [1, 2] else []
-
-    # Mock Media repository
-    with patch.object(service.media_repo, 'get_media_items_by_evidence_id') as mock_media:
-
-        mock_media.side_effect = lambda evidence_id: [
-            MediaItem(
-                evidence_id=evidence_id,
-                file_path=f"/path/to/media/image{evidence_id}.jpg",
-                sha256=f"sha{evidence_id}",
-                mime_type="image/jpeg",
-                media_type="image",
-                file_size=1000,
-                width=800,
-                height=600,
-                duration=None,
-                exif_data={},
-                is_orphan=False,
-                linked_message_id=f"wa_msg{evidence_id}",
-            )
-        ] if evidence_id == 1 else []  # Only evidence 1 has media
-
-    # Mock correlation repository
-    with patch.object(service.correlation_repo, 'save_edges') as mock_save_edges, \
-         patch.object(service.correlation_repo, 'delete_edges_by_case_id') as mock_delete_edges:
+        mock_wa_msgs.return_value = [wa_msg1]
+        mock_wa_contacts.return_value = [wa_contact1]
+        mock_tg_msgs.return_value = [tg_msg1]
+        mock_tg_contacts.return_value = [tg_contact1]
+        mock_media.return_value = [media1]
 
         # Call the method
         edge_count = service.correlate_case(mock_db, 1)
 
         # Verify
-        assert edge_count > 0  # We expect some edges to be created
+        assert edge_count > 0  # Edges should be created
         mock_delete_edges.assert_called_once_with(mock_db, 1)
         mock_save_edges.assert_called_once()
 
@@ -156,35 +127,62 @@ def test_correlate_case_success():
             assert edge["case_id"] == 1
 
 
-def test_correlate_case_no_case():
-    """Test correlation when case does not exist."""
-    service = correlation_service
+def test_correlate_case_no_evidence():
+    """Test correlation when case has no evidence."""
+    service = CorrelationService()
 
     # Mock database session
     mock_db = MagicMock()
-    mock_db.query.return_value.filter.return_value.first.return_value = None
 
-    # Call the method
-    edge_count = service.correlate_case(mock_db, 999)
+    # Mock query chain: db.query(Evidence).filter(...).all() returns []
+    mock_evidences = MagicMock()
+    mock_evidences.all.return_value = []
+    mock_evidences.filter.return_value = mock_evidences
+    mock_db.query.return_value = mock_evidences
 
-    # Verify
-    assert edge_count == 0
-    # No correlation edges should be deleted or saved
-    service.correlation_repo.delete_edges_by_case_id.assert_not_called()
-    service.correlation_repo.save_edges.assert_not_called()
+    with patch.object(service.correlation_repo, 'delete_edges_by_case_id') as mock_delete_edges:
+        # Call the method
+        edge_count = service.correlate_case(mock_db, 1)
+
+        # Verify
+        assert edge_count == 0
+        mock_delete_edges.assert_called_once_with(mock_db, 1)
+
+
+def test_correlate_case_empty_data():
+    """Test correlation when evidence has no data."""
+    service = CorrelationService()
+
+    # Mock database session
+    mock_db = MagicMock()
+    mock_evidences = MagicMock()
+    mock_evidences.all.return_value = [MockModel(id=1, case_id=1)]
+    mock_evidences.filter.return_value = mock_evidences
+    mock_db.query.return_value = mock_evidences
+
+    # All repos return empty lists
+    with patch.object(service.whatsapp_repo, 'get_messages_by_evidence_id', return_value=[]), \
+         patch.object(service.whatsapp_repo, 'get_contacts_by_evidence_id', return_value=[]), \
+         patch.object(service.telegram_repo, 'get_messages_by_evidence_id', return_value=[]), \
+         patch.object(service.telegram_repo, 'get_contacts_by_evidence_id', return_value=[]), \
+         patch.object(service.media_repo, 'get_media_items_by_evidence_id', return_value=[]), \
+         patch.object(service.correlation_repo, 'save_edges') as mock_save_edges, \
+         patch.object(service.correlation_repo, 'delete_edges_by_case_id') as mock_delete_edges:
+
+        edge_count = service.correlate_case(mock_db, 1)
+
+        assert edge_count == 0
+        mock_delete_edges.assert_called_once_with(mock_db, 1)
+        # save_edges takes db as first arg, then edges list
+        mock_save_edges.assert_called_once()
 
 
 def test_get_edges_for_case():
     """Test getting edges for a case."""
-    service = correlation_service
+    service = CorrelationService()
 
     # Mock database session
     mock_db = MagicMock()
-
-    # Mock case existence
-    mock_case = MagicMock()
-    mock_case.id = 1
-    mock_db.query.return_value.filter.return_value.first.return_value = mock_case
 
     # Mock correlation repository
     with patch.object(service.correlation_repo, 'get_edges_by_case_id') as mock_get_edges:
@@ -214,3 +212,14 @@ def test_get_edges_for_case():
         assert edges[0]["target_id"] == "user1@example.com"
         assert edges[0]["relation_type"] == "sent_by"
         mock_get_edges.assert_called_once_with(mock_db, 1)
+
+
+def test_get_edges_for_case_empty():
+    """Test getting edges when no edges exist."""
+    service = CorrelationService()
+    mock_db = MagicMock()
+
+    with patch.object(service.correlation_repo, 'get_edges_by_case_id') as mock_get_edges:
+        mock_get_edges.return_value = []
+        edges = service.get_edges_for_case(mock_db, 1)
+        assert edges == []

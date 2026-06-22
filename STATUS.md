@@ -14,7 +14,7 @@
 | 5 | Timeline Reconstruction | Complete | Complete | |
 | 6 | Deleted Message Detection | Complete | Complete | |
 | 7 | Media Analysis | Complete | Complete | Media analysis service, detectors, and orphan detection implemented |
-| 8 | Evidence Correlation | Not Started | Not Started | |
+| 8 | Evidence Correlation | Complete | Complete | All correlation features implemented and tested |
 | 9 | Search & Filtering | Not Started | Not Started | |
 | 10 | Dashboard | Not Started | Not Started | |
 | 11 | Reporting | Not Started | Not Started | |
@@ -73,11 +73,10 @@
 - [x] Orphan Media Detection
 
 ### Evidence Correlation
-- [ ] Message Contact Correlation
-- [ ] Message Media Correlation
-- [ ]dlar Correlation
-- [ ] Cross App Correlation
-- [ ] Evidence Graph
+- [x] Message Contact Correlation
+- [x] Message Media Correlation
+- [x] Cross App Correlation
+- [x] Evidence Graph
 
 ## Search
 - [ ] Message Search
