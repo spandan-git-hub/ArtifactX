@@ -26,6 +26,18 @@ from backend.schemas.search import (
     AppFilterRequest,
     SearchSummary,
 )
+from backend.schemas.dashboard import (
+    TimelineMiniEvent,
+    AppStats,
+    CaseStats,
+    CorrelationStats,
+    TimelineStats,
+    CaseOverview,
+    ChartData,
+    MessageActivityData,
+    MediaDistributionData,
+    TopContactsData,
+)
 
 __all__ = [
     "CaseCreate",
@@ -62,4 +74,14 @@ __all__ = [
     "DateFilterRequest",
     "AppFilterRequest",
     "SearchSummary",
+    "TimelineMiniEvent",
+    "AppStats",
+    "CaseStats",
+    "CorrelationStats",
+    "TimelineStats",
+    "CaseOverview",
+    "ChartData",
+    "MessageActivityData",
+    "MediaDistributionData",
+    "TopContactsData",
 ]

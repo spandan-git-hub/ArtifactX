@@ -75,10 +75,10 @@
 
 ## Dashboard
 
-- [ ] Case Overview
-- [ ] Statistics
-- [ ] Timeline View
-- [ ] Evidence Graph View
+- [x] Case Overview
+- [x] Statistics
+- [x] Timeline View
+- [x] Evidence Graph View
 
 ## Reporting
 
