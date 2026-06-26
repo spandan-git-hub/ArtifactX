@@ -2,74 +2,66 @@
 
 ## Project Files
 
-Always read the following files before starting work:
+Always read `PLAN.md` before starting work. It contains the complete project documentation including requirements, phases, architecture, and completion status.
 
-* PROJECT_PLAN.md
-* REQUIREMENTS.md
-* PLAN.md
-* STATUS.md
-* TASKS.md
-
-Use these files as the source of truth.
+For skill usage, refer to `SKILLS.md` which catalogs available and recommended skills.
 
 Do not rely on conversation history.
 
 ---
 
-## Required Skills
+## Skills
 
-* fastapi
-* frontend-design
-* vercel-react-best-practices
-* forensic-data-engineer
-* forensic-reporting
-* find-skills
+See `SKILLS.md` for:
+- Installed skills and their purposes
+- How to find new skills
+- When to use each skill
 
-If a required skill is missing:
+Installed skills:
+- `find-skills` — Search for and install new capabilities
+- `frontend-design` — Visual design guidance
+- `vercel-react-best-practices` — React performance optimization
 
-* attempt global installation
-* if installation is not possible, stop and report the missing skill
+If a needed skill is missing:
+
+* search at https://skills.sh/ or run `npx skills find [query]`
+* install via `npx skills add <skill> -g -y`
+* if installation fails, stop and report
 
 ---
 
 ## Technology Stack
 
-Frontend
-
+**Frontend**
 * React
 * JavaScript
 * Tailwind CSS
 
-Backend
-
+**Backend**
 * FastAPI
 * Python
 
-Database
-
+**Database**
 * SQLite
 
 ---
 
 ## Development Rules
 
-* Follow REQUIREMENTS.md exactly.
+* Follow PLAN.md exactly.
 * Do not invent features.
 * Do not remove features.
 * Do not change the technology stack.
 * Generate production-ready code.
-* Generate tests for backend functionality.
 * Fix discovered issues before moving forward.
 
 ---
 
 ## Phase Execution Rules
 
-* Determine the next unfinished phase from PLAN.md.
-* Implement only one phase at a time.
-* Do not start the next phase until the current phase is complete.
-* Update TASKS.md after completed tasks.
-* Update STATUS.md after completed phases.
+* All phases are complete according to PLAN.md
+* Maintain feature parity with existing implementation
+* Refer to PLAN.md for architecture and module design
 
 ---
 
@@ -77,17 +69,13 @@ Database
 
 When asked to review:
 
-* Verify requirements implementation.
-* Verify tests exist.
-* Verify tests pass.
-* Verify APIs function correctly.
-* Verify frontend integration if applicable.
-* Check for dead code.
-* Check for duplicate code.
-* Check for broken imports.
-* Fix discovered issues.
-
-Do not start another phase during review.
+* Verify requirements implementation matches PLAN.md
+* Verify APIs function correctly
+* Verify frontend integration if applicable
+* Check for dead code
+* Check for duplicate code
+* Check for broken imports
+* Fix discovered issues
 
 ---
 
@@ -102,10 +90,8 @@ Do not start another phase during review.
 
 ## Completion Rules
 
-ArtifactX is complete only when:
+ArtifactX is complete when:
 
-* Every phase in PLAN.md is complete.
-* Every task in TASKS.md is checked.
-* Every requirement in REQUIREMENTS.md is implemented.
-* Integration testing passes.
-* Requirements audit passes.
+* All phases in PLAN.md are marked complete
+* All requirements in PLAN.md are implemented
+* Verification of the implementation passes

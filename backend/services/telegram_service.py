@@ -10,8 +10,8 @@ from backend.app.config import UPLOADS_DIR
 from forensic.telegram.detector import is_telegram_database
 from forensic.telegram.message_parser import extract_messages
 from forensic.telegram.contact_parser import extract_contacts
-from forensic.telegram.group_parser = extract_groups
-from forensic.telegram.media_parser = extract_media_references
+from forensic.telegram.group_parser import extract_groups
+from forensic.telegram.media_parser import extract_media_references
 from backend.repositories.telegram_repo import TelegramRepository
 from backend.models.models import Evidence, TelegramMessage, TelegramContact, TelegramGroup, EvidenceFile, MediaItem
 from backend.services.log_service import get_log_service

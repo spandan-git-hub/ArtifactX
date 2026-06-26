@@ -15,6 +15,7 @@ import {
   Clock,
   Hash,
   Zap,
+  AlertCircle,
 } from 'lucide-react';
 import { useCaseOverview } from '../hooks/useDashboard';
 import { StatsCard, AppStatsCard, RecentEvents, CorrelationSummary } from '../components/dashboard';
@@ -255,8 +256,5 @@ const DashboardPage = () => {
     </div>
   );
 };
-
-// Import AlertCircle for error state
-import { AlertCircle } from 'lucide-react';
 
 export default DashboardPage;

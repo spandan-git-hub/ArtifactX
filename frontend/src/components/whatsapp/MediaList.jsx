@@ -1,74 +1,92 @@
-import { useState } from 'react';
+import { Image, Video, Music, FileText, FolderOpen } from 'lucide-react';
 
 const MediaList = ({ evidenceId, media }) => {
+  const getMediaIcon = (mediaType) => {
+    switch (mediaType) {
+      case 'image':
+        return <Image className="h-6 w-6 text-accent-emerald" />;
+      case 'video':
+        return <Video className="h-6 w-6 text-accent-violet" />;
+      case 'audio':
+        return <Music className="h-6 w-6 text-accent-amber" />;
+      default:
+        return <FileText className="h-6 w-6 text-forensic-500" />;
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="flex justify-between items-start mb-4">
-        <h2 className="font-semibold">WhatsApp Media References</h2>
+    <div className="card">
+      <div className="flex items-center gap-2 mb-4">
+        <Image className="h-5 w-5 text-accent-violet" />
+        <span className="font-semibold text-forensic-100">Media References</span>
+        <span className="badge badge-violet">{media.length}</span>
       </div>
 
       {media.length === 0 ? (
-        <p className="text-gray-500 text-center py-6">No WhatsApp media references found.</p>
+        <div className="text-center py-8">
+          <FolderOpen className="h-12 w-12 text-forensic-600 mx-auto mb-3" />
+          <p className="text-forensic-500">No WhatsApp media references found.</p>
+          <p className="text-sm text-forensic-600 mt-1">Analyze evidence to extract media.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Message ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Media Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Media Path
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Size
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Dimensions
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Duration
-                </th>
+                <th>Type</th>
+                <th>Message ID</th>
+                <th>Path</th>
+                <th>Size</th>
+                <th>Dimensions</th>
+                <th>Duration</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {media.map((m) => (
-                <tr key={m.message_id || Math.random()} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {m.message_id || 'Unknown'}
+            <tbody>
+              {media.map((m, idx) => (
+                <tr key={m.message_id || m.id || idx}>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {getMediaIcon(m.media_type)}
+                      <span className="capitalize text-forensic-300">
+                        {m.media_type || 'unknown'}
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-capitalize">
-                    {m.media_type || 'Unknown'}
+                  <td className="text-forensic-400 font-mono text-sm">
+                    {m.message_id || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="text-forensic-400 text-sm truncate max-w-[200px]">
                     {m.media_path || 'Unknown'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {(m.file_size || 0).toLocaleString()} bytes
+                  <td className="text-forensic-400 font-mono text-sm">
+                    {formatFileSize(m.file_size)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {m.width && m.height ?
-                      `${m.width} × ${m.height}` :
-                      m.width || m.height ?
-                        `${m.width || '?'} × ${m.height || '?'}` :
-                        'Unknown'
-                    }
+                  <td className="text-forensic-400">
+                    {m.width && m.height ? (
+                      <span className="font-mono text-sm">{m.width} × {m.height}</span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {m.duration ? `${m.duration.toFixed(2)}s` : 'Unknown'}
+                  <td className="text-forensic-400">
+                    {m.duration ? (
+                      <span className="font-mono text-sm">{m.duration.toFixed(2)}s</span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-
-        <p className="mt-2 text-xs text-gray-500 text-right">
-          Showing {media.length} media reference{media.length !== 1 ? 's' : ''}
-        </p>
       )}
     </div>
   );

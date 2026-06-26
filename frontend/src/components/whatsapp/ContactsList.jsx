@@ -1,57 +1,57 @@
-import { useState } from 'react';
+import { Users } from 'lucide-react';
 
 const ContactsList = ({ evidenceId, contacts }) => {
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="flex justify-between items-start mb-4">
-        <h2 className="font-semibold">WhatsApp Contacts</h2>
+    <div className="card">
+      <div className="flex items-center gap-2 mb-4">
+        <Users className="h-5 w-5 text-accent-emerald" />
+        <span className="font-semibold text-forensic-100">Contacts</span>
+        <span className="badge badge-emerald">{contacts.length}</span>
       </div>
 
       {contacts.length === 0 ? (
-        <p className="text-gray-500 text-center py-6">No WhatsApp contacts found.</p>
+        <div className="text-center py-8">
+          <Users className="h-12 w-12 text-forensic-600 mx-auto mb-3" />
+          <p className="text-forensic-500">No WhatsApp contacts found.</p>
+          <p className="text-sm text-forensic-600 mt-1">Analyze evidence to extract contacts.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  JID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Phone Number
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
+                <th>Name</th>
+                <th>JID</th>
+                <th>Phone</th>
+                <th>Status</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {contacts.map((contact) => (
-                <tr key={contact.jid || contact.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <tr key={contact.jid || contact.id}>
+                  <td className="text-forensic-100 font-medium">
                     {contact.display_name || 'Unnamed'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 break-all">
+                  <td className="hash-text">
                     {contact.jid || 'Unknown'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {contact.phone_number || 'Unknown'}
+                  <td className="text-forensic-400">
+                    {contact.phone_number || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {contact.status || 'Unknown'}
+                  <td>
+                    <span className={`badge ${
+                      contact.status === 'new' ? 'badge-emerald' :
+                      contact.status === 'completed' ? 'badge-cyan' :
+                      'badge-gray'
+                    }`}>
+                      {contact.status || 'Unknown'}
+                    </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-
-        <p className="mt-2 text-xs text-gray-500 text-right">
-          Showing {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
-        </p>
       )}
     </div>
   );

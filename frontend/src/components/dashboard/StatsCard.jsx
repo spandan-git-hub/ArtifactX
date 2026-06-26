@@ -1,27 +1,37 @@
-import { MessageSquare, Users, Image, Trash2, Layers } from 'lucide-react';
+import {
+  MessageSquare,
+  Users,
+  Image,
+  Trash2,
+  Layers,
+  BarChart3,
+} from 'lucide-react';
 
-const StatsCard = ({ title, value, icon: Icon, description, color = 'blue' }) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    purple: 'bg-purple-50 text-purple-600 border-purple-200',
-    orange: 'bg-orange-50 text-orange-600 border-orange-200',
-    red: 'bg-red-50 text-red-600 border-red-200',
-    gray: 'bg-gray-50 text-gray-600 border-gray-200',
+const StatsCard = ({ title, value, icon: Icon, description, color = 'cyan' }) => {
+  const colorMap = {
+    cyan: 'text-accent-cyan bg-accent-cyan/10',
+    emerald: 'text-accent-emerald bg-accent-emerald/10',
+    violet: 'text-accent-violet bg-accent-violet/10',
+    amber: 'text-accent-amber bg-accent-amber/10',
+    rose: 'text-accent-rose bg-accent-rose/10',
+    blue: 'text-accent-blue bg-accent-blue/10',
   };
+  const classes = colorMap[color] || colorMap.cyan;
 
   return (
-    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
+    <div className="card card-hover">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value?.toLocaleString() ?? 0}</p>
+          <p className="text-sm text-forensic-500">{title}</p>
+          <p className="text-3xl font-bold font-mono mt-1 text-forensic-50">
+            {value?.toLocaleString() ?? 0}
+          </p>
           {description && (
-            <p className="text-xs mt-1 opacity-75">{description}</p>
+            <p className="text-xs mt-1 text-forensic-500">{description}</p>
           )}
         </div>
         {Icon && (
-          <div className="p-3 rounded-full bg-white/50">
+          <div className={`p-3 rounded-xl ${classes}`}>
             <Icon className="h-6 w-6" />
           </div>
         )}

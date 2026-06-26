@@ -10,7 +10,16 @@
       "Bash(git checkout *)",
       "Skill(run)",
       "Bash(npm run *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(pip install *)",
+      "Bash(C:/Users/Spandan/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe -m pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings python-multipart reportlab structlog Pillow aiosqlite python-dotenv httpx)",
+      "Bash(C:/Users/Spandan/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe -c \"from backend.app.main import app; print\\('Import OK'\\)\")",
+      "Bash(C:/Users/Spandan/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s http://localhost:8000/api/health)",
+      "Bash(C:/Users/Spandan/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe -c ' *)",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 2116)"
     ]
   }
 }

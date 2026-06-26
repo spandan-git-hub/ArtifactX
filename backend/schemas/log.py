@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class LogEntryBase(BaseModel):
     """Base log schema."""
 
-    message: str
+    message: Optional[str] = None
     timestamp: Optional[datetime] = None
 
 
@@ -45,13 +45,15 @@ class ErrorLogEntry(BaseModel):
         from_attributes = True
 
 
-class ActivityLogEntry(LogEntryBase):
+class ActivityLogEntry(BaseModel):
     """Activity log entry schema."""
 
     id: int
     case_id: Optional[int] = None
     action: Optional[str] = None
+    message: Optional[str] = None  # Computed from description if needed
     description: Optional[str] = None
+    timestamp: datetime
 
     class Config:
         from_attributes = True

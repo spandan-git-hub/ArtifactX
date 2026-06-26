@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Filter,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import {
   useAnalysisLogs,
@@ -18,9 +19,9 @@ import {
  * Tab configuration for log types
  */
 const LOG_TABS = [
-  { id: 'activity', label: 'Activity', icon: Activity, color: 'blue' },
-  { id: 'analysis', label: 'Analysis', icon: Info, color: 'green' },
-  { id: 'errors', label: 'Errors', icon: AlertTriangle, color: 'red' },
+  { id: 'activity', label: 'Activity', icon: Activity, color: 'cyan' },
+  { id: 'analysis', label: 'Analysis', icon: Info, color: 'emerald' },
+  { id: 'errors', label: 'Errors', icon: AlertTriangle, color: 'rose' },
 ];
 
 /**
@@ -37,81 +38,92 @@ const formatTimestamp = (timestamp) => {
  */
 const LogEntry = ({ log, logType }) => {
   const [expanded, setExpanded] = useState(false);
-  const Icon = LOG_TABS.find((t) => t.id === logType)?.icon || Info;
-  const colorClass = LOG_TABS.find((t) => t.id === logType)?.color || 'gray';
+  const config = LOG_TABS.find((t) => t.id === logType) || LOG_TABS[0];
+
+  const borderColors = {
+    cyan: 'border-l-accent-cyan',
+    emerald: 'border-l-accent-emerald',
+    rose: 'border-l-accent-rose',
+  };
+  const textColors = {
+    cyan: 'text-accent-cyan',
+    emerald: 'text-accent-emerald',
+    rose: 'text-accent-rose',
+  };
 
   return (
     <div
-      className={`border-l-4 border-${colorClass}-500 bg-white p-3 mb-2 rounded-r shadow-sm hover:shadow transition-shadow`}
+      className={`border-l-4 ${borderColors[config.color] || 'border-l-forensic-600'}
+                  bg-forensic-900/50 p-3 mb-2 rounded-r
+                  hover:bg-forensic-800/50 transition-colors`}
     >
       <div
         className="flex items-start justify-between cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-start gap-3">
-          <Icon
-            className={`h-5 w-5 text-${colorClass}-500 mt-0.5 flex-shrink-0`}
+          <config.icon
+            className={`h-5 w-5 ${textColors[config.color] || 'text-forensic-500'} mt-0.5 flex-shrink-0`}
           />
           <div>
-            <p className="font-medium text-gray-900">{log.message}</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="font-medium text-forensic-100">{log.message}</p>
+            <p className="text-sm text-forensic-500 mt-1">
               {formatTimestamp(log.timestamp)}
               {log.case_id && ` • Case #${log.case_id}`}
               {log.evidence_id && ` • Evidence #${log.evidence_id}`}
             </p>
-            {log.action && (
-              <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">
-                {log.action}
-              </span>
-            )}
-            {log.error_type && (
-              <span className="inline-block mt-1 mr-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">
-                {log.error_type}
-              </span>
-            )}
-            {log.stack_trace && (
-              <span className="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded">
-                Has stack trace
-              </span>
-            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {log.action && (
+                <span className="badge badge-gray">{log.action}</span>
+              )}
+              {log.log_type && (
+                <span className="badge badge-cyan">{log.log_type}</span>
+              )}
+              {log.error_type && (
+                <span className="badge badge-rose">{log.error_type}</span>
+              )}
+              {log.stack_trace && (
+                <span className="badge badge-amber">Has stack trace</span>
+              )}
+            </div>
           </div>
         </div>
         {expanded ? (
-          <ChevronDown className="h-5 w-5 text-gray-400" />
+          <ChevronDown className="h-5 w-5 text-forensic-500" />
         ) : (
-          <ChevronRight className="h-5 w-5 text-gray-400" />
+          <ChevronRight className="h-5 w-5 text-forensic-500" />
         )}
       </div>
 
       {/* Expanded details */}
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
+        <div className="mt-3 pt-3 border-t border-forensic-700 text-sm space-y-2">
           {(log.details || log.metadata_) && (
-            <div className="mb-2">
-              <span className="text-gray-500">Details: </span>
-              <pre className="bg-gray-50 p-2 rounded overflow-x-auto text-xs">
+            <div>
+              <span className="text-forensic-500">Details: </span>
+              <pre className="data-block mt-1">
                 {JSON.stringify(log.details || log.metadata_ || {}, null, 2)}
               </pre>
             </div>
           )}
           {log.stack_trace && (
-            <div className="mb-2">
-              <span className="text-gray-500">Stack Trace: </span>
-              <pre className="bg-red-50 p-2 rounded overflow-x-auto text-xs text-red-700">
+            <div>
+              <span className="text-forensic-500">Stack Trace: </span>
+              <pre className="data-block mt-1 text-accent-rose border border-accent-rose/30">
                 {log.stack_trace}
               </pre>
             </div>
           )}
           {log.endpoint && (
-            <p className="text-gray-600">
-              <span className="text-gray-500">Endpoint: </span>
-              {log.method} {log.endpoint}
-              {log.client_ip && ` (${log.client_ip})`}
+            <p className="text-forensic-400">
+              <span className="text-forensic-500">Endpoint: </span>
+              <span className="font-mono">{log.method} {log.endpoint}</span>
+              {log.client_ip && ` ({log.client_ip})`}
             </p>
           )}
           {log.description && (
-            <p className="text-gray-600">
-              <span className="text-gray-500">Description: </span>
+            <p className="text-forensic-400">
+              <span className="text-forensic-500">Description: </span>
               {log.description}
             </p>
           )}
@@ -126,49 +138,49 @@ const LogEntry = ({ log, logType }) => {
  */
 const FilterBar = ({ filters, onChange, logType }) => {
   return (
-    <div className="bg-white p-3 rounded-lg shadow-sm mb-4">
+    <div className="card mb-4">
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">Filters</span>
+          <Filter className="h-4 w-4 text-forensic-500" />
+          <span className="text-sm font-medium text-forensic-300">Filters</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Case ID:</label>
+          <label className="text-sm text-forensic-500">Case ID:</label>
           <input
             type="number"
             value={filters.case_id || ''}
             onChange={(e) =>
               onChange({ ...filters, case_id: e.target.value || undefined })
             }
-            className="w-24 border border-gray-300 rounded px-2 py-1 text-sm"
+            className="w-24 rounded px-2 py-1.5 text-sm border bg-forensic-800 border-forensic-700 text-forensic-100"
             placeholder="ID"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Evidence ID:</label>
+          <label className="text-sm text-forensic-500">Evidence ID:</label>
           <input
             type="number"
             value={filters.evidence_id || ''}
             onChange={(e) =>
               onChange({ ...filters, evidence_id: e.target.value || undefined })
             }
-            className="w-24 border border-gray-300 rounded px-2 py-1 text-sm"
+            className="w-24 rounded px-2 py-1.5 text-sm border bg-forensic-800 border-forensic-700 text-forensic-100"
             placeholder="ID"
           />
         </div>
 
         {logType === 'analysis' && (
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Log Type:</label>
+            <label className="text-sm text-forensic-500">Log Type:</label>
             <input
               type="text"
               value={filters.log_type || ''}
               onChange={(e) =>
                 onChange({ ...filters, log_type: e.target.value || undefined })
               }
-              className="w-32 border border-gray-300 rounded px-2 py-1 text-sm"
+              className="w-32 rounded px-2 py-1.5 text-sm border bg-forensic-800 border-forensic-700 text-forensic-100"
               placeholder="e.g., info, warning"
             />
           </div>
@@ -176,27 +188,27 @@ const FilterBar = ({ filters, onChange, logType }) => {
 
         {logType === 'errors' && (
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Error Type:</label>
+            <label className="text-sm text-forensic-500">Error Type:</label>
             <input
               type="text"
               value={filters.error_type || ''}
               onChange={(e) =>
                 onChange({ ...filters, error_type: e.target.value || undefined })
               }
-              className="w-32 border border-gray-300 rounded px-2 py-1 text-sm"
+              className="w-32 rounded px-2 py-1.5 text-sm border bg-forensic-800 border-forensic-700 text-forensic-100"
               placeholder="e.g., ValidationError"
             />
           </div>
         )}
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Limit:</label>
+          <label className="text-sm text-forensic-500">Limit:</label>
           <select
             value={filters.limit || 100}
             onChange={(e) =>
               onChange({ ...filters, limit: parseInt(e.target.value) })
             }
-            className="border border-gray-300 rounded px-2 py-1 text-sm"
+            className="rounded px-2 py-1.5 text-sm border bg-forensic-800 border-forensic-700 text-forensic-100"
           >
             <option value={50}>50</option>
             <option value={100}>100</option>
@@ -251,7 +263,6 @@ const LogsViewer = ({ caseId }) => {
       analysis: fetchAnalysis,
       errors: fetchError,
     };
-
     const fetchFn = fetchLogsMap[activeTab];
     if (fetchFn) {
       fetchFn(filters);
@@ -264,62 +275,39 @@ const LogsViewer = ({ caseId }) => {
       analysis: fetchAnalysis,
       errors: fetchError,
     };
-
     const fetchFn = fetchLogsMap[activeTab];
     if (fetchFn) {
       fetchFn(filters);
     }
   };
 
-  const loadingMap = {
-    activity: loadingActivity,
-    analysis: loadingAnalysis,
-    errors: loadingError,
-  };
-
-  const errorMap = {
-    activity: errorActivity,
-    analysis: errorAnalysis,
-    errors: errorError,
-  };
-
-  const logsMap = {
-    activity: activityLogs,
-    analysis: analysisLogs,
-    errors: errorLogs,
-  };
+  const loadingMap = { activity: loadingActivity, analysis: loadingAnalysis, errors: loadingError };
+  const errorMap = { activity: errorActivity, analysis: errorAnalysis, errors: errorError };
+  const logsMap = { activity: activityLogs, analysis: analysisLogs, errors: errorLogs };
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4">
+    <div className="card">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">
-          System Logs
-        </h2>
+        <h2 className="text-lg font-semibold text-forensic-100">System Logs</h2>
         <button
           onClick={handleRefresh}
           disabled={loadingMap[activeTab]}
-          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          className="btn-ghost flex items-center gap-2"
         >
-          <RefreshCw
-            className={`h-4 w-4 ${loadingMap[activeTab] ? 'animate-spin' : ''}`}
-          />
-          <span className="text-sm">Refresh</span>
+          <RefreshCw className={`h-4 w-4 ${loadingMap[activeTab] ? 'animate-spin' : ''}`} />
+          Refresh
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-white p-1 rounded-lg">
+      <div className="flex gap-1 mb-4 bg-forensic-800/50 p-1 rounded-lg">
         {LOG_TABS.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? `bg-${tab.color}-100 text-${tab.color}-700`
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`tab-button flex items-center gap-2 ${activeTab === tab.id ? 'tab-button-active' : ''}`}
             >
               <Icon className="h-4 w-4" />
               {tab.label}
@@ -329,42 +317,41 @@ const LogsViewer = ({ caseId }) => {
       </div>
 
       {/* Filters */}
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        logType={activeTab}
-      />
+      <FilterBar filters={filters} onChange={setFilters} logType={activeTab} />
 
       {/* Log List */}
       <div className="mt-4">
         {loadingMap[activeTab] && (
-          <div className="text-center py-8 text-gray-500">
-            <div className="animate-pulse">Loading logs...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-accent-cyan" />
+            <span className="ml-2 text-forensic-400">Loading logs...</span>
           </div>
         )}
 
         {errorMap[activeTab] && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            <p className="font-medium">Error loading logs</p>
-            <p className="text-sm mt-1">{errorMap[activeTab]}</p>
+          <div className="alert alert-error">
+            <AlertTriangle className="h-5 w-5" />
+            <div>
+              <p className="font-semibold">Error loading logs</p>
+              <p className="text-sm opacity-80">{errorMap[activeTab]}</p>
+            </div>
           </div>
         )}
 
         {!loadingMap[activeTab] && !errorMap[activeTab] && (
           <>
             {logsMap[activeTab].length === 0 ? (
-              <div className="text-center py-8 text-gray-500 bg-white rounded-lg">
-                <p>No {activeTab} logs found</p>
+              <div className="text-center py-8 card">
+                <p className="text-forensic-500">No {activeTab} logs found</p>
               </div>
             ) : (
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-[400px] overflow-y-auto">
                 {logsMap[activeTab].map((log, index) => (
                   <LogEntry key={log.id || index} log={log} logType={activeTab} />
                 ))}
               </div>
             )}
-
-            <p className="text-sm text-gray-500 mt-2 text-center">
+            <p className="text-sm text-forensic-500 mt-2 text-center">
               Showing {logsMap[activeTab].length} logs
             </p>
           </>

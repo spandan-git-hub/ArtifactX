@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useCases } from '../hooks/useCases';
 import { Header } from '../components/layout';
+import { caseService } from '../services/caseService';
 import EvidenceUploader from '../components/evidence/EvidenceUploader';
 import EvidenceInventory from '../components/evidence/EvidenceInventory';
 import WhatsAppAnalysis from '../components/whatsapp/WhatsAppAnalysis';
@@ -350,8 +351,5 @@ const CaseDetailPage = () => {
     </div>
   );
 };
-
-// Import caseService for fetching case data
-import { caseService } from '../services/caseService';
 
 export default CaseDetailPage;

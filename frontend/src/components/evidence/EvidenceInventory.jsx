@@ -1,13 +1,26 @@
 import { useState, useEffect } from 'react';
-import { useEvidence } from '../hooks/useEvidence';
-import * as evidenceService from '../services/evidenceService';
+import { useEvidence } from '../../hooks/useEvidence';
+import * as evidenceService from '../../services/evidenceService';
+import {
+  FileArchive,
+  Trash2,
+  Loader2,
+  Eye,
+  Download,
+  FolderOpen,
+  FileText,
+} from 'lucide-react';
 
-const EvidenceInventory = ({ caseId }) => {
+const EvidenceInventory = ({ caseId, selectedEvidenceId: propSelectedId, onSelectEvidence }) => {
   const { evidences, loading, error, loadEvidences, deleteEvidence } = useEvidence();
-  const [selectedEvidenceId, setSelectedEvidenceId] = useState(null);
+  const [internalSelectedId, setInternalSelectedId] = useState(null);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(null);
+
+  const selectedEvidenceId = propSelectedId !== undefined ? propSelectedId : internalSelectedId;
+  const setSelectedEvidenceId = propSelectedId !== undefined ? onSelectEvidence : setInternalSelectedId;
 
   useEffect(() => {
     if (caseId) {
@@ -16,6 +29,11 @@ const EvidenceInventory = ({ caseId }) => {
   }, [caseId, loadEvidences]);
 
   const handleLoadFiles = async (evidenceId) => {
+    if (selectedEvidenceId === evidenceId) {
+      setSelectedEvidenceId(null);
+      setEvidenceFiles([]);
+      return;
+    }
     setSelectedEvidenceId(evidenceId);
     setFilesLoading(true);
     setFilesError(null);
@@ -32,168 +50,225 @@ const EvidenceInventory = ({ caseId }) => {
     }
   };
 
-  const handleDeleteEvidence = async (evidenceId) => {
-    if (window.confirm('Are you sure you want to delete this evidence?')) {
+  const handleDeleteEvidence = async (evidenceId, e) => {
+    e.stopPropagation();
+    const evidence = evidences.find(ev => ev.id === evidenceId);
+    if (window.confirm(`Delete evidence "${evidence?.original_filename}"? This cannot be undone.`)) {
+      setDeleteLoading(evidenceId);
       try {
         await deleteEvidence(evidenceId);
-        // Remove from list
-        setEvidences((prev) => prev.filter((e) => e.id !== evidenceId));
-        if (selectedEvidenceId === evidenceId) {
-          setSelectedEvidenceId(null);
-          setEvidenceFiles([]);
-        }
       } catch (err) {
         // error handled by hook
+      } finally {
+        setDeleteLoading(null);
       }
     }
   };
 
-  if (loading) return <p className="text-center py-4">Loading evidences...</p>;
-  if (error) return <p className="text-center text-red-600">{error}</p>;
+  const handleDownloadFile = async (fileId, fileName) => {
+    try {
+      const blob = await evidenceService.downloadEvidenceFile(selectedEvidenceId, fileId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-accent-cyan" />
+        <span className="ml-2 text-forensic-400">Loading evidences...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        <span>{error}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <h2 className="font-semibold mb-2">Evidence List</h2>
+    <div className="card">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-accent-emerald/20 flex items-center justify-center">
+            <FolderOpen className="h-5 w-5 text-accent-emerald" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-forensic-100">Evidence Files</h3>
+            <p className="text-sm text-forensic-500">{evidences.length} file(s) uploaded</p>
+          </div>
+        </div>
+      </div>
+
       {evidences.length === 0 ? (
-        <p className="text-gray-500">No evidence uploaded yet.</p>
+        <div className="text-center py-8">
+          <FileText className="h-12 w-12 text-forensic-600 mx-auto mb-3" />
+          <p className="text-forensic-500">No evidence uploaded yet.</p>
+          <p className="text-sm text-forensic-600 mt-1">Upload a ZIP or database file to get started.</p>
+        </div>
       ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Filename
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    SHA-256
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Size
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {evidences.map((ev) => (
-                  <tr key={ev.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {ev.original_filename}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {ev.evidence_type === 'zip' ? 'ZIP Package' : 'File'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {ev.sha256}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {(ev.upload_size || 0).toLocaleString()} bytes
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>SHA-256</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {evidences.map((ev) => (
+                <tr
+                  key={ev.id}
+                  className={selectedEvidenceId === ev.id ? 'bg-accent-cyan/5' : ''}
+                >
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <FileArchive className="h-4 w-4 text-accent-cyan" />
+                      <span className="text-forensic-100 font-medium truncate max-w-[200px]">
+                        {ev.original_filename}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`badge ${
+                      ev.evidence_type === 'zip' ? 'badge-cyan' :
+                      ev.evidence_type === 'database' ? 'badge-violet' : 'badge-gray'
+                    }`}>
+                      {ev.evidence_type || 'file'}
+                    </span>
+                  </td>
+                  <td className="text-forensic-400 font-mono text-sm">
+                    {formatFileSize(ev.upload_size)}
+                  </td>
+                  <td>
+                    <span className="hash-text text-xs">
+                      {ev.sha256?.substring(0, 16)}...
+                    </span>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleLoadFiles(ev.id)}
-                        className={`
-                          btn text-xs font-semibold
-                          ${selectedEvidenceId === ev.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}
-                          px-3 py-1 rounded hover:bg-gray-300
-                        `}
+                        className={`btn-ghost p-1.5 ${
+                          selectedEvidenceId === ev.id ? 'text-accent-cyan' : ''
+                        }`}
+                        title="View Files"
                       >
-                        {selectedEvidenceId === ev.id ? 'View Files' : 'View Files'}
+                        {filesLoading && selectedEvidenceId === ev.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                       <button
-                        onClick={() => handleDeleteEvidence(ev.id)}
-                        className="ml-2 text-xs font-semibold text-red-600 hover:text-red-800"
+                        onClick={(e) => handleDeleteEvidence(ev.id, e)}
+                        disabled={deleteLoading === ev.id}
+                        className="btn-ghost p-1.5 text-accent-rose hover:bg-accent-rose/10"
+                        title="Delete"
                       >
-                        Delete
+                        {deleteLoading === ev.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Files panel */}
+      {selectedEvidenceId && (
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FolderOpen className="h-4 w-4 text-accent-emerald" />
+            <h4 className="font-semibold text-forensic-100">
+              Extracted Files
+            </h4>
+            <span className="badge badge-emerald">{evidenceFiles.length}</span>
           </div>
 
-          {/* Files panel */}
-          {selectedEvidenceId && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-semibold mb-2">
-                Files in Evidence:
-                {evidences.find((e) => e.id === selectedEvidenceId)?.original_filename}
-              </h3>
-              {filesLoading ? (
-                <p className="text-center py-4">Loading files...</p>
-              ) : filesError ? (
-                <p className="text-center text-red-600">{filesError}</p>
-              ) : evidenceFiles.length === 0 ? (
-                <p className="text-gray-500">No files in this evidence.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Relative Path
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Size
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          MIME Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {evidenceFiles.map((f) => (
-                        <tr key={f.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {f.relative_path}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {f.size.toLocaleString()} bytes
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {f.mime_type || 'application/octet-stream'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
-                            <a
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                // Trigger download
-                                evidenceService
-                                  .downloadEvidenceFile(selectedEvidenceId, f.id)
-                                  .then((blob) => {
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = f.relative_path.split('/').pop() || 'file';
-                                    a.click();
-                                    window.URL.revokeObjectURL(url);
-                                  })
-                                  .catch(console.error);
-                              }}
-                              className="text-blue-600 hover:underline"
-                            >
-                              Download
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {filesLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-accent-cyan" />
+              <span className="ml-2 text-forensic-400">Loading files...</span>
+            </div>
+          ) : filesError ? (
+            <div className="alert alert-error">
+              <span>{filesError}</span>
+            </div>
+          ) : evidenceFiles.length === 0 ? (
+            <p className="text-forensic-500 text-sm">No files found in this evidence package.</p>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>Size</th>
+                    <th>MIME Type</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evidenceFiles.slice(0, 100).map((f) => (
+                    <tr key={f.id}>
+                      <td className="text-forensic-300 font-mono text-sm truncate max-w-[300px]">
+                        {f.relative_path}
+                      </td>
+                      <td className="text-forensic-400 font-mono text-sm">
+                        {formatFileSize(f.size)}
+                      </td>
+                      <td>
+                        <span className="badge badge-gray">
+                          {f.mime_type?.split('/')[1] || 'unknown'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleDownloadFile(f.id, f.relative_path.split('/').pop())}
+                          className="btn-ghost p-1.5"
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {evidenceFiles.length > 100 && (
+                <div className="p-3 text-center text-sm text-forensic-500 border-t border-forensic-700">
+                  Showing 100 of {evidenceFiles.length} files
                 </div>
               )}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

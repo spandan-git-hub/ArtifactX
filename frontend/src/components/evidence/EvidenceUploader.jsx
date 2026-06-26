@@ -1,14 +1,37 @@
 import { useState } from 'react';
-import { useEvidence } from '../hooks/useEvidence';
+import { useEvidence } from '../../hooks/useEvidence';
+import { Upload, FileArchive, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 const EvidenceUploader = ({ caseId }) => {
   const { uploadEvidence, loading, error } = useEvidence();
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0] || null);
+    const file = e.target.files[0] || null;
+    setSelectedFile(file);
     setUploadSuccess(false);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setSelectedFile(e.dataTransfer.files[0]);
+      setUploadSuccess(false);
+    }
   };
 
   const handleUpload = async (e) => {
@@ -17,49 +40,117 @@ const EvidenceUploader = ({ caseId }) => {
     try {
       await uploadEvidence(caseId, selectedFile);
       setUploadSuccess(true);
-      // Optionally reset form
       setSelectedFile(null);
     } catch (err) {
       // error handled by hook
     }
   };
 
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow mb-4">
-      <h2 className="font-semibold mb-2">Upload Evidence</h2>
-      <form onSubmit={handleUpload} className="space-y-3">
+    <div className="card">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-accent-emerald/20 flex items-center justify-center">
+          <Upload className="h-5 w-5 text-accent-emerald" />
+        </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Select file (ZIP or other)
-          </label>
+          <h3 className="font-semibold text-forensic-100">Upload Evidence</h3>
+          <p className="text-sm text-forensic-500">ZIP packages, databases, or media files</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleUpload}>
+        <div
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
+            dragActive
+              ? 'border-accent-cyan bg-accent-cyan/5'
+              : 'border-forensic-700 hover:border-forensic-600'
+          }`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
+          <FileArchive className="h-12 w-12 text-forensic-500 mx-auto mb-4" />
+          <p className="text-forensic-300 mb-1">
+            Drag and drop evidence file here
+          </p>
+          <p className="text-sm text-forensic-500 mb-4">
+            or click to browse files
+          </p>
           <input
             type="file"
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4
-                       file:rounded file:border-0 file:bg-primary-50 file:text-primary-600
-                       hover:file:bg-primary-100"
+            className="file-input"
             onChange={handleFileChange}
             disabled={loading}
+            accept=".zip,.db,.sqlite,.sqlite3,.vid"
           />
-          {selectedFile && (
-            <p className="mt-1 text-xs text-gray-600">
-              Selected: {selectedFile.name}
-            </p>
-          )}
         </div>
+
+        {selectedFile && (
+          <div className="mt-4 p-4 bg-forensic-800/50 rounded-lg border border-forensic-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-accent-cyan/20 flex items-center justify-center">
+                  <FileArchive className="h-5 w-5 text-accent-cyan" />
+                </div>
+                <div>
+                  <p className="text-forensic-100 font-medium truncate max-w-xs">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-sm text-forensic-500">
+                    {formatFileSize(selectedFile.size)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFile(null)}
+                className="text-forensic-500 hover:text-forensic-300"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 flex items-center gap-2 text-accent-rose text-sm">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </div>
+        )}
+
+        {uploadSuccess && (
+          <div className="mt-4 flex items-center gap-2 text-accent-emerald text-sm">
+            <CheckCircle className="h-4 w-4" />
+            Evidence uploaded successfully! File is being processed.
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={loading || !selectedFile}
-          className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary w-full mt-4"
         >
-          {loading ? 'Uploading...' : 'Upload Evidence'}
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4" />
+              Upload Evidence
+            </>
+          )}
         </button>
       </form>
-      {error && <p className="mt-2 text-red-600 text-sm">{error}</p>}
-      {uploadSuccess && (
-        <p className="mt-2 text-green-600 text-sm">
-          Evidence uploaded successfully!
-        </p>
-      )}
     </div>
   );
 };

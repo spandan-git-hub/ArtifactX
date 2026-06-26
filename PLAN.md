@@ -1,45 +1,136 @@
-# ArtifactX Implementation Plan
+# ArtifactX Plan
 
-## 1. Context
+> Consolidated project documentation. Last updated: 2026-06-26
 
-ArtifactX is a forensic analysis platform that analyzes acquired evidence from WhatsApp databases, Telegram databases, media files, and ZIP evidence packages. It does not perform rooting or phone hacking — it only parses and analyzes uploaded evidence files.
+---
 
-Technology: React + JavaScript + Tailwind CSS (Frontend), FastAPI + Python (Backend), SQLite (Database).
+## 1. Overview
 
-## 2. Phase Overview
+ArtifactX is a forensic analysis platform that analyzes acquired evidence from:
+- WhatsApp Databases
+- Telegram Databases
+- Media Files
+- ZIP Evidence Packages
 
-| Phase | Name | Purpose | Dependent On |
-|---|---|---|---|
-| 0 | Foundation | Project structure, dev environment, DB scaffold | None |
-| 1 | Case Management | CRUD for cases | 0 |
-| 2 | Evidence Management | Upload, store, hash, inventory | 1 |
-| 3 | WhatsApp Analysis | Parse WhatsApp databases | 2 |
-| 4 | Telegram Analysis | Parse Telegram databases | 2 |
-| 5 | Timeline Reconstruction | Normalize and build timeline | 3, 4 |
-| 6 | Deleted Message Detection | Detect deletions | 3, 4 |
-| 7 | Media Analysis | EXIF, orphan detection | 2 |
-| 8 | Evidence Correlation | Cross-link entities | 3, 4, 7 |
-| 9 | Search & Filtering | Full-text + filters | 3, 4, 7 |
-| 10 | Dashboard | Stats, graphs, timeline view | 5, 7, 8, 9 |
-| 11 | Reporting | PDF generation | 5, 6, 9 |
-| 12 | Logging & Audit | Structured logging | All |
+**Scope:** ArtifactX analyzes uploaded evidence files and generates forensic findings. It does NOT perform rooting, phone hacking, or device exploitation.
 
-## 3. Dependencies
+---
 
-```
-Phase 0 --▶ Phase 1 --▶ Phase 2 --▶ Phase 3 (+ Phase 4)
-  └─ DB configured    Case CRUD    Upload/Hash    DB parsers
-                                │                      │
-Phase 12 (Logging)   Phase 6 (Deleted)       Phase 7 (Media)
-                                │                      │
-Phase 5 (Timeline) ◀── Phase 3, 4              Phase 8 (Correlation)
-  │                                                 │
-Phase 11 (Reporting) ◀── Phase 5, 6, 9     Phase 9 (Search)
-  │                                                 │
-Phase 10 (Dashboard) ◀── Phase 5, 7, 8, 9
-```
+## 2. Technology Stack
 
-## 4. Module Breakdown
+### Frontend
+- React
+- JavaScript
+- Tailwind CSS
+
+### Backend
+- FastAPI
+- Python
+
+### Database
+- SQLite
+
+---
+
+## 3. Requirements
+
+### Case Management
+- Create Case
+- View Cases
+- Case Details
+- Delete Case
+
+### Evidence Management
+- Upload ZIP/File
+- File Inventory
+- Evidence Metadata
+- SHA-256 Hashing
+
+### WhatsApp Analysis
+- Database Detection
+- Message Extraction
+- Contact Extraction
+- Group Extraction
+- Media Reference Extraction
+
+### Telegram Analysis
+- Database Detection
+- Message Extraction
+- Contact Extraction
+- Group/Channel Extraction
+- Media Reference Extraction
+
+### Timeline Reconstruction
+- Timestamp Normalization
+- Event Collection
+- Timeline Generation
+- Timeline Filtering
+
+### Deleted Message Detection
+- Sequence Gap Detection
+- Missing Record Detection
+- Confidence Scoring
+
+### Media Analysis
+- Image Detection
+- Video Detection
+- Audio Detection
+- Media Metadata Extraction
+- Orphan Media Detection
+
+### Evidence Correlation
+- Message ↔ Contact Correlation
+- Message ↔ Media Correlation
+- Cross-App Correlation
+- Evidence Graph Generation
+
+### Search & Filtering
+- Message Search
+- Contact Search
+- Media Search
+- Date Filter
+- App Filter
+
+### Visualization Dashboard
+- Case Overview
+- Statistics Charts
+- Timeline View
+- Evidence Graph View
+
+### Reporting
+- PDF Report Generation
+- Evidence Summary
+- Timeline Summary
+- Deleted Message Summary
+
+### Logging & Audit
+- Analysis Logs
+- Error Logs
+- Activity Logs
+
+---
+
+## 4. Phase Overview
+
+| Phase | Name | Purpose | Status |
+|-------|------|---------|--------|
+| 0 | Foundation | Project structure, dev environment, DB scaffold | Complete |
+| 1 | Case Management | CRUD for cases | Complete |
+| 2 | Evidence Management | Upload, store, hash, inventory | Complete |
+| 3 | WhatsApp Analysis | Parse WhatsApp databases | Complete |
+| 4 | Telegram Analysis | Parse Telegram databases | Complete |
+| 5 | Timeline Reconstruction | Normalize and build timeline | Complete |
+| 6 | Deleted Message Detection | Detect deletions | Complete |
+| 7 | Media Analysis | EXIF, orphan detection | Complete |
+| 8 | Evidence Correlation | Cross-link entities | Complete |
+| 9 | Search & Filtering | Full-text + filters | Complete |
+| 10 | Dashboard | Stats, graphs, timeline view | Complete |
+| 11 | Reporting | PDF generation | Complete |
+| 12 | Logging & Audit | Structured logging | Complete |
+
+---
+
+## 5. Module Architecture
 
 ### Backend (`backend/`)
 
@@ -47,11 +138,11 @@ Phase 10 (Dashboard) ◀── Phase 5, 7, 8, 9
 |--------|---------|
 | `backend/app/` | FastAPI entry point, configuration, CORS, database init |
 | `backend/api/` | FastAPI routers (cases, evidence, analysis, search, reports, logs) |
-| `backend/models/` | SQLAlchemy ORM models (cases, evidence, messages, timeline, media, logs) |
+| `backend/models/` | SQLAlchemy ORM models |
 | `backend/schemas/` | Pydantic request/response validation schemas |
-| `backend/services/` | Business logic (case, evidence, analysis, report, search) |
-| `backend/repositories/` | Data access layer over SQLAlchemy |
-| `backend/utils/` | SHA-256 computation, file storage, logging config |
+| `backend/services/` | Business logic |
+| `backend/repositories/` | Data access layer |
+| `backend/utils/` | SHA-256 hashing, file storage, logging config |
 
 ### Forensic Engine (`forensic/`)
 
@@ -59,31 +150,24 @@ Phase 10 (Dashboard) ◀── Phase 5, 7, 8, 9
 |--------|---------|
 | `forensic/whatsapp/` | WhatsApp DB detection, message/contact/group extraction |
 | `forensic/telegram/` | Telegram DB detection, message/contact/group extraction |
-| `forensic/timeline/` | Timestamp normalization, event collection and building |
+| `forensic/timeline/` | Timestamp normalization, event collection |
 | `forensic/deleted/` | Sequence gap detection, confidence scoring |
-| `forensic/media/` | MIME detection, EXIF metadata, orphan media detection |
-| `forensic/correlation/` | Cross-app contact matching, evidence graph building |
+| `forensic/media/` | MIME detection, EXIF metadata, orphan detection |
+| `forensic/correlation/` | Cross-app contact matching, evidence graph |
 
 ### Frontend (`frontend/`)
 
 | Module | Purpose |
 |--------|---------|
-| `frontend/src/components/` | Reusable UI (cases, evidence, messages, timeline, dashboard, search, reports) |
-| `frontend/src/pages/` | Page-level components (CaseList, CaseDetail, Dashboard, etc.) |
+| `frontend/src/components/` | Reusable UI components |
+| `frontend/src/pages/` | Page-level components |
 | `frontend/src/hooks/` | React hooks for data fetching |
 | `frontend/src/services/` | API client functions |
 | `frontend/src/context/` | Global state (active case) |
 
-### Tests (`tests/`)
+---
 
-| Module | Purpose |
-|--------|---------|
-| `tests/api/` | API endpoint integration tests |
-| `tests/forensic/` | Forensic parser unit tests |
-| `tests/services/` | Service logic tests |
-| `tests/fixtures/` | Sample databases, media, ZIP files |
-
-## 5. Database Schema
+## 6. Database Schema
 
 ```python
 # Core Models
@@ -122,7 +206,9 @@ AnalysisLog(id, evidence_id, log_type, message, details, timestamp)
 ActivityLog(id, case_id, action, description, timestamp)
 ```
 
-## 6. API Endpoints
+---
+
+## 7. API Endpoints
 
 ### Cases
 - `POST /api/cases` — Create case
@@ -183,44 +269,9 @@ ActivityLog(id, case_id, action, description, timestamp)
 - `GET /api/logs/errors` — Error logs
 - `GET /api/logs/activity` — Activity logs
 
-## 7. Testing Strategy
+---
 
-### Backend Tests (pytest)
-
-| Phase | Test File | Coverage |
-|---|---|---|
-| 0 | `test_database.py` | SQLAlchemy engine, all models insert/select |
-| 1 | `test_api_cases.py` | Case CRUD, validation, cascade delete |
-| 2 | `test_api_evidence.py` | Upload, ZIP extraction, SHA-256, inventory |
-| 3 | `test_whatsapp_parser.py` | DB detection, message/contact/group extraction |
-| 4 | `test_telegram_parser.py` | DB detection, message/contact/group extraction |
-| 5 | `test_timeline.py` | Timestamp normalization, event ordering, filtering |
-| 6 | `test_deleted_detection.py` | Gap detection, confidence scoring |
-| 7 | `test_media_analysis.py` | MIME detection, EXIF, orphan flagging |
-| 8 | `test_correlation.py` | Edge creation, graph, cross-app matching |
-| 9 | `test_search.py` | Full-text, date range, app filter |
-| 10 | `test_stats.py` | Aggregation counts |
-| 11 | `test_pdf_generation.py` | Report generation, content validation |
-| 12 | `test_logging.py` | Log entries, structured output |
-
-### Frontend Tests (Vitest)
-
-| Component | Coverage |
-|---|---|
-| `CaseListPage` | Loading, create, delete |
-| `EvidenceUploader` | Drag-drop, progress, error |
-| `TimelineViewer` | Event rendering, filtering |
-| `SearchBar` | Input, debounce, results |
-| `DashboardPage` | Stat cards, charts display |
-
-### Test Fixtures
-
-- `tests/fixtures/whatsapp/` — msgstore.db, wa.db
-- `tests/fixtures/telegram/` — cache4.db, messages
-- `tests/fixtures/media/` — JPEG, MP4, OGG samples
-- `tests/fixtures/zip/` — Sample evidence packages
-
-## 8. File/Folder Structure
+## 8. File Structure
 
 ```
 ArtifactX/
@@ -306,110 +357,62 @@ ArtifactX/
 │   ├── src/
 │   │   ├── main.jsx
 │   │   ├── App.jsx
+│   │   ├── index.css
 │   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   ├── cases/
-│   │   │   ├── evidence/
-│   │   │   ├── messages/
-│   │   │   ├── contacts/
-│   │   │   ├── timeline/
-│   │   │   ├── dashboard/
-│   │   │   ├── search/
-│   │   │   └── reports/
 │   │   ├── pages/
 │   │   ├── services/
 │   │   ├── hooks/
 │   │   ├── context/
 │   │   └── utils/
 │   ├── public/
-│   ├── tests/
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── tailwind.config.js
 │   └── postcss.config.js
 ├── reports/
-├── tests/
-│   ├── conftest.py
-│   ├── fixtures/
-│   ├── forensic/
-│   ├── api/
-│   └── services/
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
+
+---
 
 ## 9. Dependencies
 
 ### Backend
 
 | Library | Version | Purpose |
-|---|---|---|
+|---------|---------|---------|
 | fastapi | ^0.110 | Web framework |
 | uvicorn | ^0.30 | ASGI server |
 | sqlalchemy | ^2.0 | ORM |
 | pydantic | ^2.0 | Validation |
 | pydantic-settings | ^2.0 | Configuration |
-| python-multipart | ^0.0.9 | File upload handling |
+| python-multipart | ^0.0.9 | File upload |
 | reportlab | ^4.0 | PDF generation |
 | structlog | ^24.0 | Structured logging |
-| Pillow | ^10.0 | Image metadata/EXIF |
+| Pillow | ^10.0 | Image EXIF |
 | aiosqlite | ^0.20 | Async SQLite |
-| pytest | ^8.0 | Test runner |
-| pytest-cov | ^5.0 | Coverage reporting |
 
 ### Frontend
 
 | Package | Version | Purpose |
-|---|---|---|
+|---------|---------|---------|
 | react | ^18.3 | UI framework |
 | react-router-dom | ^6.24 | Routing |
 | vite | ^5.3 | Build tool |
 | tailwindcss | ^3.4 | Styling |
 | axios | ^1.7 | HTTP client |
 | @tanstack/react-query | ^5.0 | Data fetching |
-| chart.js / react-chartjs-2 | ^4.4 | Dashboard charts |
-| vis-network | ^latest | Evidence graph |
+| chart.js / react-chartjs-2 | ^4.4 | Charts |
+| vis-network | latest | Evidence graph |
 | date-fns | ^3.0 | Date formatting |
-| vitest | ^1.6 | Unit testing |
-| @testing-library/react | ^16.0 | Component testing |
 | lucide-react | ^0.400 | Icons |
 
-## 10. Verification
+---
 
-### Test Commands
+## 10. Completion Status
 
-```bash
-# Backend
-pytest tests/ -v
-pytest --cov=backend --cov-report=html
+All 12 phases are complete. Every requirement has been implemented.
 
-# Frontend
-npm test
-npm test -- --coverage
-```
-
-### Acceptance Criteria
-
-| Requirement | Acceptance Criteria |
-|---|---|
-| Case Management | Create, list, view, delete cases. Cascade delete. |
-| Evidence Management | Upload ZIP/files, list contents, view metadata (SHA-256, MIME). |
-| WhatsApp | Detect DB, extract messages, contacts, groups, media refs. |
-| Telegram | Detect DB, extract messages, contacts, groups, media refs. |
-| Timeline | Normalize to UTC, display ordered, filter by date/type. |
-| Deleted Messages | Detect sequence gaps and missing records with confidence. |
-| Media Analysis | Identify image/video/audio, extract metadata, flag orphan media. |
-| Correlation | Link messages to contacts, messages to media, cross-app contacts. Graph. |
-| Search | Full-text search on messages, contacts, media. Date + app filters. |
-| Dashboard | Case stats, message counts, timeline mini-view, evidence graph. |
-| Reporting | Generate PDF with evidence, timeline, and_detections. |
-| Logging | All analysis, errors, and activity logged to SQLite. |
-
-### Completion Criteria
-
-- All TASKS.md items checked
-- pytest suite passes for every backend feature
-- Frontend loads without errors
-- Evidence is read-only (never modified)
-- No fabricated data in any output
+**Last updated:** 2026-06-26

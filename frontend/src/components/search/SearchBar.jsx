@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, X, Filter } from 'lucide-react';
+import { Search, X, Filter, Loader2 } from 'lucide-react';
 
 const SearchBar = ({
   onSearch,
@@ -25,23 +25,26 @@ const SearchBar = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="card">
+      <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-forensic-500 h-5 w-5" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={placeholder}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-12 pr-10 py-3 rounded-lg bg-forensic-800 border border-forensic-700
+                       text-forensic-100 placeholder-forensic-500
+                       focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20
+                       transition-all duration-200"
             disabled={loading}
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-forensic-500 hover:text-forensic-300 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -51,35 +54,47 @@ const SearchBar = ({
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className={`p-2 border rounded-lg ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+          className={`px-4 py-3 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+            showFilters
+              ? 'bg-accent-cyan/10 border-accent-cyan/50 text-accent-cyan'
+              : 'bg-forensic-800 border-forensic-700 text-forensic-400 hover:text-forensic-200 hover:border-forensic-600'
+          }`}
         >
           <Filter className="h-5 w-5" />
+          <span className="hidden sm:inline">Filters</span>
         </button>
 
         <button
           type="submit"
           disabled={!query.trim() || loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+          className="btn-primary px-6 py-3"
         >
           {loading ? (
-            <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Searching...
+            </>
           ) : (
-            'Search'
+            <>
+              <Search className="h-5 w-5" />
+              Search
+            </>
           )}
         </button>
       </form>
 
       {showFilters && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="mt-4 pt-4 border-t border-forensic-700">
           <div className="flex flex-wrap gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-forensic-400 mb-2">
                 App Filter
               </label>
               <select
                 value={appFilter}
                 onChange={(e) => setAppFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-4 py-2 rounded-lg bg-forensic-800 border border-forensic-700 text-forensic-100
+                           focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20"
               >
                 <option value="all">All Apps</option>
                 <option value="whatsapp">WhatsApp</option>
@@ -92,13 +107,13 @@ const SearchBar = ({
 
       {query && (
         <div className="mt-3 flex items-center justify-between">
-          <p className="text-sm text-gray-600">
-            Searching for: <span className="font-medium">"{query}"</span>
+          <p className="text-sm text-forensic-500">
+            Searching for: <span className="text-forensic-200 font-medium">"{query}"</span>
           </p>
           <button
             type="button"
             onClick={handleClear}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-accent-cyan hover:text-accent-cyan-light transition-colors"
           >
             Clear search
           </button>
