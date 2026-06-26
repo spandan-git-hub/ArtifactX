@@ -1,7 +1,407 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-50 text-gray-900;
+@layer base {
+  html {
+    @apply antialiased scroll-smooth;
+  }
+
+  body {
+    @apply bg-forensic-950 text-forensic-100 font-sans;
+    min-height: 100vh;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-accent-cyan/30 text-forensic-100;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent-cyan ring-offset-2 ring-offset-forensic-950;
+  }
+
+  /* Input reset - forensic dark */
+  input, textarea, select {
+    @apply bg-forensic-800 border-forensic-700 text-forensic-100 placeholder-forensic-500;
+    @apply transition-colors duration-200;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    @apply border-accent-cyan ring-2 ring-accent-cyan/20;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-forensic-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-forensic-700 rounded-full;
+    @apply hover:bg-forensic-600;
+  }
+}
+
+@layer components {
+  /* Card component - primary container */
+  .card {
+    @apply bg-forensic-900 border border-forensic-700/50 rounded-xl p-5;
+    @apply transition-all duration-200;
+  }
+
+  /* Card hover state */
+  .card-hover {
+    @apply hover:border-forensic-600/80 hover:bg-forensic-900/90;
+    @apply hover:shadow-lg hover:shadow-accent-cyan/5;
+  }
+
+  /* Primary button - main actions */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply bg-accent-cyan text-forensic-950 font-semibold px-4 py-2 rounded-lg;
+    @apply hover:bg-accent-cyan-light active:scale-[0.98];
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply transition-all duration-200;
+  }
+
+  /* Secondary button - secondary actions */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply bg-forensic-800 text-forensic-100 border border-forensic-600 font-medium px-4 py-2 rounded-lg;
+    @apply hover:bg-forensic-700 hover:border-forensic-500 active:scale-[0.98];
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply transition-all duration-200;
+  }
+
+  /* Ghost button - subtle actions */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply text-forensic-400 px-3 py-2 rounded-lg;
+    @apply hover:text-forensic-100 hover:bg-forensic-800 active:bg-forensic-700;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply transition-all duration-200;
+  }
+
+  /* Danger button - destructive actions */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply bg-accent-rose text-white font-semibold px-4 py-2 rounded-lg;
+    @apply hover:bg-accent-rose/90 active:scale-[0.98];
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply transition-all duration-200;
+  }
+
+  /* Badge component - status indicators */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply transition-colors duration-200;
+  }
+
+  .badge-cyan {
+    @apply bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30;
+  }
+
+  .badge-emerald {
+    @apply bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/30;
+  }
+
+  .badge-amber {
+    @apply bg-accent-amber/15 text-accent-amber border border-accent-amber/30;
+  }
+
+  .badge-rose {
+    @apply bg-accent-rose/15 text-accent-rose border border-accent-rose/30;
+  }
+
+  .badge-violet {
+    @apply bg-accent-violet/15 text-accent-violet border border-accent-violet/30;
+  }
+
+  .badge-gray {
+    @apply bg-forensic-700/50 text-forensic-300 border border-forensic-600;
+  }
+
+  /* Stats card - data display */
+  .stats-card {
+    @apply card flex items-center gap-4;
+    @apply hover:border-accent-cyan/30 transition-colors duration-300;
+  }
+
+  .stats-card-icon {
+    @apply p-3 rounded-xl bg-forensic-800/80;
+    @apply transition-colors duration-300;
+  }
+
+  /* Tab button - navigation tabs */
+  .tab-button {
+    @apply px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200;
+    @apply text-forensic-400 hover:text-forensic-100 hover:bg-forensic-800;
+  }
+
+  .tab-button-active {
+    @apply bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply h-5 w-5 border-2 border-forensic-600 border-t-accent-cyan rounded-full animate-spin;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-active {
+    @apply bg-accent-emerald animate-pulse;
+  }
+
+  .status-dot-inactive {
+    @apply bg-forensic-600;
+  }
+
+  .status-dot-warning {
+    @apply bg-accent-amber;
+  }
+
+  .status-dot-error {
+    @apply bg-accent-rose;
+  }
+
+  /* Table container */
+  .table-container {
+    @apply overflow-x-auto rounded-lg border border-forensic-700/50;
+  }
+
+  /* Hash/text display */
+  .hash-text {
+    @apply font-mono text-xs text-accent-cyan/80 break-all;
+  }
+
+  /* Sidebar navigation item */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-forensic-400;
+    @apply hover:text-forensic-100 hover:bg-forensic-800/50;
+    @apply transition-all duration-200;
+  }
+
+  .nav-item-active {
+    @apply bg-accent-cyan/10 text-accent-cyan border-l-2 border-accent-cyan;
+  }
+
+  /* Input file */
+  .file-input {
+    @apply block w-full text-sm text-forensic-400;
+    @apply file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0;
+    @apply file:text-sm file:font-semibold file:bg-forensic-800 file:text-forensic-100;
+    @apply hover:file:bg-forensic-700 file:transition-colors file:duration-200;
+    @apply cursor-pointer file:cursor-pointer;
+  }
+
+  /* Data table styles */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table thead {
+    @apply bg-forensic-800/50;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-forensic-400 uppercase tracking-wider;
+    @apply border-b border-forensic-700/50;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b border-forensic-800;
+    @apply text-forensic-300;
+  }
+
+  .data-table tbody tr {
+    @apply hover:bg-forensic-800/30 transition-colors duration-150;
+  }
+
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Metric card */
+  .metric-card {
+    @apply card text-center;
+    @apply hover:border-accent-cyan/30 transition-all duration-300;
+  }
+
+  .metric-value {
+    @apply text-3xl font-bold text-forensic-100;
+    @apply font-mono tracking-tight;
+  }
+
+  .metric-label {
+    @apply text-xs uppercase tracking-wider text-forensic-500 mt-1;
+  }
+
+  /* Code/data block */
+  .data-block {
+    @apply bg-forensic-950 border border-forensic-800 rounded-lg p-4;
+    @apply font-mono text-sm text-forensic-400;
+    @apply overflow-x-auto;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-forensic-100;
+  }
+
+  .section-icon {
+    @apply p-2 rounded-lg bg-forensic-800 text-forensic-400;
+  }
+
+  /* Alert box */
+  .alert {
+    @apply p-4 rounded-lg border flex items-start gap-3;
+  }
+
+  .alert-info {
+    @apply bg-accent-cyan/10 border-accent-cyan/30 text-accent-cyan;
+  }
+
+  .alert-success {
+    @apply bg-accent-emerald/10 border-accent-emerald/30 text-accent-emerald;
+  }
+
+  .alert-warning {
+    @apply bg-accent-amber/10 border-accent-amber/30 text-accent-amber;
+  }
+
+  .alert-error {
+    @apply bg-accent-rose/10 border-accent-rose/30 text-accent-rose;
+  }
+
+  /* Quick action card */
+  .quick-action {
+    @apply flex flex-col items-center gap-2 p-4 rounded-lg;
+    @apply bg-forensic-800/50 border border-forensic-700/50;
+    @apply hover:bg-forensic-800 hover:border-accent-cyan/30;
+    @apply transition-all duration-200 cursor-pointer;
+  }
+
+  .quick-action-icon {
+    @apply p-3 rounded-xl;
+  }
+
+  .quick-action-label {
+    @apply text-sm text-forensic-400 font-medium;
+    @apply group-hover:text-forensic-100 transition-colors;
+  }
+}
+
+@layer utilities {
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent-cyan to-accent-violet bg-clip-text text-transparent;
+  }
+
+  /* Subtle glow effects */
+  .glow-cyan {
+    @apply shadow-[0_0_20px_rgba(6,182,212,0.3)];
+  }
+
+  .glow-emerald {
+    @apply shadow-[0_0_20px_rgba(16,185,129,0.3)];
+  }
+
+  .glow-rose {
+    @apply shadow-[0_0_20px_rgba(244,63,94,0.3)];
+  }
+
+  /* Animated fade in */
+  .animate-in {
+    animation: fadeIn 0.3s ease-out, slideUp 0.3s ease-out;
+  }
+
+  /* Staggered children animation */
+  .stagger-children > * {
+    animation: fadeIn 0.3s ease-out both;
+  }
+
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+  /* Hide scrollbar but keep functionality */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-forensic-900/80 backdrop-blur-md;
+  }
+
+  /* Subtle gradient backgrounds */
+  .bg-gradient-subtle {
+    @apply bg-gradient-to-br from-forensic-900 to-forensic-950;
+  }
+
+  /* Interactive lift effect */
+  .lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }

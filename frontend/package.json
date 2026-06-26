@@ -13,7 +13,9 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.24.0",
-    "axios": "^1.7.0"
+    "axios": "^1.7.0",
+    "lucide-react": "^0.400.0",
+    "date-fns": "^3.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

@@ -1,6 +1,15 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { caseService } from '../../services/caseService';
+import { Header } from '../layout';
+import {
+  ArrowLeft,
+  Save,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  FileText,
+} from 'lucide-react';
 
 const CaseForm = () => {
   const navigate = useNavigate();
@@ -11,99 +20,42 @@ const CaseForm = () => {
     name: '',
     description: '',
     investigator: '',
-    status: 'active'
+    status: 'active',
   });
 
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEdit);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
   // Load case data if editing
-  const loadCase = async () => {
-    if (!isEdit) return;
-    try {
-      setLoading(true);
-      const data = await caseService.getCase(id);
-      setFormData(data);
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load case');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      if (isEdit) {
-        await caseService.updateCase(id, formData);
-        setSuccess('Case updated successfully!');
-      } else {
-        const newCase = await caseService.createCase(formData);
-        setSuccess('Case created successfully!');
-        // Reset form after creation
-        setFormData({
-          name: '',
-          description: '',
-          investigator: '',
-          status: 'active'
-        });
-        // Redirect to list after a short delay
-        setTimeout(() => {
-          navigate('/cases');
-        }, 1500);
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Operation failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load case on mount if editing
-  // Note: useEffect not allowed in conditional, but we can call directly
-  // We'll use a useEffect hook instead.
-};
-
-import { useEffect } from 'react';
-
-const CaseFormWithEffect = () => {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const isEdit = !!id;
-
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    investigator: '',
-    status: 'active'
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-
   useEffect(() => {
-    if (isEdit) {
+    if (isEdit && id) {
       const loadCase = async () => {
         try {
-          setLoading(true);
+          setFetchLoading(true);
           const data = await caseService.getCase(id);
-          setFormData(data);
+          setFormData({
+            name: data.name || '',
+            description: data.description || '',
+            investigator: data.investigator || '',
+            status: data.status || 'active',
+          });
         } catch (err) {
           setError(err.response?.data?.detail || err.message || 'Failed to load case');
         } finally {
-          setLoading(false);
+          setFetchLoading(false);
         }
       };
       loadCase();
     }
   }, [id, isEdit]);
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -114,20 +66,11 @@ const CaseFormWithEffect = () => {
       if (isEdit) {
         await caseService.updateCase(id, formData);
         setSuccess('Case updated successfully!');
+        setTimeout(() => navigate(`/cases/${id}`), 1500);
       } else {
         const newCase = await caseService.createCase(formData);
         setSuccess('Case created successfully!');
-        // Reset form after creation
-        setFormData({
-          name: '',
-          description: '',
-          investigator: '',
-          status: 'active'
-        });
-        // Redirect to list after a short delay
-        setTimeout(() => {
-          navigate('/cases');
-        }, 1500);
+        setTimeout(() => navigate(`/cases/${newCase.id}`), 1500);
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Operation failed');
@@ -136,76 +79,165 @@ const CaseFormWithEffect = () => {
     }
   };
 
+  if (fetchLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-accent-cyan" />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-6">{isEdit ? 'Edit Case' : 'Create New Case'}</h1>
-      {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded">{error}</div>}
-      {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-600 rounded">{success}</div>}
+    <div className="min-h-screen">
+      <Header
+        breadcrumbs={[
+          { label: 'ArtifactX', path: '/' },
+          { label: 'Cases', path: '/cases' },
+          { label: isEdit ? 'Edit Case' : 'New Case' },
+        ]}
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-2">Case Name *</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+      <div className="p-6 animate-in max-w-2xl mx-auto">
+        <div className="card">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-accent-cyan/20 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-accent-cyan" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">{isEdit ? 'Edit Case' : 'Create New Case'}</h1>
+              <p className="text-sm text-forensic-500">
+                {isEdit ? 'Update case information' : 'Set up a new forensic investigation'}
+              </p>
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Description</label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 rounded-lg bg-accent-rose/10 border border-accent-rose/30">
+              <div className="flex items-center gap-3 text-accent-rose">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Investigator</label>
-          <input
-            type="text"
-            value={formData.investigator}
-            onChange={(e) => setFormData({ ...formData, investigator: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          {/* Success Message */}
+          {success && (
+            <div className="mb-6 p-4 rounded-lg bg-accent-emerald/10 border border-accent-emerald/30">
+              <div className="flex items-center gap-3 text-accent-emerald">
+                <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                <span>{success}</span>
+              </div>
+            </div>
+          )}
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Status</label>
-          <select
-            value={formData.status}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="closed">Closed</option>
-          </select>
-        </div>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Case Name */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-forensic-300 mb-2">
+                Case Name *
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                placeholder="e.g., Smith vs. Johnson Evidence Review"
+                className="w-full px-4 py-2.5 rounded-lg border border-forensic-700 bg-forensic-800
+                           text-forensic-100 placeholder-forensic-500
+                           focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20"
+              />
+            </div>
 
-        <div className="flex items-center justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate('/cases')}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${loading ? 'opacity-70' : ''}`}
-          >
-            {loading ? 'Saving...' : isEdit ? 'Update Case' : 'Create Case'}
-          </button>
+            {/* Description */}
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-forensic-300 mb-2">
+                Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={4}
+                placeholder="Provide a detailed description of the case scope and objectives..."
+                className="w-full px-4 py-2.5 rounded-lg border border-forensic-700 bg-forensic-800
+                           text-forensic-100 placeholder-forensic-500
+                           focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20 resize-none"
+              />
+            </div>
+
+            {/* Investigator */}
+            <div>
+              <label htmlFor="investigator" className="block text-sm font-medium text-forensic-300 mb-2">
+                Lead Investigator
+              </label>
+              <input
+                type="text"
+                id="investigator"
+                name="investigator"
+                value={formData.investigator}
+                onChange={handleChange}
+                placeholder="e.g., John Smith, Digital Forensics LLC"
+                className="w-full px-4 py-2.5 rounded-lg border border-forensic-700 bg-forensic-800
+                           text-forensic-100 placeholder-forensic-500
+                           focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20"
+              />
+            </div>
+
+            {/* Status */}
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-forensic-300 mb-2">
+                Case Status
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-lg border border-forensic-700 bg-forensic-800
+                           text-forensic-100 focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20"
+              >
+                <option value="active">Active - Investigation in progress</option>
+                <option value="archived">Archived - On hold or pending review</option>
+                <option value="closed">Closed - Investigation complete</option>
+              </select>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-forensic-700">
+              <Link
+                to={isEdit ? `/cases/${id}` : '/cases'}
+                className="btn-ghost flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={loading || !formData.name.trim()}
+                className="btn-primary flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    {isEdit ? 'Update Case' : 'Create Case'}
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 };
 
-export default CaseFormWithEffect;
+export default CaseForm;

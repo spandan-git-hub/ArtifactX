@@ -61,3 +61,8 @@ reports/*.pdf
 htmlcov/
 .coverage
 .pytest_cache/
+
+# Misc
+.claude/
+.agents/
+file::memory:

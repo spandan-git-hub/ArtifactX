@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, BarChart3 } from 'lucide-react';
+import { ArrowLeft, FileText, BarChart3, Trash2, ClipboardList, Loader2 } from 'lucide-react';
 import { caseService } from '../services/caseService';
 import { ReportPanel } from '../components/reports';
 import { useReportSummaries } from '../hooks/useReports';
@@ -32,130 +32,171 @@ const ReportsPage = () => {
   }, [caseId, loadSummaries]);
 
   if (loading) {
-    return <div className="p-6">Loading case...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent-cyan mx-auto" />
+          <span className="mt-3 text-forensic-400 block">Loading case data...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto animate-in">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link to="/cases" className="hover:text-blue-600 flex items-center gap-1">
+      <div className="mb-8">
+        <div className="flex items-center gap-2 text-sm text-forensic-500 mb-3">
+          <Link to="/cases" className="hover:text-accent-cyan flex items-center gap-1 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             Cases
           </Link>
-          <span>/</span>
-          <Link to={`/cases/${caseId}`} className="hover:text-blue-600">
+          <span className="text-forensic-700">/</span>
+          <Link to={`/cases/${caseId}`} className="hover:text-accent-cyan transition-colors">
             {caseData?.name || 'Case'}
           </Link>
-          <span>/</span>
-          <span>Reports</span>
+          <span className="text-forensic-700">/</span>
+          <span className="text-accent-cyan">Reports</span>
         </div>
-        <h1 className="text-2xl font-bold">Forensic Reports</h1>
-        <p className="text-gray-600">Generate PDF reports for case: {caseData?.name}</p>
+        <h1 className="text-2xl font-bold text-forensic-50 mb-1">Forensic Reports</h1>
+        <p className="text-forensic-500">Generate PDF reports for: <span className="text-forensic-300">{caseData?.name}</span></p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Report Generation Panel */}
         <div className="lg:col-span-1">
-          <ReportPanel caseId={caseId} />
+          <div className="card">
+            <div className="section-header mb-4">
+              <div className="section-icon">
+                <FileText className="h-5 w-5" />
+              </div>
+              <h2 className="section-title">Generate Report</h2>
+            </div>
+            <ReportPanel caseId={caseId} />
+          </div>
         </div>
 
         {/* Summary Previews */}
         <div className="lg:col-span-2 space-y-6">
           {/* Evidence Summary */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              Evidence Summary
-            </h3>
+          <div className="card">
+            <div className="section-header mb-4">
+              <div className="section-icon text-accent-emerald">
+                <ClipboardList className="h-5 w-5" />
+              </div>
+              <h2 className="section-title">Evidence Summary</h2>
+            </div>
             {loadingSummaries ? (
-              <p className="text-gray-500">Loading...</p>
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-accent-cyan" />
+              </div>
             ) : evidenceSummary ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold">{evidenceSummary.total_evidence_files}</p>
-                  <p className="text-xs text-gray-500">Evidence Files</p>
+                <div className="metric-card">
+                  <p className="metric-value">{evidenceSummary.total_evidence_files}</p>
+                  <p className="metric-label">Evidence Files</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold">{evidenceSummary.total_extracted_files}</p>
-                  <p className="text-xs text-gray-500">Extracted Files</p>
+                <div className="metric-card">
+                  <p className="metric-value">{evidenceSummary.total_extracted_files}</p>
+                  <p className="metric-label">Extracted</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold">{evidenceSummary.media_summary?.total || 0}</p>
-                  <p className="text-xs text-gray-500">Media Files</p>
+                <div className="metric-card">
+                  <p className="metric-value text-accent-violet">{evidenceSummary.media_summary?.total || 0}</p>
+                  <p className="metric-label">Media Files</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold">{evidenceSummary.apps_found?.length || 0}</p>
-                  <p className="text-xs text-gray-500">Apps Found</p>
+                <div className="metric-card">
+                  <p className="metric-value">{evidenceSummary.apps_found?.length || 0}</p>
+                  <p className="metric-label">Apps Found</p>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">No evidence data</p>
+              <p className="text-center text-forensic-500 py-8">No evidence data available</p>
             )}
           </div>
 
           {/* Timeline Summary */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-green-600" />
-              Timeline Summary
-            </h3>
+          <div className="card">
+            <div className="section-header mb-4">
+              <div className="section-icon text-accent-cyan">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <h2 className="section-title">Timeline Summary</h2>
+            </div>
             {loadingSummaries ? (
-              <p className="text-gray-500">Loading...</p>
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-accent-cyan" />
+              </div>
             ) : timelineSummary ? (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="font-medium">Total Events</span>
-                  <span className="text-xl font-bold">{timelineSummary.total_events}</span>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-forensic-800/50 rounded-lg">
+                  <span className="font-medium text-forensic-300">Total Events</span>
+                  <span className="text-2xl font-bold text-accent-cyan font-mono">
+                    {timelineSummary.total_events.toLocaleString()}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-blue-50 rounded text-center">
-                    <p className="font-semibold">{timelineSummary.events_by_app?.whatsapp || 0}</p>
-                    <p className="text-xs text-gray-500">WhatsApp</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-forensic-800/30 rounded-lg text-center border border-forensic-700/50">
+                    <p className="text-xl font-bold text-accent-emerald font-mono">
+                      {timelineSummary.events_by_app?.whatsapp || 0}
+                    </p>
+                    <p className="text-xs text-forensic-500 mt-1">WhatsApp</p>
                   </div>
-                  <div className="p-2 bg-blue-50 rounded text-center">
-                    <p className="font-semibold">{timelineSummary.events_by_app?.telegram || 0}</p>
-                    <p className="text-xs text-gray-500">Telegram</p>
+                  <div className="p-4 bg-forensic-800/30 rounded-lg text-center border border-forensic-700/50">
+                    <p className="text-xl font-bold text-accent-blue font-mono">
+                      {timelineSummary.events_by_app?.telegram || 0}
+                    </p>
+                    <p className="text-xs text-forensic-500 mt-1">Telegram</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">No timeline data</p>
+              <p className="text-center text-forensic-500 py-8">No timeline data available</p>
             )}
           </div>
 
           {/* Deleted Messages Summary */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <span className="text-red-600">⚠</span>
-              Deleted Messages
-            </h3>
+          <div className="card border-accent-rose/20">
+            <div className="section-header mb-4">
+              <div className="section-icon text-accent-rose">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <h2 className="section-title">Deleted Messages</h2>
+            </div>
             {loadingSummaries ? (
-              <p className="text-gray-500">Loading...</p>
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-accent-cyan" />
+              </div>
             ) : deletedSummary ? (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                  <span className="font-medium">Total Detections</span>
-                  <span className="text-xl font-bold text-red-600">{deletedSummary.total_deletions}</span>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-accent-rose/10 rounded-lg border border-accent-rose/20">
+                  <span className="font-medium text-forensic-300">Total Detections</span>
+                  <span className="text-2xl font-bold text-accent-rose font-mono">
+                    {deletedSummary.total_deletions}
+                  </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                  <div className="p-2 bg-green-50 rounded">
-                    <p className="font-semibold text-green-600">{deletedSummary.high_confidence_count || 0}</p>
-                    <p className="text-xs text-gray-500">High Conf.</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 bg-accent-emerald/10 rounded-lg text-center border border-accent-emerald/20">
+                    <p className="text-lg font-bold text-accent-emerald font-mono">
+                      {deletedSummary.high_confidence_count || 0}
+                    </p>
+                    <p className="text-xs text-forensic-500 mt-0.5">High Conf.</p>
                   </div>
-                  <div className="p-2 bg-yellow-50 rounded">
-                    <p className="font-semibold text-yellow-600">{deletedSummary.medium_confidence_count || 0}</p>
-                    <p className="text-xs text-gray-500">Med Conf.</p>
+                  <div className="p-3 bg-accent-amber/10 rounded-lg text-center border border-accent-amber/20">
+                    <p className="text-lg font-bold text-accent-amber font-mono">
+                      {deletedSummary.medium_confidence_count || 0}
+                    </p>
+                    <p className="text-xs text-forensic-500 mt-0.5">Med Conf.</p>
                   </div>
-                  <div className="p-2 bg-gray-50 rounded">
-                    <p className="font-semibold text-gray-600">{deletedSummary.low_confidence_count || 0}</p>
-                    <p className="text-xs text-gray-500">Low Conf.</p>
+                  <div className="p-3 bg-forensic-800/30 rounded-lg text-center border border-forensic-700/50">
+                    <p className="text-lg font-bold text-forensic-400 font-mono">
+                      {deletedSummary.low_confidence_count || 0}
+                    </p>
+                    <p className="text-xs text-forensic-500 mt-0.5">Low Conf.</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">No deleted message data</p>
+              <p className="text-center text-forensic-500 py-8">No deleted message data available</p>
             )}
           </div>
         </div>
