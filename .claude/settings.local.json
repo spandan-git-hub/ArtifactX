@@ -19,7 +19,10 @@
       "Bash(C:/Users/Spandan/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe -c ' *)",
       "Bash(curl *)",
       "Bash(netstat -ano)",
-      "Bash(taskkill //F //PID 2116)"
+      "Bash(taskkill //F //PID 2116)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pip show *)",
+      "Bash(where python *)"
     ]
   }
 }

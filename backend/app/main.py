@@ -9,7 +9,7 @@ from backend.app.config import settings
 from backend.app.database import Base, engine
 from backend.utils.logging_config import configure_logging
 from backend.middleware import ErrorLoggingMiddleware
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo
 
 
 @asynccontextmanager
@@ -51,8 +51,15 @@ app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
+app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
+
 
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "app": settings.app_name}
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "version": "1.0.0",
+        "demo_mode": settings.demo_mode
+    }

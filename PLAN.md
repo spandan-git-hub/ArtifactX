@@ -26,9 +26,11 @@ ArtifactX is a forensic analysis platform that analyzes acquired evidence from:
 ### Backend
 - FastAPI
 - Python
+- PostgreSQL (application database)
+- SQLite (used only by forensic parsers to read evidence files)
 
 ### Database
-- SQLite
+- PostgreSQL
 
 ---
 
@@ -386,13 +388,14 @@ ArtifactX/
 | fastapi | ^0.110 | Web framework |
 | uvicorn | ^0.30 | ASGI server |
 | sqlalchemy | ^2.0 | ORM |
+| psycopg2-binary | ^2.9 | PostgreSQL adapter |
 | pydantic | ^2.0 | Validation |
 | pydantic-settings | ^2.0 | Configuration |
 | python-multipart | ^0.0.9 | File upload |
 | reportlab | ^4.0 | PDF generation |
 | structlog | ^24.0 | Structured logging |
 | Pillow | ^10.0 | Image EXIF |
-| aiosqlite | ^0.20 | Async SQLite |
+| sqlite3 | (stdlib) | Reads evidence files (WhatsApp/Telegram databases) |
 
 ### Frontend
 
@@ -415,4 +418,17 @@ ArtifactX/
 
 All 12 phases are complete. Every requirement has been implemented.
 
-**Last updated:** 2026-06-26
+### Phase 13: Refinements & Demo Mode (2026-07-15)
+
+- [x] Fixed `DeletedMessage` import error in `deleted_service.py`
+- [x] Populated `forensic/__init__.py` with proper exports
+- [x] Added demo mode API endpoints (`backend/api/demo.py`)
+- [x] Added demo mode frontend service and UI
+- [x] Fixed frontend null checks in DashboardPage
+- [x] Fixed date formatting safety in CaseListPage
+- [x] Added common UI components (ErrorBoundary, LoadingSpinner, EmptyState)
+- [x] Updated health endpoint with version and demo_mode status
+- [x] Added PostgreSQL migration guidelines to REFINEMENT.md
+- [x] Created database setup scripts for PostgreSQL
+
+**Last updated:** 2026-07-15

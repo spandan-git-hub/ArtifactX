@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.repositories.deleted_repo import DeletedRepository
 from backend.repositories.whatsapp_repo import WhatsAppRepository
 from backend.repositories.telegram_repo import TelegramRepository
-from backend.models.models import WhatsAppMessage, TelegramMessage, Evidence
+from backend.models.models import WhatsAppMessage, TelegramMessage, Evidence, DeletedMessage
 from forensic.deleted.detector import DeletedDetector
 from backend.services.log_service import get_log_service
 

@@ -1,6 +1,6 @@
 """API routers."""
 
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo
 
 __all__ = [
     "cases",
@@ -15,4 +15,5 @@ __all__ = [
     "dashboard",
     "reports",
     "logs",
+    "demo",
 ]

@@ -164,7 +164,7 @@ const CaseListPage = () => {
                 <div className="flex items-center gap-4 text-xs text-forensic-500 mb-4">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {new Date(caseItem.created_at).toLocaleDateString()}
+                    {caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString() : 'N/A'}
                   </div>
                   {caseItem.investigator && (
                     <div className="flex items-center gap-1">

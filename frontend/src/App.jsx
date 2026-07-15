@@ -8,9 +8,25 @@ import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
 import CaseForm from './components/cases/CaseForm';
 import { Layout } from './components/layout';
-import { Shield } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
+import { demoService } from './services/demoService';
 
 function HomeScreen() {
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleCreateDemo = async () => {
+    setDemoLoading(true);
+    try {
+      const stats = await demoService.createDemoCase();
+      // Navigate to the new demo case
+      window.location.href = `/cases/${stats.case_id}/dashboard`;
+    } catch (err) {
+      console.error('Failed to create demo case:', err);
+      alert('Failed to create demo case. Please try again.');
+      setDemoLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-forensic-950 flex items-center justify-center">
       <div className="text-center animate-in">
@@ -25,9 +41,28 @@ function HomeScreen() {
           <div className="status-dot status-dot-active" />
           <span className="text-sm text-forensic-500 font-mono">System Online</span>
         </div>
-        <Link to="/cases" className="btn-primary inline-flex items-center gap-2">
-          Access Dashboard
-        </Link>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link to="/cases" className="btn-primary inline-flex items-center gap-2">
+            Access Dashboard
+          </Link>
+          <button
+            onClick={handleCreateDemo}
+            disabled={demoLoading}
+            className="btn-secondary inline-flex items-center gap-2"
+          >
+            {demoLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating Demo...
+              </>
+            ) : (
+              'Create Demo Case'
+            )}
+          </button>
+        </div>
+        <p className="text-xs text-forensic-600 mt-4">
+          Demo mode creates sample WhatsApp data for testing
+        </p>
       </div>
     </div>
   );

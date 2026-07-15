@@ -163,13 +163,13 @@ const DashboardPage = () => {
             <h2 className="section-title">By Application</h2>
           </div>
           <div className="space-y-4">
-            {apps.includes('whatsapp') && stats.whatsapp && (
+            {apps?.includes('whatsapp') && stats?.whatsapp && (
               <AppStatsCard app="WhatsApp" stats={stats.whatsapp} icon="whatsapp" />
             )}
-            {apps.includes('telegram') && stats.telegram && (
+            {apps?.includes('telegram') && stats?.telegram && (
               <AppStatsCard app="Telegram" stats={stats.telegram} icon="telegram" />
             )}
-            {(!apps.includes('whatsapp') && !apps.includes('telegram')) && (
+            {(!apps?.includes('whatsapp') && !apps?.includes('telegram')) && (
               <div className="text-center py-8">
                 <Layers className="h-12 w-12 text-forensic-600 mx-auto mb-3" />
                 <p className="text-forensic-500">No app data available</p>

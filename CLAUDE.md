@@ -95,3 +95,18 @@ ArtifactX is complete when:
 * All phases in PLAN.md are marked complete
 * All requirements in PLAN.md are implemented
 * Verification of the implementation passes
+
+
+<!-- 
+
+# Backend
+cd backend && pip install -r requirements.txt
+$env:PYTHONPATH = "D:\ArtifactX"
+$env:PATH = "C:\Users\Spandan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\Scripts;$env:PATH"
+cd D:\ArtifactX\backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Frontend (new terminal)
+cd frontend && npm install && npm run dev  
+
+-->
