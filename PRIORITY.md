@@ -11,43 +11,43 @@
 
 These tasks must happen first. They are read-only investigations.
 
-- [ ] **A1** — Read `forensic/whatsapp/contact_parser.py`, `group_parser.py`, `media_parser.py`
+- [x] **A1** — Read `forensic/whatsapp/contact_parser.py`, `group_parser.py`, `media_parser.py`
   - Verify each exists and follows the same schema-adaptive pattern as `message_parser.py`
   - Verify return dicts match `WhatsAppContact`, `WhatsAppGroup` model fields
 
-- [ ] **A2** — Read all files in `forensic/telegram/`
+- [x] **A2** — Read all files in `forensic/telegram/`
   - Verify `detector.py`, `message_parser.py`, `contact_parser.py`, `group_parser.py` all exist
   - Verify `detector.py` correctly identifies `cache4.db` / Telegram SQLite schemas
 
-- [ ] **A3** — Read `forensic/timeline/builder.py`
+- [x] **A3** — Read `forensic/timeline/builder.py`
   - Verify `TimelineBuilder.build_timeline_for_case(db, case_id)` exists
   - Verify it returns list of dicts compatible with `TimelineEvent` model fields (especially `normalized_timestamp` as a real `datetime` object)
 
-- [ ] **A4** — Read `forensic/correlation/matcher.py`
+- [x] **A4** — Read `forensic/correlation/matcher.py`
   - Verify the dataclasses `WhatsAppMessage`, `WhatsAppContact`, `TelegramMessage`, `TelegramContact`, `MediaItem` defined there have the same field names that `correlation_service.py` uses when converting from ORM objects
 
-- [ ] **A5** — Read `forensic/media/orphan.py`
+- [x] **A5** — Read `forensic/media/orphan.py`
   - Verify these three function signatures:
     - `find_orphan_media_items(case_id: int, db: Session) -> List[MediaItem]`
     - `find_orphan_files(case_id: int, evidence_id: int, db: Session) -> List[EvidenceFile]`
     - `mark_media_orphan_status(case_id: int, db: Session) -> int`
 
-- [ ] **A6** — Read `backend/services/log_service.py`
+- [x] **A6** — Read `backend/services/log_service.py`
   - Verify `log_analysis(evidence_id=0, ...)` does NOT trigger a FK constraint violation
   - The `analysis_logs.evidence_id` column must be nullable for passing `0` or `None` to work
   - If it is NOT nullable, add `nullable=True` to the column definition in `models.py`
 
-- [ ] **A7** — Read `frontend/src/hooks/useDashboard.js`
+- [x] **A7** — Read `frontend/src/hooks/useDashboard.js`
   - Verify `loadOverview` is wrapped in `useCallback(async (id) => {...}, [])`
   - If not: the DashboardPage causes an infinite re-render loop
 
-- [ ] **A8** — Read `frontend/src/services/reportService.js`
+- [x] **A8** — Read `frontend/src/services/reportService.js`
   - Verify `getEvidenceSummary`, `getTimelineSummary`, `getDeletedSummary` use `axios.get(...)` not `axios.post(...)`
 
-- [ ] **A9** — Read `frontend/src/pages/ReportsPage.jsx`
+- [x] **A9** — Read `frontend/src/pages/ReportsPage.jsx`
   - Verify it exists and loads the three summary cards
 
-- [ ] **A10** — Read `frontend/vite.config.js`
+- [x] **A10** — Read `frontend/vite.config.js`
   - Verify `/api` proxy to `http://localhost:8000` is configured
 
 ---
