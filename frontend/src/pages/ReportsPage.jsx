@@ -10,7 +10,7 @@ const ReportsPage = () => {
   const { caseId } = useParams();
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { evidenceSummary, timelineSummary, deletedSummary, loading: loadingSummaries, loadSummaries } = useReportSummaries();
+  const { evidenceSummary, timelineSummary, deletedSummary, loading: loadingSummaries, loadSummaries } = useReportSummaries(caseId);
 
   useEffect(() => {
     const loadCase = async () => {

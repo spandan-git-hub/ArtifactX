@@ -17,12 +17,19 @@ def is_whatsapp_database(file_path: Path) -> bool:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in cursor.fetchall()}
         conn.close()
-        # WhatsApp msgstore.db typically has these tables:
-        # chats, messages, wa_contacts, etc.
-        # We'll check for a combination of known tables.
-        required_tables = {"messages", "wa_contacts", "chats"}
-        # If at least one of the known tables exists, consider it a WhatsApp DB
-        # (more robust: check for multiple)
-        return len(tables.intersection(required_tables)) >= 2
+        tables = {table.lower() for table in tables}
+
+        legacy_tables = {"messages", "wa_contacts", "chats"}
+        modern_tables = {"message", "chat", "jid"}
+
+        if len(tables.intersection(legacy_tables)) >= 2:
+            return True
+        if "message" in tables and ("jid" in tables or "chat" in tables):
+            return True
+        if "messages" in tables and ("jid" in tables or "chat" in tables or "chats" in tables):
+            return True
+        if len(tables.intersection(modern_tables)) >= 2:
+            return True
+        return False
     except sqlite3.Error:
         return False

@@ -34,6 +34,7 @@ const CaseDetailPage = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('evidence');
   const [selectedEvidenceId, setSelectedEvidenceId] = useState(null);
+  const [evidenceRefreshToken, setEvidenceRefreshToken] = useState(0);
 
   // Accidentally had a typo in "useParams()" - it's actually "useParams" which is correct
 
@@ -232,9 +233,17 @@ const CaseDetailPage = () => {
 
           {activeSection === 'evidence' && (
             <div className="mt-6 pt-6 border-t border-forensic-700 space-y-6">
-              <EvidenceUploader caseId={id} onUploadSuccess={() => {}} />
+              <EvidenceUploader
+                caseId={id}
+                onUploadSuccess={(uploadedEvidence) => {
+                  setSelectedEvidenceId(uploadedEvidence?.id ?? null);
+                  setEvidenceRefreshToken((token) => token + 1);
+                  setActiveSection('whatsapp');
+                }}
+              />
               <EvidenceInventory
                 caseId={id}
+                refreshToken={evidenceRefreshToken}
                 selectedEvidenceId={selectedEvidenceId}
                 onSelectEvidence={(evId) => setSelectedEvidenceId(evId)}
               />

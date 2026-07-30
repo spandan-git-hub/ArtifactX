@@ -1,22 +1,72 @@
 """Evidence management API endpoints."""
 
-import zipfile
 import io
+import logging
+import mimetypes
+import shutil
+import traceback
+import uuid
+import zipfile
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.models.models import Evidence, EvidenceFile
+from backend.models.models import ActivityLog, Case, Evidence, EvidenceFile
 from backend.utils.hashing import compute_sha256_bytes, compute_sha256
-from backend.utils.file_storage import save_upload, delete_file
+from backend.utils.file_storage import delete_file
 from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
 from backend.services.log_service import get_log_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+SUPPORTED_UPLOAD_EXTENSIONS = {
+    ".zip",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".tiff",
+    ".webp",
+    ".heic",
+    ".heif",
+    ".mp4",
+    ".avi",
+    ".mkv",
+    ".mov",
+    ".wmv",
+    ".flv",
+    ".webm",
+    ".m4v",
+    ".3gp",
+    ".3g2",
+    ".mp3",
+    ".wav",
+    ".flac",
+    ".aac",
+    ".ogg",
+    ".m4a",
+    ".wma",
+    ".aiff",
+    ".alac",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".txt",
+    ".rtf",
+    ".vid",
+}
 
 
 def _is_zip_file(filename: str, content_type: Optional[str]) -> bool:
@@ -28,52 +78,153 @@ def _is_zip_file(filename: str, content_type: Optional[str]) -> bool:
     return False
 
 
+def _safe_filename(filename: Optional[str]) -> str:
+    """Return a filesystem-safe basename for a client-provided filename."""
+    raw_name = Path(filename or "unnamed").name.strip()
+    if not raw_name or raw_name in {".", ".."}:
+        return "unnamed"
+
+    safe_chars = []
+    for char in raw_name:
+        if char.isalnum() or char in {".", "-", "_"}:
+            safe_chars.append(char)
+        else:
+            safe_chars.append("_")
+    return "".join(safe_chars)[:255] or "unnamed"
+
+
+def _validate_supported_upload(filename: Optional[str], content_type: Optional[str]) -> None:
+    """Reject files this endpoint does not know how to inventory/analyze."""
+    safe_name = _safe_filename(filename)
+    extension = Path(safe_name).suffix.lower()
+
+    if extension in SUPPORTED_UPLOAD_EXTENSIONS:
+        return
+    if content_type and (
+        content_type.startswith("image/")
+        or content_type.startswith("video/")
+        or content_type.startswith("audio/")
+        or content_type in {"application/zip", "application/x-sqlite3", "application/octet-stream"}
+    ):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail=f"Unsupported evidence file type: {extension or content_type or 'unknown'}",
+    )
+
+
+def _media_type_from_mime(mime_type: Optional[str]) -> Optional[str]:
+    if not mime_type:
+        return None
+    if mime_type.startswith("image/"):
+        return "image"
+    if mime_type.startswith("video/"):
+        return "video"
+    if mime_type.startswith("audio/"):
+        return "audio"
+    return None
+
+
+def _safe_zip_member_path(filename: str) -> Path:
+    """Validate and normalize a ZIP member path before extraction."""
+    member_path = Path(filename)
+    if member_path.is_absolute() or any(part in {"", ".", ".."} for part in member_path.parts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsafe ZIP member path: {filename}",
+        )
+    return member_path
+
+
 def _extract_zip(zip_data: bytes, extract_dir: Path) -> List[dict]:
     """Extract ZIP archive to directory, return list of file info.
     Each dict contains: relative_path, size, sha256.
     """
     extracted_info = []
-    with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
-        # Ensure no path traversal
-        for info in zf.infolist():
-            # Skip directories
-            if info.is_dir():
-                continue
-            # Normalize path to prevent directory traversal
-            target_path = Path(info.filename)
-            # Ensure the path is relative and does not start with slash or contain ..
-            # We'll join with extract_dir and then check if it's inside.
-            # Simpler: we only accept filenames without path separators? Keep as is but ensure safety.
-            # For simplicity, we'll basename only? But we want to preserve directory structure inside ZIP.
-            # We'll allow subdirectories but ensure they stay under extract_dir.
-            # Resolve the target path relative to extract_dir.
-            target_path = extract_dir / info.filename
-            # Resolve to absolute path and ensure it's still under extract_dir.
-            try:
-                target_path.resolve().relative_to(extract_dir.resolve())
-            except ValueError:
-                # Attempted path traversal
-                continue
-            # Ensure parent directory exists
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            # Extract file
-            with zf.open(info) as source, open(target_path, "wb") as target:
-                # Copy in chunks to handle large files
-                while True:
-                    chunk = source.read(8192)
-                    if not chunk:
-                        break
-                    target.write(chunk)
-            # Compute SHA-256
-            file_sha256 = compute_sha256(target_path)
-            extracted_info.append(
-                {
-                    "relative_path": str(target_path.relative_to(extract_dir)),
-                    "size": info.file_size,
-                    "sha256": file_sha256,
-                }
-            )
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+            bad_member = zf.testzip()
+            if bad_member:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Corrupt ZIP member: {bad_member}",
+                )
+
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+
+                relative_path = _safe_zip_member_path(info.filename)
+                target_path = extract_dir / relative_path
+                try:
+                    target_path.resolve().relative_to(extract_dir.resolve())
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Unsafe ZIP member path: {info.filename}",
+                    )
+
+                logger.info(
+                    "Extracting ZIP member filename=%s size=%s target=%s",
+                    info.filename,
+                    info.file_size,
+                    target_path,
+                )
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(info) as source, open(target_path, "wb") as target:
+                    while chunk := source.read(8192):
+                        target.write(chunk)
+
+                file_sha256 = compute_sha256(target_path)
+                mime_type, _ = mimetypes.guess_type(str(target_path))
+                extracted_info.append(
+                    {
+                        "relative_path": str(relative_path),
+                        "size": info.file_size,
+                        "sha256": file_sha256,
+                        "mime_type": mime_type,
+                    }
+                )
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is not a valid ZIP archive",
+        ) from exc
     return extracted_info
+
+
+def _cleanup_upload_artifacts(*paths: Optional[Path]) -> None:
+    """Best-effort cleanup for files/directories created before an error."""
+    for path in paths:
+        if not path:
+            continue
+        try:
+            if path.exists():
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+                logger.info("Cleaned up upload artifact path=%s", path)
+        except Exception:
+            logger.error("Failed to clean up upload artifact path=%s\n%s", path, traceback.format_exc())
+
+
+def _evidence_to_response(evidence: Evidence) -> dict:
+    """Serialize Evidence explicitly so response validation cannot hit SQLAlchemy metadata."""
+    return {
+        "id": evidence.id,
+        "case_id": evidence.case_id,
+        "original_filename": evidence.original_filename,
+        "storage_path": evidence.storage_path,
+        "sha256": evidence.sha256,
+        "content_type": evidence.content_type,
+        "evidence_type": evidence.evidence_type,
+        "metadata": evidence.metadata_ or {},
+        "extracted_path": evidence.extracted_path,
+        "uploaded_at": evidence.uploaded_at,
+        "analyzed_at": evidence.analyzed_at,
+    }
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -83,92 +234,124 @@ def upload_evidence(
     db: Session = Depends(get_db),
 ):
     """Upload evidence file (ZIP or regular) for a case."""
+    storage_path: Optional[Path] = None
+    extract_dir: Optional[Path] = None
+    extracted_files: list[dict] = []
+    safe_name = _safe_filename(file.filename)
+
     try:
-        # Read file data
+        logger.info(
+            "Evidence upload requested case_id=%s filename=%s content_type=%s",
+            case_id,
+            file.filename,
+            file.content_type,
+        )
+
+        logger.info("Validating case exists case_id=%s", case_id)
+        case = db.query(Case).filter(Case.id == case_id).first()
+        if not case:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Case {case_id} not found",
+            )
+
+        logger.info("Validating upload directory path=%s", UPLOADS_DIR)
+        try:
+            UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.error("Upload directory is not writable path=%s\n%s", UPLOADS_DIR, traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Upload storage is not available",
+            ) from exc
+        if not UPLOADS_DIR.is_dir():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Upload storage path is not a directory",
+            )
+
+        logger.info("Validating supported upload filename=%s content_type=%s", safe_name, file.content_type)
+        _validate_supported_upload(safe_name, file.content_type)
+
+        logger.info("Reading uploaded file filename=%s", safe_name)
         file_data = file.file.read()
+        file_size = len(file_data)
+        logger.info("Uploaded file read complete filename=%s size=%s", safe_name, file_size)
+        if file_size == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is empty",
+            )
 
-        # Compute SHA-256 of the uploaded file
+        logger.info("Computing uploaded file SHA-256 filename=%s size=%s", safe_name, file_size)
         sha256 = compute_sha256_bytes(file_data)
+        logger.info("Computed uploaded file SHA-256 filename=%s sha256=%s", safe_name, sha256)
 
-        # Determine if it's a ZIP
-        is_zip = _is_zip_file(file.filename, file.content_type)
-
-        storage_path = None
-        extracted_path = None
+        is_zip = _is_zip_file(safe_name, file.content_type)
         evidence_type = "zip" if is_zip else "file"
+        stored_name = f"{uuid.uuid4().hex}_{safe_name}"
+        storage_path = UPLOADS_DIR / stored_name
 
         if is_zip:
-            # Create a subdirectory for extracted files under UPLOADS_DIR
-            # Use a unique directory name based on hash or timestamp
-            import uuid
             extract_dir_name = f"extract_{uuid.uuid4().hex}"
             extract_dir = UPLOADS_DIR / extract_dir_name
+            logger.info("Creating ZIP extraction directory path=%s", extract_dir)
             extract_dir.mkdir(parents=True, exist_ok=True)
 
-            # Extract ZIP
+            logger.info("Extracting ZIP filename=%s extract_dir=%s", safe_name, extract_dir)
             extracted_files = _extract_zip(file_data, extract_dir)
-            extracted_path = str(extract_dir)
+            logger.info(
+                "ZIP extraction complete filename=%s extract_dir=%s extracted_count=%s",
+                safe_name,
+                extract_dir,
+                len(extracted_files),
+            )
 
-            # Save the ZIP file itself as evidence
-            zip_filename = file.filename or "unnamed.zip"
-            zip_storage_path = save_upload(zip_filename, file_data)
-            storage_path = str(zip_storage_path)
-        else:
-            # Regular file: save directly
-            filename = file.filename or "unnamed"
-            storage_path = save_upload(filename, file_data)
-            extracted_path = None
+        logger.info("Saving uploaded file storage_path=%s", storage_path)
+        with open(storage_path, "xb") as target:
+            target.write(file_data)
+        logger.info("Uploaded file saved storage_path=%s", storage_path)
 
-        # Prepare metadata for evidence (uploaded file)
         evidence_metadata = {
             "original_content_type": file.content_type,
-            "upload_size": len(file_data),
+            "upload_size": file_size,
             "is_zip": is_zip,
-            "original_filename": file.filename or "unnamed"
+            "original_filename": file.filename or "unnamed",
+            "stored_filename": stored_name,
         }
 
-        # Create evidence record
+        logger.info("Creating Evidence row case_id=%s filename=%s sha256=%s", case_id, safe_name, sha256)
         evidence = Evidence(
             case_id=case_id,
-            original_filename=file.filename or "unnamed",
-            storage_path=storage_path,
+            original_filename=safe_name,
+            storage_path=str(storage_path),
             sha256=sha256,
             content_type=file.content_type,
             evidence_type=evidence_type,
             metadata_=evidence_metadata,
-            extracted_path=extracted_path,
+            extracted_path=str(extract_dir) if extract_dir else None,
         )
         db.add(evidence)
-        db.commit()
-        db.refresh(evidence)
+        db.flush()
+        logger.info("Evidence row flushed evidence_id=%s", evidence.id)
 
-        # If ZIP, create EvidenceFile records for each extracted file
-        if is_zip and extracted_path:
-            extract_dir = Path(extracted_path)
+        if is_zip and extract_dir:
             for file_info in extracted_files:
-                # Build absolute path to the extracted file
                 abs_path = extract_dir / file_info["relative_path"]
-                # Determine mime type (simple extension mapping)
-                mime_type = None
-                if abs_path.suffix:
-                    # Very basic mapping; could be improved
-                    ext = abs_path.suffix.lower()
-                    if ext in [".jpg", ".jpeg"]:
-                        mime_type = "image/jpeg"
-                    elif ext == ".png":
-                        mime_type = "image/png"
-                    elif ext == ".gif":
-                        mime_type = "image/gif"
-                    elif ext == ".pdf":
-                        mime_type = "application/pdf"
-                    elif ext == ".txt":
-                        mime_type = "text/plain"
-                    # else leave as None
+                mime_type = file_info.get("mime_type")
                 file_metadata = {
                     "size": file_info["size"],
                     "mime_type": mime_type,
                     "extracted_path": str(abs_path),
                 }
+                media_type = _media_type_from_mime(mime_type)
+                logger.info(
+                    "Creating EvidenceFile row evidence_id=%s relative_path=%s size=%s mime_type=%s",
+                    evidence.id,
+                    file_info["relative_path"],
+                    file_info["size"],
+                    mime_type,
+                )
                 evidence_file = EvidenceFile(
                     evidence_id=evidence.id,
                     relative_path=file_info["relative_path"],
@@ -176,104 +359,226 @@ def upload_evidence(
                     file_size=file_info["size"],
                     mime_type=mime_type,
                     metadata_=file_metadata,
-                    is_media=mime_type and mime_type.startswith("image/") or mime_type and mime_type.startswith("video/"),
-                    media_type=(
-                        "image"
-                        if mime_type and mime_type.startswith("image/")
-                        else "video"
-                        if mime_type and mime_type.startswith("video/")
-                        else "audio"
-                        if mime_type and mime_type.startswith("audio/")
-                        else None
-                    ),
+                    is_media=media_type is not None,
+                    media_type=media_type,
                 )
                 db.add(evidence_file)
-            db.commit()
 
-        # Log activity
-        log_service = get_log_service(db)
-        log_service.log_activity(
+        logger.info("Creating ActivityLog row case_id=%s evidence_id=%s", case_id, evidence.id)
+        db.add(ActivityLog(
             case_id=case_id,
             action="upload_evidence",
-            description=f"Evidence uploaded: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)"
-        )
+            description=f"Evidence uploaded: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)",
+        ))
 
-        # Return response
+        logger.info("Committing evidence upload transaction evidence_id=%s", evidence.id)
+        db.commit()
+        db.refresh(evidence)
+        logger.info("Evidence upload committed evidence_id=%s", evidence.id)
+
         return {
             "id": evidence.id,
             "filename": evidence.original_filename,
             "sha256": evidence.sha256,
-            "size": len(file_data),
+            "size": file_size,
             "evidence_type": evidence.evidence_type,
             "is_zip": is_zip,
             "extracted_files_count": len(extracted_files) if is_zip else 0,
         }
-    except Exception as e:
-        # Log error
-        log_service = get_log_service(db)
-        log_service.log_error(
-            error_type="evidence_upload_error",
-            message=f"Error uploading evidence: {str(e)}",
-            case_id=case_id,
-            evidence_id=None,
-            stack_trace=str(e.__traceback__),
-            endpoint="/api/evidence/upload",
-            method="POST"
+    except HTTPException:
+        logger.warning(
+            "Evidence upload rejected case_id=%s filename=%s\n%s",
+            case_id,
+            file.filename,
+            traceback.format_exc(),
         )
+        db.rollback()
+        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise
+    except IntegrityError as exc:
+        logger.error(
+            "Evidence upload integrity error case_id=%s filename=%s\n%s",
+            case_id,
+            file.filename,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        _cleanup_upload_artifacts(storage_path, extract_dir)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Evidence upload conflicts with existing database state",
+        ) from exc
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Evidence upload database error case_id=%s filename=%s\n%s",
+            case_id,
+            file.filename,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        _cleanup_upload_artifacts(storage_path, extract_dir)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while uploading evidence",
+        ) from exc
+    except OSError as exc:
+        logger.error(
+            "Evidence upload file handling error case_id=%s filename=%s storage_path=%s extract_dir=%s\n%s",
+            case_id,
+            file.filename,
+            storage_path,
+            extract_dir,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        _cleanup_upload_artifacts(storage_path, extract_dir)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="File storage error while uploading evidence",
+        ) from exc
+    except Exception as e:
+        logger.error(
+            "Unexpected evidence upload error case_id=%s filename=%s\n%s",
+            case_id,
+            file.filename,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        _cleanup_upload_artifacts(storage_path, extract_dir)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while uploading evidence",
+        ) from e
 
 
+@router.get("", response_model=List[EvidenceRead])
 @router.get("/", response_model=List[EvidenceRead])
 def list_evidences(case_id: int, db: Session = Depends(get_db)):
     """List evidences for a specific case."""
     try:
-        evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
-        return evidences
-    except Exception as e:
-        # Log error
-        log_service = get_log_service(db)
-        log_service.log_error(
-            error_type="evidence_list_error",
-            message=f"Error listing evidences: {str(e)}",
-            case_id=case_id,
-            evidence_id=None,
-            stack_trace=str(e.__traceback__),
-            endpoint="/api/evidence",
-            method="GET"
+        logger.info("Listing evidence requested case_id=%s", case_id)
+
+        logger.info("Validating case exists before listing evidence case_id=%s", case_id)
+        case = db.query(Case).filter(Case.id == case_id).first()
+        if not case:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Case {case_id} not found",
+            )
+
+        logger.info("Querying evidence rows case_id=%s", case_id)
+        evidences = (
+            db.query(Evidence)
+            .filter(Evidence.case_id == case_id)
+            .order_by(Evidence.uploaded_at.desc())
+            .all()
         )
+        logger.info("Evidence rows loaded case_id=%s count=%s", case_id, len(evidences))
+
+        return [_evidence_to_response(evidence) for evidence in evidences]
+    except HTTPException:
+        logger.warning(
+            "Evidence list rejected case_id=%s\n%s",
+            case_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
         raise
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Evidence list database error case_id=%s\n%s",
+            case_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while listing evidence",
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "Unexpected evidence list error case_id=%s\n%s",
+            case_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while listing evidence",
+        ) from exc
 
 
 @router.get("/{evidence_id}")
 def get_evidence(evidence_id: int, db: Session = Depends(get_db)):
     try:
+        logger.info("Getting evidence requested evidence_id=%s", evidence_id)
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
-            raise HTTPException(status_code=404, detail="Evidence not found")
-        return evidence
-    except Exception as e:
-        # Log error
-        log_service = get_log_service(db)
-        log_service.log_error(
-            error_type="evidence_retrieval_error",
-            message=f"Error retrieving evidence: {str(e)}",
-            case_id=None,  # We don't have the case_id easily without another query
-            evidence_id=evidence_id,
-            stack_trace=str(e.__traceback__),
-            endpoint=f"/api/evidence/{evidence_id}",
-            method="GET"
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Evidence {evidence_id} not found",
+            )
+
+        logger.info(
+            "Evidence row loaded evidence_id=%s case_id=%s filename=%s",
+            evidence.id,
+            evidence.case_id,
+            evidence.original_filename,
         )
+        return _evidence_to_response(evidence)
+    except HTTPException:
+        logger.warning(
+            "Evidence retrieval rejected evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
         raise
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Evidence retrieval database error evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while retrieving evidence",
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "Unexpected evidence retrieval error evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while retrieving evidence",
+        ) from exc
 
 
 @router.get("/{evidence_id}/files")
 def list_evidence_files(evidence_id: int, db: Session = Depends(get_db)):
     """List files contained within the evidence (if ZIP)."""
     try:
+        logger.info("Listing evidence files requested evidence_id=%s", evidence_id)
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
-            raise HTTPException(status_code=404, detail="Evidence not found")
-        files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).all()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Evidence {evidence_id} not found",
+            )
+
+        logger.info("Querying evidence file rows evidence_id=%s", evidence_id)
+        files = (
+            db.query(EvidenceFile)
+            .filter(EvidenceFile.evidence_id == evidence_id)
+            .order_by(EvidenceFile.relative_path.asc())
+            .all()
+        )
+        logger.info("Evidence file rows loaded evidence_id=%s count=%s", evidence_id, len(files))
+
         return [
             {
                 "id": f.id,
@@ -287,19 +592,36 @@ def list_evidence_files(evidence_id: int, db: Session = Depends(get_db)):
             }
             for f in files
         ]
-    except Exception as e:
-        # Log error
-        log_service = get_log_service(db)
-        log_service.log_error(
-            error_type="evidence_files_list_error",
-            message=f"Error listing evidence files: {str(e)}",
-            case_id=None,
-            evidence_id=evidence_id,
-            stack_trace=str(e.__traceback__),
-            endpoint=f"/api/evidence/{evidence_id}/files",
-            method="GET"
+    except HTTPException:
+        logger.warning(
+            "Evidence files list rejected evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
         )
+        db.rollback()
         raise
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Evidence files list database error evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while listing evidence files",
+        ) from exc
+    except Exception as exc:
+        logger.error(
+            "Unexpected evidence files list error evidence_id=%s\n%s",
+            evidence_id,
+            traceback.format_exc(),
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while listing evidence files",
+        ) from exc
 
 
 @router.get("/{evidence_id}/files/{file_id}")

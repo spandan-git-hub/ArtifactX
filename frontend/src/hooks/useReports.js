@@ -49,6 +49,14 @@ export const useReportSummaries = (caseId) => {
   const [error, setError] = useState(null);
 
   const loadSummaries = useCallback(async () => {
+    if (!caseId) {
+      setEvidenceSummary(null);
+      setTimelineSummary(null);
+      setDeletedSummary(null);
+      setError('Missing case ID');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

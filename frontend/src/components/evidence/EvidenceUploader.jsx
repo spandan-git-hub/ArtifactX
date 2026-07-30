@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useEvidence } from '../../hooks/useEvidence';
 import { Upload, FileArchive, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
-const EvidenceUploader = ({ caseId }) => {
+const EvidenceUploader = ({ caseId, onUploadSuccess }) => {
   const { uploadEvidence, loading, error } = useEvidence();
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -38,9 +38,10 @@ const EvidenceUploader = ({ caseId }) => {
     e.preventDefault();
     if (!selectedFile) return;
     try {
-      await uploadEvidence(caseId, selectedFile);
+      const uploadedEvidence = await uploadEvidence(caseId, selectedFile);
       setUploadSuccess(true);
       setSelectedFile(null);
+      onUploadSuccess?.(uploadedEvidence);
     } catch (err) {
       // error handled by hook
     }

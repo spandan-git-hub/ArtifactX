@@ -21,19 +21,19 @@ export const downloadReport = (caseId, filename) => {
 
 // Get evidence summary
 export const getEvidenceSummary = async (caseId) => {
-  const response = await axios.post(`${API_BASE}/cases/${caseId}/reports/summary`);
+  const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/summary`);
   return response.data;
 };
 
 // Get timeline summary
 export const getTimelineSummary = async (caseId) => {
-  const response = await axios.post(`${API_BASE}/cases/${caseId}/reports/timeline`);
+  const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/timeline`);
   return response.data;
 };
 
 // Get deleted messages summary
 export const getDeletedSummary = async (caseId) => {
-  const response = await axios.post(`${API_BASE}/cases/${caseId}/reports/deleted`);
+  const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/deleted`);
   return response.data;
 };
 

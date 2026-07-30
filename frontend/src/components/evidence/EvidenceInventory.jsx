@@ -11,7 +11,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-const EvidenceInventory = ({ caseId, selectedEvidenceId: propSelectedId, onSelectEvidence }) => {
+const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propSelectedId, onSelectEvidence }) => {
   const { evidences, loading, error, loadEvidences, deleteEvidence } = useEvidence();
   const [internalSelectedId, setInternalSelectedId] = useState(null);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
@@ -26,7 +26,7 @@ const EvidenceInventory = ({ caseId, selectedEvidenceId: propSelectedId, onSelec
     if (caseId) {
       loadEvidences(caseId);
     }
-  }, [caseId, loadEvidences]);
+  }, [caseId, refreshToken, loadEvidences]);
 
   const handleLoadFiles = async (evidenceId) => {
     if (selectedEvidenceId === evidenceId) {
@@ -222,7 +222,7 @@ const EvidenceInventory = ({ caseId, selectedEvidenceId: propSelectedId, onSelec
               <span>{filesError}</span>
             </div>
           ) : evidenceFiles.length === 0 ? (
-            <p className="text-forensic-500 text-sm">No files found in this evidence package.</p>
+            <p className="text-forensic-500 text-sm">This evidence is a single file. Open the analysis section for extracted data.</p>
           ) : (
             <div className="table-container">
               <table className="data-table">

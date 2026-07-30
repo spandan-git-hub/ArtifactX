@@ -5,6 +5,65 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 
+def _tables(cursor: sqlite3.Cursor) -> set[str]:
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    return {row[0].lower() for row in cursor.fetchall()}
+
+
+def _columns(cursor: sqlite3.Cursor, table: str) -> set[str]:
+    cursor.execute(f"PRAGMA table_info({table})")
+    return {row[1] for row in cursor.fetchall()}
+
+
+def _first_existing(cols: set[str], candidates: list[str], default: str = "NULL") -> str:
+    for column in candidates:
+        if column in cols:
+            return f"msg.{column}"
+    return default
+
+
+def _message_query(table: str, cols: set[str]) -> str:
+    message_id = _first_existing(cols, ["key_id", "message_id", "_id", "id"], "msg.rowid")
+    remote_jid = _first_existing(cols, ["key_remote_jid", "remote_jid", "chat_jid", "chat_row_id"], "''")
+    from_me = _first_existing(cols, ["key_from_me", "from_me", "is_from_me"], "0")
+    body = _first_existing(cols, ["data", "text_data", "message", "body", "text"], "''")
+    timestamp = _first_existing(cols, ["timestamp", "received_timestamp", "date", "sort_id"], "0")
+    media_type = _first_existing(cols, ["media_mime_type", "mime_type"], "NULL")
+    media_path = _first_existing(cols, ["media_url", "media_name", "file_path", "media_path"], "NULL")
+    status = _first_existing(cols, ["status", "message_status"], "''")
+
+    return f"""
+        SELECT
+            {message_id} AS message_id,
+            {remote_jid} AS key_remote_jid,
+            CASE
+                WHEN {from_me} = 1 THEN 'me'
+                ELSE CAST({remote_jid} AS TEXT)
+            END AS sender_jid,
+            CASE
+                WHEN {from_me} = 1 THEN CAST({remote_jid} AS TEXT)
+                ELSE 'me'
+            END AS participant_jid,
+            {body} AS body,
+            {timestamp} AS timestamp,
+            {media_type} AS media_type,
+            {media_path} AS media_path,
+            CASE
+                WHEN {media_type} IS NOT NULL THEN
+                    CASE
+                        WHEN LOWER({media_type}) LIKE 'image/%' THEN 'image'
+                        WHEN LOWER({media_type}) LIKE 'video/%' THEN 'video'
+                        WHEN LOWER({media_type}) LIKE 'audio/%' THEN 'audio'
+                        ELSE 'document'
+                    END
+                WHEN {media_path} IS NOT NULL THEN 'media'
+                ELSE 'text'
+            END AS message_type,
+            {status} AS status
+        FROM {table} msg
+    """
+
+
 def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
     """Extract WhatsApp messages from the database.
     Returns a list of dictionaries matching WhatsAppMessage model.
@@ -15,41 +74,16 @@ def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row  # to access columns by name
         cursor = conn.cursor()
-        # Try to get messages; adjust table and column names as needed
-        # Common WhatsApp msgstore.db schema:
-        # messages table: _id, key_remote_jid, key_from_me, key_id, status, needs_push,
-        #   data, timestamp, media_url, media_mime_type, media_size, latitude, longitude,
-        #   thumb_image, duration, broadcast, etc.
-        # We'll attempt a simple query.
-        cursor.execute("""
-            SELECT
-                msg.key_id AS message_id,
-                msg.key_remote_jid AS key_remote_jid,
-                CASE
-                    WHEN msg.key_from_me = 1 THEN ?  -- Our number (we don't have it, use placeholder)
-                    ELSE msg.key_remote_jid
-                END AS sender_jid,
-                CASE
-                    WHEN msg.key_from_me = 1 THEN msg.key_remote_jid
-                    ELSE ?  -- Our number (we don't have it, use placeholder)
-                END AS participant_jid,
-                msg.data AS body,
-                msg.timestamp AS timestamp,
-                msg.media_mime_type AS media_type,
-                msg.media_url AS media_path,
-                CASE
-                    WHEN msg.media_url IS NOT NULL THEN
-                        CASE
-                            WHEN LOWER(msg.media_mime_type) LIKE 'image/%' THEN 'image'
-                            WHEN LOWER(msg.media_mime_type) LIKE 'video/%' THEN 'video'
-                            WHEN LOWER(msg.media_mime_type) LIKE 'audio/%' THEN 'audio'
-                            ELSE 'document'
-                        END
-                    ELSE NULL
-                END AS message_type,
-                msg.status AS status
-            FROM messages msg
-        """, (evidence_id, evidence_id))  # placeholders for our number
+        table_names = _tables(cursor)
+        if "messages" in table_names:
+            table = "messages"
+        elif "message" in table_names:
+            table = "message"
+        else:
+            conn.close()
+            return []
+
+        cursor.execute(_message_query(table, _columns(cursor, table)))
         rows = cursor.fetchall()
         messages = []
         for row in rows:
