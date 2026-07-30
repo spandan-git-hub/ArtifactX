@@ -17,9 +17,9 @@ export const demoService = {
     const defaults = {
       case_name: `Demo Case - ${new Date().toLocaleDateString()}`,
       has_whatsapp: true,
-      has_telegram: false,
-      message_count: 50,
-      contact_count: 10,
+      has_telegram: true,
+      message_count: 100,
+      contact_count: 15,
     };
     const config = { ...defaults, ...options };
     const response = await axios.post(`${API_BASE}/demo/create-demo-case`, config);

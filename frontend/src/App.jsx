@@ -8,24 +8,11 @@ import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
 import CaseForm from './components/cases/CaseForm';
 import { Layout } from './components/layout';
-import { Shield, Loader2 } from 'lucide-react';
-import { demoService } from './services/demoService';
+import DemoModal from './components/demo/DemoModal';
+import { Shield, Sparkles } from 'lucide-react';
 
 function HomeScreen() {
-  const [demoLoading, setDemoLoading] = useState(false);
-
-  const handleCreateDemo = async () => {
-    setDemoLoading(true);
-    try {
-      const stats = await demoService.createDemoCase();
-      // Navigate to the new demo case
-      window.location.href = `/cases/${stats.case_id}/dashboard`;
-    } catch (err) {
-      console.error('Failed to create demo case:', err);
-      alert('Failed to create demo case. Please try again.');
-      setDemoLoading(false);
-    }
-  };
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-forensic-950 flex items-center justify-center">
@@ -46,24 +33,22 @@ function HomeScreen() {
             Access Dashboard
           </Link>
           <button
-            onClick={handleCreateDemo}
-            disabled={demoLoading}
+            onClick={() => setDemoModalOpen(true)}
             className="btn-secondary inline-flex items-center gap-2"
           >
-            {demoLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Creating Demo...
-              </>
-            ) : (
-              'Create Demo Case'
-            )}
+            <Sparkles className="w-4 h-4 text-accent-cyan" />
+            Create Demo Case
           </button>
         </div>
         <p className="text-xs text-forensic-600 mt-4">
-          Demo mode creates sample WhatsApp data for testing
+          Demo mode creates sample WhatsApp and Telegram forensic data for testing
         </p>
       </div>
+
+      <DemoModal
+        isOpen={demoModalOpen}
+        onClose={() => setDemoModalOpen(false)}
+      />
     </div>
   );
 }

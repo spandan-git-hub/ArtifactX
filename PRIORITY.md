@@ -166,7 +166,7 @@ The demo flow needs a proper UI. This is a new component.
 
 ### Frontend
 
-- [ ] **F7** Create `DemoModal` component
+- [x] **F7** Create `DemoModal` component
   - File: `frontend/src/components/demo/DemoModal.jsx` (NEW — does not exist)
   - Create directory `frontend/src/components/demo/` if it doesn't exist
   - Full spec in **FRONTEND.md Section 8.1**
@@ -175,7 +175,7 @@ The demo flow needs a proper UI. This is a new component.
   - On success: navigate to `/cases/{case_id}/dashboard`
   - On error: show error message with retry button
 
-- [ ] **F8** Integrate `DemoModal` into HomeScreen
+- [x] **F8** Integrate `DemoModal` into HomeScreen
   - File: `frontend/src/App.jsx` (HomeScreen component at bottom of file)
   - Add `demoModalOpen` state
   - "Create Demo Case" button → `setDemoModalOpen(true)`
