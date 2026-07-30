@@ -1,26 +1,36 @@
 """Demo mode endpoints for testing without real evidence."""
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.config import settings
-from backend.models.models import Case, Evidence, WhatsAppMessage, WhatsAppContact, TelegramMessage, TelegramContact
+from backend.models.models import (
+    Case,
+    Evidence,
+    WhatsAppMessage,
+    WhatsAppContact,
+    TelegramMessage,
+    TelegramContact,
+    TimelineEvent,
+    DeletedMessage,
+    MediaItem,
+)
 
 router = APIRouter()
 
 
 class DemoData(BaseModel):
     """Demo data structure."""
-    case_name: str
+    case_name: str = Field(default_factory=lambda: f"Demo Case - {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     has_whatsapp: bool = True
-    has_telegram: bool = False
-    message_count: int = 50
-    contact_count: int = 10
+    has_telegram: bool = True
+    message_count: int = 100
+    contact_count: int = 15
 
 
 # Demo data templates
@@ -62,7 +72,8 @@ def create_demo_case(data: DemoData, db: Session = Depends(get_db)) -> dict:
     Create a demo case with mock forensic data for testing.
     Returns the case ID and statistics.
     """
-    # Check if demo mode is enabled (allow bypass for now, add check in production)
+    if not settings.demo_mode:
+        raise HTTPException(status_code=403, detail="Demo mode is disabled")
 
     # Create case
     case = Case(
@@ -132,7 +143,7 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
     db.commit()
 
     # Create demo messages
-    base_time = datetime.utcnow() - timedelta(days=7)
+    base_time = datetime.now(timezone.utc) - timedelta(days=7)
     total_messages = min(message_count, 100)
 
     for i in range(total_messages):
@@ -166,6 +177,47 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
             status="delivered"
         )
         db.add(msg)
+
+        # Timeline event for message
+        evt = TimelineEvent(
+            case_id=case_id,
+            evidence_id=evidence_id,
+            event_type="message",
+            source_app="whatsapp",
+            timestamp=msg.timestamp,
+            normalized_timestamp=datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc),
+            entity_id=str(msg.message_id),
+            entity_type="message",
+            description=f"Message: {msg.body[:60]}"
+        )
+        db.add(evt)
+
+    # Create demo deleted messages
+    del_msg1 = DeletedMessage(
+        case_id=case_id,
+        evidence_id=evidence_id,
+        source_app="whatsapp",
+        chat_jid="+12025551234@s.whatsapp.net",
+        gap_start=int((base_time + timedelta(hours=2)).timestamp() * 1000),
+        gap_end=int((base_time + timedelta(hours=3)).timestamp() * 1000),
+        missing_count=2,
+        confidence_score=0.85,
+        detection_method="sequence_gap_analysis",
+        detected_at=datetime.now(timezone.utc)
+    )
+    del_msg2 = DeletedMessage(
+        case_id=case_id,
+        evidence_id=evidence_id,
+        source_app="whatsapp",
+        chat_jid="+12025551000@g.us",
+        gap_start=int((base_time + timedelta(hours=10)).timestamp() * 1000),
+        gap_end=int((base_time + timedelta(hours=11)).timestamp() * 1000),
+        missing_count=1,
+        confidence_score=0.75,
+        detection_method="sequence_gap_analysis",
+        detected_at=datetime.now(timezone.utc)
+    )
+    db.add_all([del_msg1, del_msg2])
 
     db.commit()
 
@@ -211,7 +263,7 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
     db.commit()
 
     # Create demo messages
-    base_time = datetime.utcnow() - timedelta(days=5)
+    base_time = datetime.now(timezone.utc) - timedelta(days=5)
     total_messages = min(message_count, 80)
 
     for i in range(total_messages):
@@ -238,6 +290,47 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
         )
         db.add(msg)
 
+        # Timeline event for message
+        evt = TimelineEvent(
+            case_id=case_id,
+            evidence_id=evidence_id,
+            event_type="message",
+            source_app="telegram",
+            timestamp=msg.timestamp,
+            normalized_timestamp=datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc),
+            entity_id=str(msg.message_id),
+            entity_type="message",
+            description=f"Message: {msg.body[:60]}"
+        )
+        db.add(evt)
+
+    # Create demo deleted messages
+    del_msg1 = DeletedMessage(
+        case_id=case_id,
+        evidence_id=evidence_id,
+        source_app="telegram",
+        chat_jid="dialog_1",
+        gap_start=int((base_time + timedelta(hours=4)).timestamp() * 1000),
+        gap_end=int((base_time + timedelta(hours=5)).timestamp() * 1000),
+        missing_count=3,
+        confidence_score=0.85,
+        detection_method="sequence_gap_analysis",
+        detected_at=datetime.now(timezone.utc)
+    )
+    del_msg2 = DeletedMessage(
+        case_id=case_id,
+        evidence_id=evidence_id,
+        source_app="telegram",
+        chat_jid="dialog_2",
+        gap_start=int((base_time + timedelta(hours=12)).timestamp() * 1000),
+        gap_end=int((base_time + timedelta(hours=13)).timestamp() * 1000),
+        missing_count=1,
+        confidence_score=0.60,
+        detection_method="sequence_gap_analysis",
+        detected_at=datetime.now(timezone.utc)
+    )
+    db.add_all([del_msg1, del_msg2])
+
     db.commit()
 
     # Count created records
@@ -259,6 +352,17 @@ def delete_demo_case(case_id: int, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=404, detail="Case not found")
 
     case_name = case.name
+    evidence_ids = [e.id for e in case.evidence_items]
+    if evidence_ids:
+        db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+        db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+        db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+        db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+
+    db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete(synchronize_session=False)
+    db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete(synchronize_session=False)
+    db.query(MediaItem).filter(MediaItem.case_id == case_id).delete(synchronize_session=False)
+
     db.delete(case)
     db.commit()
 

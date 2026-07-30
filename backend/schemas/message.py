@@ -1,7 +1,7 @@
 """Pydantic schemas for WhatsApp Message."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,7 @@ class MessageCreate(MessageBase):
 
 class MessageRead(MessageBase):
     id: int
-    message_id: Optional[str] = None
+    message_id: Optional[Union[str, int]] = None
     key_remote_jid: Optional[str] = None
     sender_jid: Optional[str] = None
     participant_jid: Optional[str] = None

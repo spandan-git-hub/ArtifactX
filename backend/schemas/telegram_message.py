@@ -1,7 +1,7 @@
 """Pydantic schemas for Telegram Message."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,7 @@ class TelegramMessageCreate(TelegramMessageBase):
 
 class TelegramMessageRead(TelegramMessageBase):
     id: int
-    message_id: Optional[str] = None
+    message_id: Optional[Union[str, int]] = None
     dialog_id: Optional[str] = None
     sender_id: Optional[int] = None
     body: Optional[str] = None

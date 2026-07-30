@@ -58,7 +58,7 @@ class TimelineSummary(BaseModel):
     events_by_type: Dict[str, int] = Field(default_factory=dict)
     events_by_app: Dict[str, int] = Field(default_factory=dict)
     date_range: Optional[Dict[str, datetime]] = None
-    app_breakdown: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    app_breakdown: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
 class TimelineReportData(BaseModel):

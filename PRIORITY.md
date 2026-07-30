@@ -130,18 +130,18 @@ Demo mode is the primary way to test the app without real evidence. It must prod
 
 ### Backend
 
-- [ ] **B7** Fix `DemoData` defaults
+- [x] **B7** Fix `DemoData` defaults
   - File: `backend/api/demo.py` lines 17-24
   - Change `has_telegram: bool = False` → `True`
   - Change `message_count: int = 50` → `100`
   - Change `contact_count: int = 10` → `15`
   - Add `case_name: str = Field(default_factory=lambda: f"Demo Case - {datetime.now().strftime('%Y%m%d_%H%M%S')}")` — import `Field` from pydantic
 
-- [ ] **B8** Add `DEMO_MODE` guard to demo endpoint
+- [x] **B8** Add `DEMO_MODE` guard to demo endpoint
   - File: `backend/api/demo.py` line 60
   - Add at top of function: `if not settings.demo_mode: raise HTTPException(403, "Demo mode is disabled")`
 
-- [ ] **B9** Create `TimelineEvent` records in demo builder
+- [x] **B9** Create `TimelineEvent` records in demo builder
   - File: `backend/api/demo.py` inside `_create_demo_whatsapp` and `_create_demo_telegram`
   - After saving messages, create one `TimelineEvent` per message with:
     - `case_id`, `evidence_id`, `event_type="message"`, `source_app="whatsapp"/"telegram"`
@@ -151,7 +151,7 @@ Demo mode is the primary way to test the app without real evidence. It must prod
     - `description=f"Message: {msg.body[:60]}"`
   - This makes Dashboard's "Timeline Summary" section show actual event counts
 
-- [ ] **B10** Create `DeletedMessage` records in demo builder
+- [x] **B10** Create `DeletedMessage` records in demo builder
   - File: `backend/api/demo.py` inside `_create_demo_whatsapp` and `_create_demo_telegram`
   - After saving messages, create 2-3 `DeletedMessage` records with:
     - Varied `confidence_score` values (0.75, 0.85, 0.60)
