@@ -190,27 +190,27 @@ Visual data representations for the dashboard. Requires installing chart.js.
 
 ### Frontend
 
-- [ ] **F9** Install chart.js packages
+- [x] **F9** Install chart.js packages
   - Run in terminal: `cd D:\ArtifactX\frontend && npm install chart.js react-chartjs-2`
   - Verify it doesn't break existing builds: `npm run dev` should still work
 
-- [ ] **F10** Create `MessageVolumeChart` component
+- [x] **F10** Create `MessageVolumeChart` component
   - File: `frontend/src/components/dashboard/MessageVolumeChart.jsx` (NEW)
   - Full spec in **FRONTEND.md Section 8.2**
   - Line chart: WA (emerald) and TG (blue) messages per day
   - Data derived from `overview.recent_events` by grouping by `date(normalized_timestamp)` + `source_app`
   - Add a `buildVolumeData(events)` utility function in the component file
 
-- [ ] **F11** Create `MessageDistributionChart` component
+- [x] **F11** Create `MessageDistributionChart` component
   - File: `frontend/src/components/dashboard/MessageDistributionChart.jsx` (NEW)
   - Full spec in **FRONTEND.md Section 8.3**
   - Doughnut chart: WA vs TG total message counts
 
-- [ ] **F12** Export new charts from dashboard index
+- [x] **F12** Export new charts from dashboard index
   - File: `frontend/src/components/dashboard/index.js`
   - Add exports for `MessageVolumeChart` and `MessageDistributionChart`
 
-- [ ] **F13** Integrate charts into DashboardPage
+- [x] **F13** Integrate charts into DashboardPage
   - File: `frontend/src/pages/DashboardPage.jsx`
   - Add a new grid row after the 4-stat row (before the "Two Column Layout" section)
   - Row: `MessageDistributionChart` on left, `MessageVolumeChart` on right
