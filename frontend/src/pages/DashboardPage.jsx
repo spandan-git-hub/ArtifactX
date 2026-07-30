@@ -232,14 +232,14 @@ const DashboardPage = () => {
       {/* Quick Links */}
       <div className="flex flex-wrap gap-3">
         <Link
-          to={`/cases/${caseId}?tab=timeline`}
+          to={`/cases/${caseId}`}
           className="btn-secondary flex items-center gap-2"
         >
           <Activity className="h-4 w-4" />
           Full Timeline
         </Link>
         <Link
-          to={`/cases/${caseId}?tab=correlation`}
+          to={`/cases/${caseId}`}
           className="btn-secondary flex items-center gap-2"
         >
           <Hash className="h-4 w-4" />

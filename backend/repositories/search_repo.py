@@ -445,6 +445,9 @@ class SearchRepository:
         """Get evidence IDs for a case filtered by app type."""
         stmt = self.db.query(Evidence.id).filter(Evidence.case_id == case_id)
 
+        if app in ("whatsapp", "telegram"):
+            stmt = stmt.filter(Evidence.metadata_["app"].astext == app)
+
         evidence_records = stmt.all()
         return [e.id for e in evidence_records]
 

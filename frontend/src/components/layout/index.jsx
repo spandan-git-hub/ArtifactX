@@ -13,19 +13,31 @@ import {
   Database,
 } from 'lucide-react';
 
-const navItems = [
-  { path: '/cases', icon: FolderKanban, label: 'Cases', exact: true },
-  { path: '/search', icon: Search, label: 'Search', disabled: true },
-  { path: '/reports', icon: FileText, label: 'Reports', disabled: true },
-  { path: '/logs', icon: ClipboardList, label: 'Logs', disabled: true },
-];
-
 const Sidebar = ({ collapsed, onToggle }) => {
   const location = useLocation();
 
-  const isActive = (path, exact = false) => {
-    if (exact) return location.pathname === path;
-    return location.pathname.startsWith(path.split('/')[1] ? '/' : path);
+  // Extract caseId from any case-specific route
+  const caseIdMatch = location.pathname.match(/\/cases\/(\d+)/);
+  const activeCaseId = caseIdMatch ? caseIdMatch[1] : null;
+
+  const navItems = activeCaseId
+    ? [
+        { path: '/cases', icon: FolderKanban, label: 'All Cases' },
+        { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
+        { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
+        { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
+        { path: `/cases/${activeCaseId}/logs`, icon: ClipboardList, label: 'Logs' },
+      ]
+    : [
+        { path: '/cases', icon: FolderKanban, label: 'Cases' },
+        { path: '#', icon: Search, label: 'Search', disabled: true },
+        { path: '#', icon: FileText, label: 'Reports', disabled: true },
+        { path: '#', icon: ClipboardList, label: 'Logs', disabled: true },
+      ];
+
+  const isActive = (path) => {
+    if (path === '#') return false;
+    return location.pathname === path || (path !== '/cases' && location.pathname.startsWith(path));
   };
 
   return (
@@ -52,11 +64,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map((item) => (
           <Link
-            key={item.path}
+            key={item.label}
             to={item.disabled ? '#' : item.path}
             className={`
               nav-item
-              ${isActive(item.path, item.exact) && !item.disabled ? 'nav-item-active' : ''}
+              ${isActive(item.path) && !item.disabled ? 'nav-item-active' : ''}
               ${item.disabled ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-forensic-400' : ''}
             `}
             onClick={(e) => item.disabled && e.preventDefault()}

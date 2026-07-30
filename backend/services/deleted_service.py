@@ -1,5 +1,6 @@
 """Deleted message detection service."""
 
+import traceback
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -34,7 +35,7 @@ class DeletedService:
 
         # Log analysis start
         log_service.log_analysis(
-            evidence_id=0,  # Case-level analysis
+            evidence_id=None,  # Case-level analysis
             log_type="deleted_detection_start",
             message="Starting deleted message detection for case",
             details={"case_id": case_id}
@@ -81,7 +82,7 @@ class DeletedService:
 
             # Log analysis success
             log_service.log_analysis(
-                evidence_id=0,
+                evidence_id=None,
                 log_type="deleted_detection_completed",
                 message="Deleted message detection completed successfully",
                 details={"case_id": case_id, "deletions_detected": len(all_detected_deletions)}
@@ -95,7 +96,7 @@ class DeletedService:
                 message=f"Error during deleted message detection: {str(e)}",
                 case_id=case_id,
                 evidence_id=None,
-                stack_trace=str(e.__traceback__),
+                stack_trace=traceback.format_exc(),
                 endpoint="/api/cases/{case_id}/deleted/detect",
                 method="POST"
             )

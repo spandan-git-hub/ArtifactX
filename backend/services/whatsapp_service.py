@@ -1,6 +1,7 @@
 """WhatsApp analysis service."""
 
 import asyncio
+import traceback
 from pathlib import Path
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -120,7 +121,7 @@ class WhatsAppService:
                 message=f"Error during WhatsApp analysis: {str(e)}",
                 case_id=evidence.case_id if evidence else None,
                 evidence_id=evidence_id,
-                stack_trace=str(e.__traceback__),
+                stack_trace=traceback.format_exc(),
                 endpoint="/api/evidence/{evidence_id}/analyze/whatsapp",
                 method="POST"
             )

@@ -248,7 +248,7 @@ class AnalysisLog(Base):
     __tablename__ = "analysis_logs"
 
     id = Column(Integer, primary_key=True)
-    evidence_id = Column(Integer, ForeignKey("evidence.id"))
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=True)
     log_type = Column(String(50))
     message = Column(Text)
     details = Column(JSON, default=dict)

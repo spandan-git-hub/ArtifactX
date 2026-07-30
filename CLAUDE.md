@@ -80,7 +80,7 @@ pip install -r requirements.txt
 $env:PYTHONPATH = "D:\ArtifactX"
 $env:PATH = "C:\Users\Spandan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\Scripts;$env:PATH"
 cd D:\ArtifactX\backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 
 # Frontend (new terminal)
 cd D:\ArtifactX\frontend

@@ -37,5 +37,7 @@ def extract_contacts(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
             contacts.append(contact)
         conn.close()
         return contacts
-    except sqlite3.Error:
+    except sqlite3.Error as e:
+        import logging
+        logging.getLogger(__name__).error(f"Parse error in extract_contacts: {e}")
         return []

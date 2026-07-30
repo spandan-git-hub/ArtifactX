@@ -1,5 +1,6 @@
 """Timeline reconstruction service."""
 
+import traceback
 from typing import List, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -29,7 +30,7 @@ class TimelineService:
 
         # Log analysis start
         log_service.log_analysis(
-            evidence_id=0,  # Not tied to specific evidence; case-level analysis
+            evidence_id=None,  # Not tied to specific evidence; case-level analysis
             log_type="timeline_building_start",
             message="Starting timeline building for case",
             details={"case_id": case_id}
@@ -48,7 +49,7 @@ class TimelineService:
 
             # Log analysis success
             log_service.log_analysis(
-                evidence_id=0,
+                evidence_id=None,
                 log_type="timeline_building_completed",
                 message="Timeline building completed successfully",
                 details={"case_id": case_id, "events_created": len(timeline_events)}
@@ -62,7 +63,7 @@ class TimelineService:
                 message=f"Error during timeline building: {str(e)}",
                 case_id=case_id,
                 evidence_id=None,
-                stack_trace=str(e.__traceback__),
+                stack_trace=traceback.format_exc(),
                 endpoint="/api/cases/{case_id}/timeline/build",
                 method="POST"
             )

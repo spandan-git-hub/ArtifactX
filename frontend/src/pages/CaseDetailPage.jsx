@@ -111,38 +111,6 @@ const CaseDetailPage = () => {
           { label: 'Cases', path: '/cases' },
           { label: caseData.name },
         ]}
-        actions={
-          <div className="flex items-center gap-2">
-            <Link
-              to={`/cases/${id}/dashboard`}
-              className="btn-ghost flex items-center gap-2"
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </Link>
-            <Link
-              to={`/cases/${id}/search`}
-              className="btn-ghost flex items-center gap-2"
-            >
-              <Search className="h-4 w-4" />
-              Search
-            </Link>
-            <Link
-              to={`/cases/${id}/reports`}
-              className="btn-ghost flex items-center gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              Reports
-            </Link>
-            <Link
-              to={`/cases/${id}/logs`}
-              className="btn-ghost flex items-center gap-2"
-            >
-              <ClipboardList className="h-4 w-4" />
-              Logs
-            </Link>
-          </div>
-        }
       />
 
       <div className="p-6 animate-in">
@@ -199,10 +167,10 @@ const CaseDetailPage = () => {
 
           <div className="mt-4 pt-4 border-t border-forensic-700 flex items-center gap-6 text-sm text-forensic-500">
             <span>
-              Created: {new Date(caseData.created_at).toLocaleString()}
+              Created: {caseData.created_at ? new Date(caseData.created_at).toLocaleString() : 'N/A'}
             </span>
             <span>
-              Updated: {new Date(caseData.updated_at).toLocaleString()}
+              Updated: {caseData.updated_at ? new Date(caseData.updated_at).toLocaleString() : 'N/A'}
             </span>
           </div>
         </div>

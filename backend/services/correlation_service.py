@@ -1,5 +1,6 @@
 """Correlation service for forensic evidence."""
 
+import traceback
 from typing import List
 from sqlalchemy.orm import Session
 
@@ -49,7 +50,7 @@ class CorrelationService:
 
         # Log analysis start
         log_service.log_analysis(
-            evidence_id=0,  # Case-level analysis
+            evidence_id=None,  # Case-level analysis
             log_type="correlation_start",
             message="Starting correlation for case",
             details={"case_id": case_id}
@@ -159,7 +160,7 @@ class CorrelationService:
 
             # Log analysis success
             log_service.log_analysis(
-                evidence_id=0,
+                evidence_id=None,
                 log_type="correlation_completed",
                 message="Correlation completed successfully",
                 details={"case_id": case_id, "edges_created": len(edges)}
@@ -173,7 +174,7 @@ class CorrelationService:
                 message=f"Error during correlation: {str(e)}",
                 case_id=case_id,
                 evidence_id=None,
-                stack_trace=str(e.__traceback__),
+                stack_trace=traceback.format_exc(),
                 endpoint="/api/cases/{case_id}/correlate",
                 method="POST"
             )

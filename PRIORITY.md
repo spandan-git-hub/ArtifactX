@@ -58,39 +58,39 @@ These are bugs in **currently running code** that cause wrong behavior. Fix thes
 
 ### Backend Fixes
 
-- [ ] **B1** Fix CORS missing port 5174
+- [x] **B1** Fix CORS missing port 5174
   - File: `backend/app/main.py` line 38
   - Add `"http://localhost:5174"` to `allow_origins` list
 
-- [ ] **B2** Fix stack trace logging across all services
+- [x] **B2** Fix stack trace logging across all services
   - Add `import traceback` to the top of each file
   - Replace `stack_trace=str(e.__traceback__)` with `stack_trace=traceback.format_exc()`
   - Files: `whatsapp_service.py`, `telegram_service.py`, `timeline_service.py`, `deleted_service.py`, `correlation_service.py`
 
-- [ ] **B3** Fix WhatsApp deletion detection producing fabricated results
+- [x] **B3** Fix WhatsApp deletion detection producing fabricated results
   - File: `forensic/deleted/detector.py` lines 81-93
   - `_get_expected_next_id()`: return `None` for `source_app == "whatsapp"` (WA IDs are hex, not sequential)
   - Only Telegram integer IDs are reliable for gap detection
   - This means WhatsApp will produce 0 deletions from ID analysis — this is **correct and honest**
 
-- [ ] **B4** Fix silent `sqlite3.Error` in WhatsApp message parser
+- [x] **B4** Fix silent `sqlite3.Error` in WhatsApp message parser
   - File: `forensic/whatsapp/message_parser.py` line 107
   - Add `import logging; logging.getLogger(__name__).error(f"Parse error: {e}")` before `return []`
   - Apply same pattern to contact_parser, group_parser, media_parser if they have the same silent except
 
-- [ ] **B5** Fix `search_repo._get_evidence_ids` ignoring the `app` filter
+- [x] **B5** Fix `search_repo._get_evidence_ids` ignoring the `app` filter
   - File: `backend/repositories/search_repo.py` lines 444-448
   - Add filter: `Evidence.metadata_["app"].astext == app` when `app in ("whatsapp", "telegram")`
   - This currently returns all evidence IDs regardless of app, causing extra DB round-trips
 
-- [ ] **B6** Fix `analysis_logs.evidence_id` FK constraint if nullable
+- [x] **B6** Fix `analysis_logs.evidence_id` FK constraint if nullable
   - Only apply this fix if **A6 audit** reveals the column is NOT nullable
   - File: `backend/models/models.py`
   - Change: `evidence_id = Column(Integer, ForeignKey("evidence.id"))` → add `nullable=True`
 
 ### Frontend Fixes
 
-- [ ] **F1** Fix sidebar navigation (context-aware)
+- [x] **F1** Fix sidebar navigation (context-aware)
   - File: `frontend/src/components/layout/index.jsx`
   - Move `navItems` inside `Sidebar` component body
   - Derive `activeCaseId` from `useLocation()` via `pathname.match(/\/cases\/(\d+)/)`
@@ -98,28 +98,28 @@ These are bugs in **currently running code** that cause wrong behavior. Fix thes
   - When no `activeCaseId`: show global nav with disabled placeholders
   - Import `LayoutDashboard` from lucide-react
 
-- [ ] **F2** Fix duplicate navigation in CaseDetailPage header
+- [x] **F2** Fix duplicate navigation in CaseDetailPage header
   - File: `frontend/src/pages/CaseDetailPage.jsx` lines 114-145
   - Remove the entire `actions={<div className="flex items-center gap-2">...</div>}` prop from `<Header>`
   - Keep only `breadcrumbs` prop on the Header
 
-- [ ] **F3** Fix broken quick links on DashboardPage
+- [x] **F3** Fix broken quick links on DashboardPage
   - File: `frontend/src/pages/DashboardPage.jsx` lines 234-254
   - Change `to={/cases/${caseId}?tab=timeline}` → `to={/cases/${caseId}}`
   - Change `to={/cases/${caseId}?tab=correlation}` → `to={/cases/${caseId}}`
   - These tabs don't exist yet; the links should go somewhere valid
 
-- [ ] **F4** Fix infinite re-render if `loadOverview` is missing `useCallback`
+- [x] **F4** Fix infinite re-render if `loadOverview` is missing `useCallback`
   - Only apply if **A7 audit** confirms the bug exists
   - File: `frontend/src/hooks/useDashboard.js`
   - Wrap `loadOverview` in `useCallback(async (id) => {...}, [])`
 
-- [ ] **F5** Fix reportService GET/POST mismatch
+- [x] **F5** Fix reportService GET/POST mismatch
   - Only apply if **A8 audit** confirms the bug exists
   - File: `frontend/src/services/reportService.js`
   - Ensure `getEvidenceSummary`, `getTimelineSummary`, `getDeletedSummary` use `axios.get`
 
-- [ ] **F6** Add null guard for `created_at` date formatting
+- [x] **F6** Add null guard for `created_at` date formatting
   - Verify and fix in `CaseListPage.jsx` and `CaseDetailPage.jsx`
 
 ---
@@ -355,7 +355,7 @@ pip install -r requirements.txt
 $env:PYTHONPATH = "D:\ArtifactX"
 $env:PATH = "C:\Users\Spandan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\Scripts;$env:PATH"
 cd D:\ArtifactX\backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 
 # Frontend (new terminal)
 cd D:\ArtifactX\frontend

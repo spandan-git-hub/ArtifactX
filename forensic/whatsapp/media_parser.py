@@ -55,5 +55,7 @@ def extract_media_references(db_path: Path, evidence_id: int) -> List[Dict[str, 
             media_refs.append(media_ref)
         conn.close()
         return media_refs
-    except sqlite3.Error:
+    except sqlite3.Error as e:
+        import logging
+        logging.getLogger(__name__).error(f"Parse error in extract_media_references: {e}")
         return []

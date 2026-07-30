@@ -105,5 +105,6 @@ def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
         conn.close()
         return messages
     except sqlite3.Error as e:
-        # Log error
+        import logging
+        logging.getLogger(__name__).error(f"Parse error in extract_messages: {e}")
         return []
