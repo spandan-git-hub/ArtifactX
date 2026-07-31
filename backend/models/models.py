@@ -190,8 +190,9 @@ class TimelineEvent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     case_id = Column(Integer, ForeignKey("cases.id"))
-    evidence_id = Column(Integer, ForeignKey("evidence.id"))
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=True)
     event_type = Column(String(50), index=True)
+
     source_app = Column(String(50), index=True)
     timestamp = Column(BigInteger, index=True)
     normalized_timestamp = Column(DateTime, index=True)

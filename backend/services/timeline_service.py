@@ -70,8 +70,12 @@ class TimelineService:
             return 0
 
     def get_timeline_for_case(self, db: Session, case_id: int) -> List[dict]:
-        """Get timeline events for a case."""
+        """Get timeline events for a case, auto-building if no events exist yet."""
         events = self.timeline_repo.get_events_by_case_id(db, case_id)
+        if not events:
+            self.build_timeline_for_case(db, case_id)
+            events = self.timeline_repo.get_events_by_case_id(db, case_id)
+
         return [
             {
                 "id": e.id,
@@ -111,6 +115,20 @@ class TimelineService:
             entity_type=entity_type,
             search=search,
         )
+        if not events and not start_date and not end_date and not search:
+            # If timeline is unbuilt, attempt build & filter again
+            self.build_timeline_for_case(db, case_id)
+            events = self.timeline_repo.filter_events(
+                db,
+                case_id=case_id,
+                start_date=start_date,
+                end_date=end_date,
+                event_type=event_type,
+                source_app=source_app,
+                entity_type=entity_type,
+                search=search,
+            )
+
         return [
             {
                 "id": e.id,
@@ -127,6 +145,34 @@ class TimelineService:
             }
             for e in events
         ]
+
+    def get_histogram(
+        self,
+        db: Session,
+        case_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        event_type: Optional[str] = None,
+        source_app: Optional[str] = None,
+        search: Optional[str] = None,
+        interval: str = "day"
+    ) -> dict:
+        """Get histogram data for a case."""
+        # Ensure events exist
+        events = self.timeline_repo.get_events_by_case_id(db, case_id)
+        if not events:
+            self.build_timeline_for_case(db, case_id)
+
+        return self.timeline_repo.get_histogram_data(
+            db,
+            case_id=case_id,
+            start_date=start_date,
+            end_date=end_date,
+            event_type=event_type,
+            source_app=source_app,
+            search=search,
+            interval=interval,
+        )
 
 
 timeline_service = TimelineService()

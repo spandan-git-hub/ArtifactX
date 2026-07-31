@@ -78,21 +78,16 @@ class DeletedDetector:
 
     def _get_expected_next_id(self, message: Any, source_app: str) -> Optional[int]:
         """Get the expected next message ID in sequence.
-        Only Telegram integer IDs are sequential and reliable for gap detection.
-        WhatsApp uses opaque hex/string IDs — returning None disables gap analysis for WA.
+        Extracts numeric sequence numbers for both WhatsApp and Telegram.
         """
-        if source_app == "whatsapp":
-            # WhatsApp message IDs are hex strings, not sequential integers.
-            # Gap analysis on them would produce fabricated results.
-            return None
-        elif source_app == "telegram":
-            # Telegram uses integer message IDs
-            try:
-                return int(message.message_id) + 1
-            except (AttributeError, ValueError):
-                pass
-            return None
+        try:
+            msg_id_val = self._get_message_id(message, source_app)
+            if msg_id_val is not None:
+                return msg_id_val + 1
+        except (AttributeError, ValueError):
+            pass
         return None
+
 
     def _get_message_id(self, message: Any, source_app: str) -> Optional[int]:
         """Extract message ID as integer."""

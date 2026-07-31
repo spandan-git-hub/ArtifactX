@@ -158,13 +158,14 @@ Replace static data tables with an interactive, rich chat view for extracted Wha
 Provide a filterable multi-app event stream with visualization.
 
 ### Backend
-- [ ] **B24** Optimize `timeline_service.py` and `TimelineBuilder` to support time-range filtering, app filtering, and density aggregation (`GET /api/timeline/cases/{id}/histogram`).
+- [x] **B24** Optimize `timeline_service.py` and `TimelineBuilder` to support time-range filtering, app filtering, and density aggregation (`GET /api/timeline/cases/{id}/histogram`).
 
 ### Frontend
-- [ ] **F25** Overhaul `TimelinePage.jsx` (`/cases/:caseId/timeline`):
+- [x] **F25** Overhaul `TimelinePage.jsx` (`/cases/:caseId/timeline`):
   - Chart.js time-density histogram showing message/event volume over time.
   - Filter toolbar: Date Range picker, Source App selector, Event Type filter, Search query.
   - High-density chronological event stream with timestamps, app badges, entity JIDs, and hash fingerprints.
+
 
 ---
 

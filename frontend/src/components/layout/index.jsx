@@ -12,6 +12,7 @@ import {
   Shield,
   Upload,
   Database,
+  Clock,
 } from 'lucide-react';
 
 const Sidebar = ({ collapsed, onToggle }) => {
@@ -26,6 +27,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       { path: '/cases', icon: FolderKanban, label: 'All Cases' },
       { path: `/cases/${activeCaseId}/evidence`, icon: Database, label: 'Evidence & Artifacts' },
       { path: `/cases/${activeCaseId}/chat`, icon: MessageSquare, label: 'Chat Viewer' },
+      { path: `/cases/${activeCaseId}/timeline`, icon: Clock, label: 'Timeline' },
       { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
       { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
       { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
@@ -37,6 +39,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       { path: '#', icon: FileText, label: 'Reports', disabled: true },
       { path: '#', icon: ClipboardList, label: 'Logs', disabled: true },
     ];
+
 
   const isActive = (path) => {
     if (path === '#') return false;

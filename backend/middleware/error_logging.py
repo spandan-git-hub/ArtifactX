@@ -10,6 +10,8 @@ import structlog
 logger = structlog.get_logger()
 
 
+from fastapi.responses import JSONResponse
+
 class ErrorLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that captures unhandled exceptions into the ErrorLog table."""
 
@@ -51,4 +53,8 @@ class ErrorLoggingMiddleware(BaseHTTPMiddleware):
                 # If DB logging itself fails, don't mask the original error
                 logger.warning("failed_to_persist_error_log", exc_info=True)
 
-            raise
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc) or "Internal Server Error", "error_type": type(exc).__name__}
+            )
+

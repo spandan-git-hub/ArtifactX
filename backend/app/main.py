@@ -50,6 +50,7 @@ app.include_router(chats.router, prefix="/api/cases", tags=["chats"])
 app.include_router(evidence.router, prefix="/api/evidence", tags=["evidence"])
 app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["whatsapp"])
 app.include_router(telegram.router, prefix="/api/telegram", tags=["telegram"])
+app.include_router(timeline.router, prefix="/api", tags=["timeline"])
 app.include_router(timeline.router, prefix="/api/timeline", tags=["timeline"])
 app.include_router(deleted.router, prefix="/api/deleted", tags=["deleted"])
 app.include_router(media.router, prefix="/api/media", tags=["media"])
@@ -59,6 +60,7 @@ app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
+
 
 
 
