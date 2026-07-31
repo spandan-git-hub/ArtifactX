@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Loader2, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { useReports } from '../../hooks/useReports';
+import { downloadReport } from '../../services/reportService';
 
 const ReportPanel = ({ caseId }) => {
   const [reportType, setReportType] = useState('full');
@@ -18,6 +19,15 @@ const ReportPanel = ({ caseId }) => {
       await generateReport(caseId, { reportType, ...options });
     } catch (err) {
       // Error handled by hook
+    }
+  };
+
+  const handleDownload = () => {
+    if (lastReport?.filename) {
+      downloadReport(caseId, lastReport.filename);
+    } else if (lastReport?.message && lastReport.message.includes(': ')) {
+      const filename = lastReport.message.split(': ')[1].trim();
+      downloadReport(caseId, filename);
     }
   };
 
@@ -100,16 +110,23 @@ const ReportPanel = ({ caseId }) => {
         )}
       </button>
 
-      {/* Success Message */}
+      {/* Success Message & Download Button */}
       {lastReport && lastReport.status === 'completed' && (
-        <div className="mt-4 p-3 bg-accent-emerald/10 border border-accent-emerald/30 rounded-lg">
+        <div className="mt-4 p-3 bg-accent-emerald/10 border border-accent-emerald/30 rounded-lg space-y-2">
           <div className="flex items-center gap-2 text-accent-emerald">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">Report Generated!</span>
           </div>
-          <p className="text-sm text-accent-emerald/80 mt-1">
+          <p className="text-sm text-accent-emerald/80">
             {lastReport.message || 'PDF report is ready for download.'}
           </p>
+          <button
+            onClick={handleDownload}
+            className="w-full mt-2 py-2 px-3 bg-accent-emerald hover:bg-emerald-600 text-forensic-950 font-semibold rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Download PDF Report
+          </button>
         </div>
       )}
 

@@ -40,6 +40,7 @@ export const useEvidence = () => {
     setError(null);
     try {
       await evidenceService.deleteEvidence(evidenceId);
+      setEvidences((prev) => prev.filter((ev) => ev.id !== evidenceId));
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to delete evidence');
       throw err;

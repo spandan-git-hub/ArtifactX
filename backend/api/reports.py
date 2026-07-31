@@ -87,6 +87,7 @@ async def generate_report(
         report_type=request.report_type,
         status="completed",
         message=f"Report generated: {result['filename']}",
+        filename=result.get("filename"),
         created_at=datetime.utcnow(),
     )
 

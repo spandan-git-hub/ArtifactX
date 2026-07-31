@@ -446,7 +446,7 @@ class SearchRepository:
         stmt = self.db.query(Evidence.id).filter(Evidence.case_id == case_id)
 
         if app in ("whatsapp", "telegram"):
-            stmt = stmt.filter(Evidence.metadata_["app"].astext == app)
+            stmt = stmt.filter(Evidence.metadata_["app"].as_string() == app)
 
         evidence_records = stmt.all()
         return [e.id for e in evidence_records]

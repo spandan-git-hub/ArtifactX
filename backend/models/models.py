@@ -33,12 +33,13 @@ class Case(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     evidence_items = relationship(
-        "Evidence", back_populates="case", cascade="all, delete"
+        "Evidence", back_populates="case", cascade="all, delete-orphan"
     )
-    timeline_events = relationship("TimelineEvent", back_populates="case")
-    deleted_messages = relationship("DeletedMessage", back_populates="case")
-    media_items = relationship("MediaItem", back_populates="case")
-    activity_logs = relationship("ActivityLog", back_populates="case")
+    timeline_events = relationship("TimelineEvent", back_populates="case", cascade="all, delete-orphan")
+    deleted_messages = relationship("DeletedMessage", back_populates="case", cascade="all, delete-orphan")
+    media_items = relationship("MediaItem", back_populates="case", cascade="all, delete-orphan")
+    activity_logs = relationship("ActivityLog", back_populates="case", cascade="all, delete-orphan")
+    correlation_edges = relationship("CorrelationEdge", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -60,7 +61,17 @@ class Evidence(Base):
 
     case = relationship("Case", back_populates="evidence_items")
     files = relationship("EvidenceFile", back_populates="evidence", cascade="all, delete-orphan")
-    analysis_results = relationship("AnalysisResult", back_populates="evidence")
+    analysis_results = relationship("AnalysisResult", back_populates="evidence", cascade="all, delete-orphan")
+    wa_messages = relationship("WhatsAppMessage", cascade="all, delete-orphan")
+    wa_contacts = relationship("WhatsAppContact", cascade="all, delete-orphan")
+    wa_groups = relationship("WhatsAppGroup", cascade="all, delete-orphan")
+    tg_messages = relationship("TelegramMessage", cascade="all, delete-orphan")
+    tg_contacts = relationship("TelegramContact", cascade="all, delete-orphan")
+    tg_groups = relationship("TelegramGroup", cascade="all, delete-orphan")
+    timeline_events = relationship("TimelineEvent", cascade="all, delete-orphan")
+    deleted_messages = relationship("DeletedMessage", cascade="all, delete-orphan")
+    media_items = relationship("MediaItem", cascade="all, delete-orphan")
+    analysis_logs = relationship("AnalysisLog", cascade="all, delete-orphan")
 
 
 class EvidenceFile(Base):

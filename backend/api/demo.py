@@ -130,6 +130,7 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
 
     # Create demo contacts
     contacts_to_create = DEMO_CONTACTS[:min(contact_count, len(DEMO_CONTACTS))]
+    contacts = []
     for jid_suffix, (phone, name, username) in enumerate(contacts_to_create):
         jid = f"{phone}@s.whatsapp.net"
         contact = WhatsAppContact(
@@ -139,13 +140,15 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
             phone_number=phone,
             status=f"Demo contact {name}"
         )
-        db.add(contact)
-    db.commit()
+        contacts.append(contact)
+    db.add_all(contacts)
 
     # Create demo messages
     base_time = datetime.now(timezone.utc) - timedelta(days=7)
     total_messages = min(message_count, 100)
 
+    messages = []
+    events = []
     for i in range(total_messages):
         sender_idx = i % len(contacts_to_create)
         sender_phone = contacts_to_create[sender_idx][0]
@@ -176,7 +179,7 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
             media_path=media_path,
             status="delivered"
         )
-        db.add(msg)
+        messages.append(msg)
 
         # Timeline event for message
         evt = TimelineEvent(
@@ -190,7 +193,10 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
             entity_type="message",
             description=f"Message: {msg.body[:60]}"
         )
-        db.add(evt)
+        events.append(evt)
+
+    db.add_all(messages)
+    db.add_all(events)
 
     # Create demo deleted messages
     del_msg1 = DeletedMessage(
@@ -250,6 +256,7 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
 
     # Create demo contacts
     contacts_to_create = DEMO_CONTACTS[:min(contact_count, len(DEMO_CONTACTS))]
+    contacts = []
     for user_id, (phone, name, username) in enumerate(contacts_to_create, start=1000):
         contact = TelegramContact(
             evidence_id=evidence_id,
@@ -259,13 +266,15 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
             username=username,
             phone=phone,
         )
-        db.add(contact)
-    db.commit()
+        contacts.append(contact)
+    db.add_all(contacts)
 
     # Create demo messages
     base_time = datetime.now(timezone.utc) - timedelta(days=5)
     total_messages = min(message_count, 80)
 
+    messages = []
+    events = []
     for i in range(total_messages):
         sender_id = 1000 + (i % len(contacts_to_create))
         dialog_id = f"dialog_{random.randint(1, 100)}"
@@ -288,7 +297,7 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
             media_type=media_type,
             media_path=media_path,
         )
-        db.add(msg)
+        messages.append(msg)
 
         # Timeline event for message
         evt = TimelineEvent(
@@ -302,7 +311,10 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
             entity_type="message",
             description=f"Message: {msg.body[:60]}"
         )
-        db.add(evt)
+        events.append(evt)
+
+    db.add_all(messages)
+    db.add_all(events)
 
     # Create demo deleted messages
     del_msg1 = DeletedMessage(
@@ -347,23 +359,5 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
 @router.delete("/demo-case/{case_id}")
 def delete_demo_case(case_id: int, db: Session = Depends(get_db)) -> dict:
     """Delete a demo case and all associated data."""
-    case = db.query(Case).filter(Case.id == case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    case_name = case.name
-    evidence_ids = [e.id for e in case.evidence_items]
-    if evidence_ids:
-        db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-        db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-        db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-        db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-
-    db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete(synchronize_session=False)
-    db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete(synchronize_session=False)
-    db.query(MediaItem).filter(MediaItem.case_id == case_id).delete(synchronize_session=False)
-
-    db.delete(case)
-    db.commit()
-
-    return {"message": f"Demo case '{case_name}' deleted successfully"}
+    from backend.api.cases import delete_case
+    return delete_case(case_id, db)

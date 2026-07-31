@@ -682,44 +682,91 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
 @router.delete("/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     """Delete evidence and its associated files."""
+    # Fetch tuple without loading ORM object into identity map
+    row = db.query(
+        Evidence.case_id,
+        Evidence.original_filename,
+        Evidence.sha256,
+        Evidence.storage_path,
+        Evidence.extracted_path,
+    ).filter(Evidence.id == evidence_id).first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    case_id, original_filename, sha256, storage_path, extracted_path = row
+    sha_prefix = sha256[:8] if sha256 else "unknown"
+
+    # Delete storage files on disk
+    if storage_path:
+        try:
+            p = Path(storage_path)
+            if not p.is_absolute():
+                p = UPLOADS_DIR / storage_path
+            delete_file(p)
+        except Exception as e:
+            logger.warning(f"Could not delete storage file {storage_path}: {e}")
+
+    if extracted_path:
+        try:
+            p = Path(extracted_path)
+            if not p.is_absolute():
+                p = UPLOADS_DIR / extracted_path
+            delete_file(p)
+        except Exception as e:
+            logger.warning(f"Could not delete extracted path {extracted_path}: {e}")
+
+    # Import models for bulk delete
+    from backend.models.models import (
+        WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
+        TelegramMessage, TelegramContact, TelegramGroup,
+        TimelineEvent, DeletedMessage, MediaItem,
+        AnalysisResult, EvidenceFile, AnalysisLog
+    )
+
     try:
-        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-        if not evidence:
-            raise HTTPException(status_code=404, detail="Evidence not found")
+        # Fast bulk SQL deletes without ORM unit-of-work identity map conflicts
+        db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(TelegramMessage).filter(TelegramMessage.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(TelegramContact).filter(TelegramContact.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(TelegramGroup).filter(TelegramGroup.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(TimelineEvent).filter(TimelineEvent.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(DeletedMessage).filter(DeletedMessage.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(MediaItem).filter(MediaItem.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(AnalysisResult).filter(AnalysisResult.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(AnalysisLog).filter(AnalysisLog.evidence_id == evidence_id).delete(synchronize_session=False)
+        db.query(Evidence).filter(Evidence.id == evidence_id).delete(synchronize_session=False)
 
-        # Log activity before deletion
-        log_service = get_log_service(db)
-        log_service.log_activity(
-            case_id=evidence.case_id,
-            action="delete_evidence",
-            description=f"Evidence deleted: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)"
-        )
-
-        # Delete storage files
-        if evidence.storage_path:
-            try:
-                delete_file(Path(evidence.storage_path))
-            except Exception:
-                pass  # Best effort
-        if evidence.evidence_type == "zip" and evidence.extracted_path:
-            try:
-                delete_file(Path(evidence.extracted_path))
-            except Exception:
-                pass
-        # Delete database records (cascade will delete EvidenceFile and AnalysisResult)
-        db.delete(evidence)
         db.commit()
+
+        # Log activity after successful deletion
+        try:
+            log_service = get_log_service(db)
+            log_service.log_activity(
+                case_id=case_id,
+                action="delete_evidence",
+                description=f"Evidence deleted: {original_filename} (SHA-256: {sha_prefix}...)"
+            )
+            db.commit()
+        except Exception:
+            pass
+
         return None
+    except HTTPException:
+        raise
     except Exception as e:
-        # Log error
+        db.rollback()
         log_service = get_log_service(db)
         log_service.log_error(
             error_type="evidence_deletion_error",
             message=f"Error deleting evidence: {str(e)}",
-            case_id=evidence.case_id if evidence else None,
+            case_id=case_id,
             evidence_id=evidence_id,
-            stack_trace=str(e.__traceback__),
+            stack_trace=traceback.format_exc(),
             endpoint=f"/api/evidence/{evidence_id}",
             method="DELETE"
         )
-        raise
+        raise HTTPException(status_code=500, detail=f"Failed to delete evidence: {str(e)}")

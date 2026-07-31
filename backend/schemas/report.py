@@ -120,6 +120,7 @@ class ReportGenerateResponse(BaseModel):
     report_type: ReportType
     status: ReportStatus
     message: str
+    filename: Optional[str] = None
     created_at: datetime
 
 

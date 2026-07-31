@@ -214,6 +214,12 @@ const CaseDetailPage = () => {
                 refreshToken={evidenceRefreshToken}
                 selectedEvidenceId={selectedEvidenceId}
                 onSelectEvidence={(evId) => setSelectedEvidenceId(evId)}
+                onDeleteSuccess={(deletedId) => {
+                  if (selectedEvidenceId === deletedId) {
+                    setSelectedEvidenceId(null);
+                  }
+                  setEvidenceRefreshToken((token) => token + 1);
+                }}
               />
             </div>
           )}

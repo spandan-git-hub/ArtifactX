@@ -260,47 +260,47 @@ Test the full application workflow from scratch. Do this after Phases 1-5.
 
 ### Backend Smoke Tests
 
-- [ ] **T1** Backend starts without errors
+- [x] **T1** Backend starts without errors
   ```powershell
   $env:PYTHONPATH = "D:\ArtifactX"
   cd D:\ArtifactX\backend
-  uvicorn app.main:app --port 8000 --reload
+  uvicorn app.main:app --port 8080 --reload
   # → Should print: Application startup complete. No import errors.
   ```
 
-- [ ] **T2** Health endpoint returns demo_mode=true
+- [x] **T2** Health endpoint returns demo_mode=true
   ```
-  GET http://localhost:8000/api/health
+  GET http://localhost:8080/api/health
   # → { "status": "ok", "demo_mode": true, ... }
   ```
 
-- [ ] **T3** Demo case creation produces complete data
+- [x] **T3** Demo case creation produces complete data
   ```
-  POST http://localhost:8000/api/demo/create-demo-case
+  POST http://localhost:8080/api/demo/create-demo-case
   Body: { "case_name": "Test", "has_whatsapp": true, "has_telegram": true }
   # → Verify: response has case_id, WA stats, TG stats (all non-zero)
   # → Verify DB: SELECT COUNT(*) FROM timeline_events WHERE case_id=N → non-zero
   # → Verify DB: SELECT COUNT(*) FROM deleted_messages WHERE case_id=N → 2-3 rows
   ```
 
-- [ ] **T4** Dashboard overview returns all data
+- [x] **T4** Dashboard overview returns all data
   ```
-  GET http://localhost:8000/api/cases/{id}/overview
+  GET http://localhost:8080/api/cases/{id}/overview
   # → stats.total_messages > 0
   # → stats.total_contacts > 0
   # → timeline_stats.total_events > 0
   # → stats.total_deleted > 0
   ```
 
-- [ ] **T5** Search returns results from demo data
+- [x] **T5** Search returns results from demo data
   ```
-  GET http://localhost:8000/api/search?case_id={id}&query=meeting
+  GET http://localhost:8080/api/search?case_id={id}&query=meeting
   # → Returns message results
   ```
 
-- [ ] **T6** Report generation produces a PDF file
+- [x] **T6** Report generation produces a PDF file
   ```
-  POST http://localhost:8000/api/cases/{id}/reports
+  POST http://localhost:8080/api/cases/{id}/reports
   Body: { "report_type": "full" }
   # → Returns filename
   # → Verify file exists at reports/{id}/*.pdf
@@ -308,7 +308,7 @@ Test the full application workflow from scratch. Do this after Phases 1-5.
 
 ### Frontend Smoke Tests
 
-- [ ] **T7** Full demo workflow end-to-end
+- [x] **T7** Full demo workflow end-to-end
   1. Open `http://localhost:5173`
   2. Click "Create Demo Case"
   3. `DemoModal` opens with WhatsApp + Telegram checked
@@ -319,16 +319,16 @@ Test the full application workflow from scratch. Do this after Phases 1-5.
   8. Charts render (WA + TG data visible)
   9. Timeline Summary section is visible (events > 0)
 
-- [ ] **T8** Sidebar shows case-specific navigation
+- [x] **T8** Sidebar shows case-specific navigation
   - When on dashboard page, sidebar shows: All Cases / Dashboard / Search / Reports / Logs
   - All links are enabled and navigate correctly
   - Header does NOT show duplicate nav buttons
 
-- [ ] **T9** Search page returns results
+- [x] **T9** Search page returns results
   - Navigate to Search page
   - Type "meeting" → results appear from WA and TG messages
 
-- [ ] **T10** Reports page works
+- [x] **T10** Reports page works
   - All three summary cards show data
   - "Generate PDF" button creates a report
   - Download link appears

@@ -11,7 +11,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propSelectedId, onSelectEvidence }) => {
+const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propSelectedId, onSelectEvidence, onDeleteSuccess }) => {
   const { evidences, loading, error, loadEvidences, deleteEvidence } = useEvidence();
   const [internalSelectedId, setInternalSelectedId] = useState(null);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
@@ -30,11 +30,11 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
 
   const handleLoadFiles = async (evidenceId) => {
     if (selectedEvidenceId === evidenceId) {
-      setSelectedEvidenceId(null);
+      if (setSelectedEvidenceId) setSelectedEvidenceId(null);
       setEvidenceFiles([]);
       return;
     }
-    setSelectedEvidenceId(evidenceId);
+    if (setSelectedEvidenceId) setSelectedEvidenceId(evidenceId);
     setFilesLoading(true);
     setFilesError(null);
     try {
@@ -57,6 +57,13 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
       setDeleteLoading(evidenceId);
       try {
         await deleteEvidence(evidenceId);
+        if (selectedEvidenceId === evidenceId) {
+          if (setSelectedEvidenceId) setSelectedEvidenceId(null);
+          setEvidenceFiles([]);
+        }
+        if (onDeleteSuccess) {
+          onDeleteSuccess(evidenceId);
+        }
       } catch (err) {
         // error handled by hook
       } finally {
