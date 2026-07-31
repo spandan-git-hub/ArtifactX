@@ -110,6 +110,11 @@ class TelegramService:
                 message="Telegram analysis completed successfully",
                 details={"evidence_id": evidence_id}
             )
+            log_service.log_activity(
+                case_id=evidence.case_id,
+                action="analyze_telegram",
+                description=f"Telegram forensic parser completed for evidence: {evidence.original_filename}"
+            )
 
             return True
         except Exception as e:

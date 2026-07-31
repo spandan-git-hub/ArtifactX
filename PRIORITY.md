@@ -113,13 +113,13 @@ Revamp the UI into a high-density, professional Forensic Workstation (`ForensicS
 Ensure full evidence integrity, multi-hash calculation (SHA-256, MD5, SHA-1), and audit trail logging.
 
 ### Backend
-- [ ] **B18** Implement SHA-256, MD5, and SHA-1 calculation on evidence upload in `backend/api/evidence.py`.
-- [ ] **B19** Implement hash verification endpoint (`POST /api/evidence/{id}/verify-hashes`) to verify on-disk evidence files against recorded `EvidenceFile` manifest.
-- [ ] **B20** Implement Chain-of-Custody logging service (`log_activity`) recording evidence ingest, hash verification, analysis runs, and report exports in `activity_logs`.
+- [x] **B18** Implement SHA-256, MD5, and SHA-1 calculation on evidence upload in `backend/api/evidence.py`.
+- [x] **B19** Implement hash verification endpoint (`POST /api/evidence/{id}/verify-hashes`) to verify on-disk evidence files against recorded `EvidenceFile` manifest.
+- [x] **B20** Implement Chain-of-Custody logging service (`log_activity`) recording evidence ingest, hash verification, analysis runs, and report exports in `activity_logs`.
 
 ### Frontend
-- [ ] **F20** Create `EvidenceHashBadge.jsx` displaying SHA-256 hash in JetBrains Mono cyan text with click-to-copy and verification status badge (`VERIFIED_INTACT` / `HASH_MISMATCH`).
-- [ ] **F21** Add "Verify Evidence Hashes" button on evidence views triggering real-time re-hashing and displaying an integrity manifest modal.
+- [x] **F20** Create `EvidenceHashBadge.jsx` displaying SHA-256 hash in JetBrains Mono cyan text with click-to-copy and verification status badge (`VERIFIED_INTACT` / `HASH_MISMATCH`).
+- [x] **F21** Add "Verify Evidence Hashes" button on evidence views triggering real-time re-hashing and displaying an integrity manifest modal.
 
 ---
 

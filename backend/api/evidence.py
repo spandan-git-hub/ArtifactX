@@ -7,6 +7,7 @@ import shutil
 import traceback
 import uuid
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -16,7 +17,12 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.models.models import ActivityLog, Case, Evidence, EvidenceFile
-from backend.utils.hashing import compute_sha256_bytes, compute_sha256
+from backend.utils.hashing import (
+    compute_sha256_bytes,
+    compute_sha256,
+    compute_multi_hashes,
+    compute_multi_hashes_bytes,
+)
 from backend.utils.file_storage import delete_file
 from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
@@ -139,7 +145,7 @@ def _safe_zip_member_path(filename: str) -> Path:
 
 def _extract_zip(zip_data: bytes, extract_dir: Path) -> List[dict]:
     """Extract ZIP archive to directory, return list of file info.
-    Each dict contains: relative_path, size, sha256.
+    Each dict contains: relative_path, size, sha256, md5, sha1.
     """
     extracted_info = []
     try:
@@ -176,13 +182,15 @@ def _extract_zip(zip_data: bytes, extract_dir: Path) -> List[dict]:
                     while chunk := source.read(8192):
                         target.write(chunk)
 
-                file_sha256 = compute_sha256(target_path)
+                file_hashes = compute_multi_hashes(target_path)
                 mime_type, _ = mimetypes.guess_type(str(target_path))
                 extracted_info.append(
                     {
                         "relative_path": str(relative_path),
                         "size": info.file_size,
-                        "sha256": file_sha256,
+                        "sha256": file_hashes["sha256"],
+                        "md5": file_hashes["md5"],
+                        "sha1": file_hashes["sha1"],
                         "mime_type": mime_type,
                     }
                 )
@@ -212,15 +220,18 @@ def _cleanup_upload_artifacts(*paths: Optional[Path]) -> None:
 
 def _evidence_to_response(evidence: Evidence) -> dict:
     """Serialize Evidence explicitly so response validation cannot hit SQLAlchemy metadata."""
+    meta = evidence.metadata_ or {}
     return {
         "id": evidence.id,
         "case_id": evidence.case_id,
         "original_filename": evidence.original_filename,
         "storage_path": evidence.storage_path,
         "sha256": evidence.sha256,
+        "md5": meta.get("md5"),
+        "sha1": meta.get("sha1"),
         "content_type": evidence.content_type,
         "evidence_type": evidence.evidence_type,
-        "metadata": evidence.metadata_ or {},
+        "metadata": meta,
         "extracted_path": evidence.extracted_path,
         "uploaded_at": evidence.uploaded_at,
         "analyzed_at": evidence.analyzed_at,
@@ -283,9 +294,12 @@ def upload_evidence(
                 detail="Uploaded file is empty",
             )
 
-        logger.info("Computing uploaded file SHA-256 filename=%s size=%s", safe_name, file_size)
-        sha256 = compute_sha256_bytes(file_data)
-        logger.info("Computed uploaded file SHA-256 filename=%s sha256=%s", safe_name, sha256)
+        logger.info("Computing uploaded file multi-hashes (SHA-256, MD5, SHA-1) filename=%s size=%s", safe_name, file_size)
+        upload_hashes = compute_multi_hashes_bytes(file_data)
+        sha256 = upload_hashes["sha256"]
+        md5 = upload_hashes["md5"]
+        sha1 = upload_hashes["sha1"]
+        logger.info("Computed uploaded file hashes sha256=%s md5=%s sha1=%s", sha256, md5, sha1)
 
         is_zip = _is_zip_file(safe_name, file.content_type)
         evidence_type = "zip" if is_zip else "file"
@@ -318,6 +332,8 @@ def upload_evidence(
             "is_zip": is_zip,
             "original_filename": file.filename or "unnamed",
             "stored_filename": stored_name,
+            "md5": md5,
+            "sha1": sha1,
         }
 
         logger.info("Creating Evidence row case_id=%s filename=%s sha256=%s", case_id, safe_name, sha256)
@@ -343,6 +359,8 @@ def upload_evidence(
                     "size": file_info["size"],
                     "mime_type": mime_type,
                     "extracted_path": str(abs_path),
+                    "md5": file_info.get("md5"),
+                    "sha1": file_info.get("sha1"),
                 }
                 media_type = _media_type_from_mime(mime_type)
                 logger.info(
@@ -380,6 +398,8 @@ def upload_evidence(
             "id": evidence.id,
             "filename": evidence.original_filename,
             "sha256": evidence.sha256,
+            "md5": md5,
+            "sha1": sha1,
             "size": file_size,
             "evidence_type": evidence.evidence_type,
             "is_zip": is_zip,
@@ -642,21 +662,15 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
         if evidence.evidence_type == "zip" and evidence.extracted_path:
             base_path = Path(evidence.extracted_path)
         else:
-            # For non-ZIP, the file is the evidence itself? We'll treat the evidence file as the only file.
-            # But EvidenceFile may not exist for non-ZIP; we'll handle by serving the evidence storage.
-            # For simplicity, if evidence_type is file, we return the evidence storage.
             if evidence_file:
-                # This case shouldn't happen, but if it does, use evidence storage
                 base_path = Path(evidence.storage_path)
                 relative_path = Path(evidence_file.relative_path)
             else:
-                # No EvidenceFile record, treat the whole evidence as the file
                 base_path = Path(evidence.storage_path)
                 relative_path = Path(evidence.original_filename)
         file_path = base_path / relative_path
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Stored file not found")
-        # Return file as streaming response
         from fastapi.responses import FileResponse
 
         return FileResponse(
@@ -665,7 +679,6 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
             media_type=evidence_file.mime_type or "application/octet-stream",
         )
     except Exception as e:
-        # Log error
         log_service = get_log_service(db)
         log_service.log_error(
             error_type="evidence_file_retrieval_error",
@@ -679,10 +692,125 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
         raise
 
 
+@router.post("/{evidence_id}/verify-hashes")
+def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
+    """Verify on-disk evidence files against recorded cryptographic hashes (SHA-256, MD5, SHA-1)."""
+    try:
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+
+        # 1. Main file verification
+        main_file_path = Path(evidence.storage_path)
+        if not main_file_path.is_absolute():
+            main_file_path = UPLOADS_DIR / evidence.storage_path
+
+        expected_sha256 = evidence.sha256 or ""
+        expected_md5 = (evidence.metadata_ or {}).get("md5")
+        expected_sha1 = (evidence.metadata_ or {}).get("sha1")
+
+        main_file_match = False
+        actual_hashes = {}
+        if main_file_path.exists() and main_file_path.is_file():
+            actual_hashes = compute_multi_hashes(main_file_path)
+            sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
+            md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
+            sha1_match = True if not expected_sha1 else actual_hashes["sha1"].lower() == expected_sha1.lower()
+            main_file_match = sha256_match and md5_match and sha1_match
+        else:
+            actual_hashes = {"sha256": "FILE_NOT_FOUND", "md5": "FILE_NOT_FOUND", "sha1": "FILE_NOT_FOUND"}
+
+        # 2. Extracted files verification (if archive)
+        extracted_results = []
+        files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).all()
+        matched_count = 0
+        mismatched_count = 0
+
+        for f in files:
+            f_metadata = f.metadata_ or {}
+            exp_sha256 = f.sha256 or ""
+            exp_md5 = f_metadata.get("md5")
+            exp_sha1 = f_metadata.get("sha1")
+
+            f_match = False
+            act_hashes = {}
+            if evidence.extracted_path:
+                ext_base = Path(evidence.extracted_path)
+                if not ext_base.is_absolute():
+                    ext_base = UPLOADS_DIR / evidence.extracted_path
+                target_path = ext_base / f.relative_path
+
+                if target_path.exists() and target_path.is_file():
+                    act_hashes = compute_multi_hashes(target_path)
+                    s_match = act_hashes["sha256"].lower() == exp_sha256.lower()
+                    m_match = True if not exp_md5 else act_hashes["md5"].lower() == exp_md5.lower()
+                    sh_match = True if not exp_sha1 else act_hashes["sha1"].lower() == exp_sha1.lower()
+                    f_match = s_match and m_match and sh_match
+                else:
+                    act_hashes = {"sha256": "FILE_NOT_FOUND", "md5": "FILE_NOT_FOUND", "sha1": "FILE_NOT_FOUND"}
+
+            if f_match:
+                matched_count += 1
+            else:
+                mismatched_count += 1
+
+            extracted_results.append({
+                "id": f.id,
+                "relative_path": f.relative_path,
+                "expected_sha256": exp_sha256,
+                "actual_sha256": act_hashes.get("sha256"),
+                "expected_md5": exp_md5,
+                "actual_md5": act_hashes.get("md5"),
+                "expected_sha1": exp_sha1,
+                "actual_sha1": act_hashes.get("sha1"),
+                "is_intact": f_match,
+            })
+
+        overall_intact = main_file_match and (mismatched_count == 0)
+        verification_status = "VERIFIED_INTACT" if overall_intact else "HASH_MISMATCH"
+
+        # Log Activity for Chain-of-Custody (B20)
+        log_service = get_log_service(db)
+        log_service.log_activity(
+            case_id=evidence.case_id,
+            action="verify_hashes",
+            description=f"Evidence '{evidence.original_filename}' cryptographic verification: {verification_status} (SHA-256: {expected_sha256[:8]}...)",
+        )
+
+        return {
+            "evidence_id": evidence.id,
+            "case_id": evidence.case_id,
+            "filename": evidence.original_filename,
+            "verification_status": verification_status,
+            "is_valid": overall_intact,
+            "verified_at": datetime.utcnow().isoformat(),
+            "main_file": {
+                "storage_path": evidence.storage_path,
+                "expected_sha256": expected_sha256,
+                "actual_sha256": actual_hashes.get("sha256"),
+                "expected_md5": expected_md5,
+                "actual_md5": actual_hashes.get("md5"),
+                "expected_sha1": expected_sha1,
+                "actual_sha1": actual_hashes.get("sha1"),
+                "is_intact": main_file_match,
+            },
+            "extracted_files_summary": {
+                "total": len(files),
+                "matched": matched_count,
+                "mismatched": mismatched_count,
+            },
+            "files": extracted_results,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error verifying evidence hashes:\n%s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to verify evidence hashes: {str(e)}")
+
+
 @router.delete("/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     """Delete evidence and its associated files."""
-    # Fetch tuple without loading ORM object into identity map
     row = db.query(
         Evidence.case_id,
         Evidence.original_filename,
@@ -697,7 +825,6 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     case_id, original_filename, sha256, storage_path, extracted_path = row
     sha_prefix = sha256[:8] if sha256 else "unknown"
 
-    # Delete storage files on disk
     if storage_path:
         try:
             p = Path(storage_path)
@@ -716,7 +843,6 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
         except Exception as e:
             logger.warning(f"Could not delete extracted path {extracted_path}: {e}")
 
-    # Import models for bulk delete
     from backend.models.models import (
         WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
         TelegramMessage, TelegramContact, TelegramGroup,
@@ -725,7 +851,6 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     )
 
     try:
-        # Fast bulk SQL deletes without ORM unit-of-work identity map conflicts
         db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id == evidence_id).delete(synchronize_session=False)
         db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id == evidence_id).delete(synchronize_session=False)
         db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id == evidence_id).delete(synchronize_session=False)
@@ -742,7 +867,6 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
 
         db.commit()
 
-        # Log activity after successful deletion
         try:
             log_service = get_log_service(db)
             log_service.log_activity(

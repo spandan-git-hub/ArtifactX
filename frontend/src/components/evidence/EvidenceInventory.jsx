@@ -9,7 +9,10 @@ import {
   Download,
   FolderOpen,
   FileText,
+  ShieldCheck,
 } from 'lucide-react';
+import EvidenceHashBadge from './EvidenceHashBadge';
+import EvidenceHashVerificationModal from './EvidenceHashVerificationModal';
 
 const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propSelectedId, onSelectEvidence, onDeleteSuccess }) => {
   const { evidences, loading, error, loadEvidences, deleteEvidence } = useEvidence();
@@ -18,6 +21,12 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(null);
+
+  // Hash verification modal state
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [verifyingEvidenceId, setVerifyingEvidenceId] = useState(null);
+  const [verificationData, setVerificationData] = useState(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   const selectedEvidenceId = propSelectedId !== undefined ? propSelectedId : internalSelectedId;
   const setSelectedEvidenceId = propSelectedId !== undefined ? onSelectEvidence : setInternalSelectedId;
@@ -72,6 +81,26 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
     }
   };
 
+  const handleVerifyHashes = async (evidenceId, e) => {
+    if (e) e.stopPropagation();
+    setVerifyingEvidenceId(evidenceId);
+    setVerificationModalOpen(true);
+    setVerifyLoading(true);
+    try {
+      const data = await evidenceService.verifyEvidenceHashes(evidenceId);
+      setVerificationData(data);
+    } catch (err) {
+      console.error('Failed to verify evidence hashes:', err);
+      setVerificationData({
+        verification_status: 'HASH_MISMATCH',
+        is_valid: false,
+        error: err.response?.data?.detail || err.message,
+      });
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
   const handleDownloadFile = async (fileId, fileName) => {
     try {
       const blob = await evidenceService.downloadEvidenceFile(selectedEvidenceId, fileId);
@@ -118,7 +147,7 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
             <FolderOpen className="h-5 w-5 text-accent-emerald" />
           </div>
           <div>
-            <h3 className="font-semibold text-forensic-100">Evidence Files</h3>
+            <h3 className="font-semibold text-forensic-100">Evidence Inventory</h3>
             <p className="text-sm text-forensic-500">{evidences.length} file(s) uploaded</p>
           </div>
         </div>
@@ -138,7 +167,7 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
                 <th>Filename</th>
                 <th>Type</th>
                 <th>Size</th>
-                <th>SHA-256</th>
+                <th>SHA-256 Hash</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -168,12 +197,17 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
                     {formatFileSize(ev.upload_size)}
                   </td>
                   <td>
-                    <span className="hash-text text-xs">
-                      {ev.sha256?.substring(0, 16)}...
-                    </span>
+                    <EvidenceHashBadge hash={ev.sha256} />
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => handleVerifyHashes(ev.id, e)}
+                        className="btn-ghost p-1.5 text-accent-cyan hover:bg-accent-cyan/10"
+                        title="Verify Evidence Hashes & Integrity"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => handleLoadFiles(ev.id)}
                         className={`btn-ghost p-1.5 ${
@@ -214,7 +248,7 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
           <div className="flex items-center gap-2 mb-3">
             <FolderOpen className="h-4 w-4 text-accent-emerald" />
             <h4 className="font-semibold text-forensic-100">
-              Extracted Files
+              Extracted Archive Files
             </h4>
             <span className="badge badge-emerald">{evidenceFiles.length}</span>
           </div>
@@ -237,6 +271,7 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
                   <tr>
                     <th>Path</th>
                     <th>Size</th>
+                    <th>SHA-256</th>
                     <th>MIME Type</th>
                     <th>Actions</th>
                   </tr>
@@ -244,11 +279,14 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
                 <tbody>
                   {evidenceFiles.slice(0, 100).map((f) => (
                     <tr key={f.id}>
-                      <td className="text-forensic-300 font-mono text-sm truncate max-w-[300px]">
+                      <td className="text-forensic-300 font-mono text-sm truncate max-w-[280px]">
                         {f.relative_path}
                       </td>
                       <td className="text-forensic-400 font-mono text-sm">
                         {formatFileSize(f.size)}
+                      </td>
+                      <td>
+                        <EvidenceHashBadge hash={f.sha256} />
                       </td>
                       <td>
                         <span className="badge badge-gray">
@@ -277,6 +315,15 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
           )}
         </div>
       )}
+
+      {/* Hash Verification Modal */}
+      <EvidenceHashVerificationModal
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        verificationData={verificationData}
+        loading={verifyLoading}
+        onReverify={() => handleVerifyHashes(verifyingEvidenceId)}
+      />
     </div>
   );
 };

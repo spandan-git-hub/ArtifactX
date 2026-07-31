@@ -79,6 +79,15 @@ class ReportService:
                 include_correlations=include_correlations,
             )
 
+            from backend.services.log_service import get_log_service
+            log_service = get_log_service(self.db)
+            log_service.log_activity(
+                case_id=case_id,
+                action="export_report",
+                description=f"Generated court-ready PDF report ({report_type}): {filename}"
+            )
+            self.db.commit()
+
             return {
                 "report_id": report_id,
                 "case_id": case_id,

@@ -32,6 +32,12 @@ export const getEvidenceFiles = async (evidenceId) => {
   return response.data;
 };
 
+// Verify evidence cryptographic hashes (SHA-256, MD5, SHA-1)
+export const verifyEvidenceHashes = async (evidenceId) => {
+  const response = await axios.post(`${API_BASE}/evidence/${evidenceId}/verify-hashes`);
+  return response.data;
+};
+
 // Download a specific file from evidence
 export const downloadEvidenceFile = async (evidenceId, fileId) => {
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/files/${fileId}`, {
@@ -51,6 +57,7 @@ export default {
   getEvidences,
   getEvidence,
   getEvidenceFiles,
+  verifyEvidenceHashes,
   downloadEvidenceFile,
   deleteEvidence,
 };
