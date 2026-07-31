@@ -1,6 +1,10 @@
 # Copyright & License
 
-Copyright (c) 2026 Spandan Mhaske. All rights reserved.
+Copyright (c) 2026 ArtifactX Team. All rights reserved.
+
+* **Architecture & Core Development:** Spandan Mhaske 
+* **Testing & Debugging:** Om Chaudhari
+* **Research & Documentation:** Gurudatt Pote, Swami Sonar
 
 ## Terms of Use
 

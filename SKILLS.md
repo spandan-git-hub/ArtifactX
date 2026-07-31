@@ -11,25 +11,25 @@
 - **Location:** `.agents/skills/frontend-design/`
 - **Purpose:** Guidance for distinctive, intentional visual design — palette, typography, layout, motion
 - **When to use:**
-  - Creating any new UI component or page
-  - Redesigning existing pages for better aesthetics
+  - Creating any new UI component or page (Chat Viewer, Timeline Stream, Correlation Graph, Court Report Preview)
+  - Redesigning existing pages for better aesthetics and non-redundant layout
   - Making decisions about color, typography, spacing, animation
-- **Key principle:** Design should be forensic-tool-specific — dark, precise, data-forward. Not generic SaaS.
-- **Avoid:** AI-default looks (warm cream + serif, near-black + acid-green, broadsheet layouts)
-- **ArtifactX identity:** Dark blue-gray base (`forensic-950`), cyan accent, monospace data displays, subtle glow effects
+- **Key principle:** Design should be forensic-tool-specific — dark, precise, data-forward, high density workstation UI. Not generic SaaS.
+- **Avoid:** AI-default looks (warm cream + serif, near-black + acid-green, broadsheet layouts), broken/senseless action buttons, duplicate nav links
+- **ArtifactX identity:** Dark slate/blue-gray base (`forensic-950`), cyan accent, monospace data displays (`JetBrains Mono`), subtle glow effects, clear deletion indicators (`accent-rose`)
 
 ### `vercel-react-best-practices`
 - **Location:** `.agents/skills/vercel-react-best-practices/`
 - **Purpose:** React performance optimization — waterfalls, bundle size, re-renders, data fetching
 - **When to use:**
-  - Writing any new React component
-  - Data fetching with hooks
+  - Writing any new React component or custom hook
+  - Data fetching with hooks (`useCallback` memoization to prevent infinite re-renders)
   - Reviewing components for performance
-  - Bundle optimization
+  - Bundle optimization & chart rendering efficiency
 - **Key rules for ArtifactX:**
   - Use `Promise.all()` for parallel API calls (avoid waterfalls in hooks)
   - Avoid barrel imports — import directly from component files
-  - Use `useTransition` / `useDeferredValue` for search input
+  - Use `useTransition` / `useDeferredValue` for high-volume message search and timeline filters
   - Hoist static JSX outside component render (static icons, empty states)
   - Use functional `setState` in callbacks to avoid stale closures
 
@@ -48,11 +48,11 @@ The following skills are NOT installed but would be valuable for ArtifactX:
 
 | Capability Needed | Reason |
 |------------------|--------|
-| **Python/FastAPI best practices** | Backend needs proper async patterns, error handling, type safety |
-| **Security auditing** | Forensic tool must handle evidence securely; no file path traversal, no data leaks |
-| **Testing (pytest + jest)** | No test coverage exists; brittle to changes |
-| **PDF/report generation** | ReportLab is complex; a skill with patterns would help |
-| **Data visualization** | chart.js integration patterns for forensic dashboards |
+| **Python/FastAPI best practices** | Backend needs proper async patterns, background processing, type safety |
+| **Security & Evidence Cryptography** | Forensic tool must calculate and verify SHA-256 / MD5 / SHA-1 hashes and maintain chain of custody |
+| **Testing (pytest + jest)** | Unit & integration tests for evidence parsers and court report generator |
+| **Court-Ready PDF Generation** | ReportLab rules for legal document layout, page numbering, sworn sign-off blocks, verification tables |
+| **Data Visualization & Graphs** | chart.js + react-chartjs-2 integration for timeline density and entity correlation matrices |
 
 ### Finding New Skills
 
@@ -73,12 +73,12 @@ npx skills add <owner/repo@skill> -g -y
 
 | Task | Primary Skill | Secondary Skill |
 |------|--------------|----------------|
-| New page or component | `frontend-design` | `vercel-react-best-practices` |
-| New React hook or data fetching | `vercel-react-best-practices` | — |
-| Redesigning existing UI | `frontend-design` | — |
-| Charts / visualizations | `frontend-design` (design) | `vercel-react-best-practices` (perf) |
-| Backend API endpoint | None installed — use BACKEND.md | — |
-| Demo modal UX | `frontend-design` | `vercel-react-best-practices` |
+| Workstation UI Redesign | `frontend-design` | `vercel-react-best-practices` |
+| Interactive Chat & Message Viewer | `frontend-design` | `vercel-react-best-practices` |
+| Chronological Timeline & Correlation UI | `frontend-design` (design) | `vercel-react-best-practices` (perf) |
+| Court-Ready Report Preview & Export | `frontend-design` | — |
+| Backend API & Hashing Engine | None installed — use BACKEND.md | — |
+| Demo Workstation Workflow | `frontend-design` | `vercel-react-best-practices` |
 | Finding new capability | `find-skills` | — |
 
 ---
@@ -87,24 +87,25 @@ npx skills add <owner/repo@skill> -g -y
 
 When the `frontend-design` skill asks to "ground it in the subject":
 
-**Subject:** A forensic analysis platform used by investigators to extract and analyze evidence from mobile apps (WhatsApp, Telegram).
+**Subject:** A digital forensic analysis and court report platform used by law enforcement, legal investigators, and forensic experts to extract, correlate, and present digital evidence from mobile applications (WhatsApp, Telegram, EXIF metadata).
 
-**Audience:** Digital forensics professionals, law enforcement, legal investigators.
+**Audience:** Digital forensics professionals, law enforcement officers, legal counsel, and judicial courts.
 
 **Visual identity:**
-- **Dark, precise, clinical** — like a terminal or security dashboard
-- **Monospaced fonts for data** — hashes, IDs, timestamps all use JetBrains Mono
-- **Cyan as primary accent** — feels technological, analytical, not consumer
-- **Data-forward** — charts, tables, and metrics are the hero, not decorative elements
-- **Minimal animation** — subtle fade-ins, no bouncy transitions; this is a serious tool
-- **Green = WhatsApp, Blue = Telegram** — consistent color coding throughout
+- **Dark, precise, clinical forensic workstation** — high contrast dark slate (`forensic-950`), clear data hierarchy
+- **Monospaced fonts for technical data** — SHA-256/MD5/SHA-1 hashes, entity IDs, timestamps, and raw DB rows all use JetBrains Mono
+- **Cyan as primary accent** (`#06b6d4`) — technological, analytical, precise
+- **App Color Coding:** Green (`#10b981`) = WhatsApp, Blue (`#3b82f6`) = Telegram, Violet (`#8b5cf6`) = Cross-app Correlations, Rose (`#f43f5e`) = Deleted Messages & Anomalies
+- **Data-forward & Interactive:** Interactive chat message threads, timeline density charts, entity correlation nodes, and instant metadata inspection panels
+- **Court-Ready Formatting:** Crisp typography, official seal headers, clear evidence integrity hashes, and structured legal annexures
 
-**One unique element (signature):** The SHA-256 hash displayed for every evidence file in `hash-text` style — cyan monospace breaking across lines. This is the visual fingerprint of the forensic world made literal.
+**One unique element (signature):** The **Evidence Fingerprint Badge** displayed across every evidence item and court report page — showing cryptographic SHA-256 hash in `hash-text` style alongside verification timestamp and chain-of-custody status tag (`VERIFIED_INTACT`).
 
 ---
 
 ## Notes
 
 - Forensic rules: Never fabricate findings. All data displayed must originate from actual evidence or explicit demo mock data. No synthetic forensic results.
-- Evidence parsing lives in `forensic/` — a separate package from `backend/`. Keep this boundary.
+- Cryptographic integrity: Always compute SHA-256, MD5, and SHA-1 hashes upon file ingestion and verify them before court report compilation.
+- Evidence parsing lives in `forensic/` — a separate package from `backend/`. Keep this boundary clean.
 - The `.env` file contains real credentials (Neon DB URL). Never log or expose these.

@@ -9,329 +9,201 @@
 
 ## Phase 0 — Audit (Before Writing Any Code)
 
-These tasks must happen first. They are read-only investigations.
-
 - [x] **A1** — Read `forensic/whatsapp/contact_parser.py`, `group_parser.py`, `media_parser.py`
-  - Verify each exists and follows the same schema-adaptive pattern as `message_parser.py`
-  - Verify return dicts match `WhatsAppContact`, `WhatsAppGroup` model fields
-
 - [x] **A2** — Read all files in `forensic/telegram/`
-  - Verify `detector.py`, `message_parser.py`, `contact_parser.py`, `group_parser.py` all exist
-  - Verify `detector.py` correctly identifies `cache4.db` / Telegram SQLite schemas
-
 - [x] **A3** — Read `forensic/timeline/builder.py`
-  - Verify `TimelineBuilder.build_timeline_for_case(db, case_id)` exists
-  - Verify it returns list of dicts compatible with `TimelineEvent` model fields (especially `normalized_timestamp` as a real `datetime` object)
-
 - [x] **A4** — Read `forensic/correlation/matcher.py`
-  - Verify the dataclasses `WhatsAppMessage`, `WhatsAppContact`, `TelegramMessage`, `TelegramContact`, `MediaItem` defined there have the same field names that `correlation_service.py` uses when converting from ORM objects
-
 - [x] **A5** — Read `forensic/media/orphan.py`
-  - Verify these three function signatures:
-    - `find_orphan_media_items(case_id: int, db: Session) -> List[MediaItem]`
-    - `find_orphan_files(case_id: int, evidence_id: int, db: Session) -> List[EvidenceFile]`
-    - `mark_media_orphan_status(case_id: int, db: Session) -> int`
-
 - [x] **A6** — Read `backend/services/log_service.py`
-  - Verify `log_analysis(evidence_id=0, ...)` does NOT trigger a FK constraint violation
-  - The `analysis_logs.evidence_id` column must be nullable for passing `0` or `None` to work
-  - If it is NOT nullable, add `nullable=True` to the column definition in `models.py`
-
 - [x] **A7** — Read `frontend/src/hooks/useDashboard.js`
-  - Verify `loadOverview` is wrapped in `useCallback(async (id) => {...}, [])`
-  - If not: the DashboardPage causes an infinite re-render loop
-
 - [x] **A8** — Read `frontend/src/services/reportService.js`
-  - Verify `getEvidenceSummary`, `getTimelineSummary`, `getDeletedSummary` use `axios.get(...)` not `axios.post(...)`
-
 - [x] **A9** — Read `frontend/src/pages/ReportsPage.jsx`
-  - Verify it exists and loads the three summary cards
-
 - [x] **A10** — Read `frontend/vite.config.js`
-  - Verify `/api` proxy to `http://localhost:8000` is configured
 
 ---
 
 ## Phase 1 — Fix Broken Foundations
 
-These are bugs in **currently running code** that cause wrong behavior. Fix these before adding anything new.
-
-### Backend Fixes
-
-- [x] **B1** Fix CORS missing port 5174
-  - File: `backend/app/main.py` line 38
-  - Add `"http://localhost:5174"` to `allow_origins` list
-
-- [x] **B2** Fix stack trace logging across all services
-  - Add `import traceback` to the top of each file
-  - Replace `stack_trace=str(e.__traceback__)` with `stack_trace=traceback.format_exc()`
-  - Files: `whatsapp_service.py`, `telegram_service.py`, `timeline_service.py`, `deleted_service.py`, `correlation_service.py`
-
-- [x] **B3** Fix WhatsApp deletion detection producing fabricated results
-  - File: `forensic/deleted/detector.py` lines 81-93
-  - `_get_expected_next_id()`: return `None` for `source_app == "whatsapp"` (WA IDs are hex, not sequential)
-  - Only Telegram integer IDs are reliable for gap detection
-  - This means WhatsApp will produce 0 deletions from ID analysis — this is **correct and honest**
-
+- [x] **B1** Fix CORS missing port 5174 in `backend/app/main.py`
+- [x] **B2** Fix stack trace logging across all services using `traceback.format_exc()`
+- [x] **B3** Fix WhatsApp deletion detection producing fabricated results in `forensic/deleted/detector.py`
 - [x] **B4** Fix silent `sqlite3.Error` in WhatsApp message parser
-  - File: `forensic/whatsapp/message_parser.py` line 107
-  - Add `import logging; logging.getLogger(__name__).error(f"Parse error: {e}")` before `return []`
-  - Apply same pattern to contact_parser, group_parser, media_parser if they have the same silent except
-
 - [x] **B5** Fix `search_repo._get_evidence_ids` ignoring the `app` filter
-  - File: `backend/repositories/search_repo.py` lines 444-448
-  - Add filter: `Evidence.metadata_["app"].astext == app` when `app in ("whatsapp", "telegram")`
-  - This currently returns all evidence IDs regardless of app, causing extra DB round-trips
-
 - [x] **B6** Fix `analysis_logs.evidence_id` FK constraint if nullable
-  - Only apply this fix if **A6 audit** reveals the column is NOT nullable
-  - File: `backend/models/models.py`
-  - Change: `evidence_id = Column(Integer, ForeignKey("evidence.id"))` → add `nullable=True`
-
-### Frontend Fixes
-
-- [x] **F1** Fix sidebar navigation (context-aware)
-  - File: `frontend/src/components/layout/index.jsx`
-  - Move `navItems` inside `Sidebar` component body
-  - Derive `activeCaseId` from `useLocation()` via `pathname.match(/\/cases\/(\d+)/)`
-  - When `activeCaseId` found: show all 5 case-specific links (enabled)
-  - When no `activeCaseId`: show global nav with disabled placeholders
-  - Import `LayoutDashboard` from lucide-react
-
-- [x] **F2** Fix duplicate navigation in CaseDetailPage header
-  - File: `frontend/src/pages/CaseDetailPage.jsx` lines 114-145
-  - Remove the entire `actions={<div className="flex items-center gap-2">...</div>}` prop from `<Header>`
-  - Keep only `breadcrumbs` prop on the Header
-
-- [x] **F3** Fix broken quick links on DashboardPage
-  - File: `frontend/src/pages/DashboardPage.jsx` lines 234-254
-  - Change `to={/cases/${caseId}?tab=timeline}` → `to={/cases/${caseId}}`
-  - Change `to={/cases/${caseId}?tab=correlation}` → `to={/cases/${caseId}}`
-  - These tabs don't exist yet; the links should go somewhere valid
-
-- [x] **F4** Fix infinite re-render if `loadOverview` is missing `useCallback`
-  - Only apply if **A7 audit** confirms the bug exists
-  - File: `frontend/src/hooks/useDashboard.js`
-  - Wrap `loadOverview` in `useCallback(async (id) => {...}, [])`
-
-- [x] **F5** Fix reportService GET/POST mismatch
-  - Only apply if **A8 audit** confirms the bug exists
-  - File: `frontend/src/services/reportService.js`
-  - Ensure `getEvidenceSummary`, `getTimelineSummary`, `getDeletedSummary` use `axios.get`
-
+- [x] **F1** Fix sidebar navigation (context-aware active case links)
+- [x] **F2** Fix duplicate navigation in `CaseDetailPage` header
+- [x] **F3** Fix broken quick links on `DashboardPage`
+- [x] **F4** Fix infinite re-render in `useDashboard.js` using `useCallback`
+- [x] **F5** Fix `reportService` GET/POST mismatch
 - [x] **F6** Add null guard for `created_at` date formatting
-  - Verify and fix in `CaseListPage.jsx` and `CaseDetailPage.jsx`
 
 ---
 
 ## Phase 2 — Fix Demo Mode (Backend)
 
-Demo mode is the primary way to test the app without real evidence. It must produce **complete, realistic data** that makes all dashboard sections show real numbers.
-
-### Backend
-
-- [x] **B7** Fix `DemoData` defaults
-  - File: `backend/api/demo.py` lines 17-24
-  - Change `has_telegram: bool = False` → `True`
-  - Change `message_count: int = 50` → `100`
-  - Change `contact_count: int = 10` → `15`
-  - Add `case_name: str = Field(default_factory=lambda: f"Demo Case - {datetime.now().strftime('%Y%m%d_%H%M%S')}")` — import `Field` from pydantic
-
+- [x] **B7** Fix `DemoData` defaults (`has_telegram=True`, `message_count=100`, `contact_count=15`)
 - [x] **B8** Add `DEMO_MODE` guard to demo endpoint
-  - File: `backend/api/demo.py` line 60
-  - Add at top of function: `if not settings.demo_mode: raise HTTPException(403, "Demo mode is disabled")`
-
 - [x] **B9** Create `TimelineEvent` records in demo builder
-  - File: `backend/api/demo.py` inside `_create_demo_whatsapp` and `_create_demo_telegram`
-  - After saving messages, create one `TimelineEvent` per message with:
-    - `case_id`, `evidence_id`, `event_type="message"`, `source_app="whatsapp"/"telegram"`
-    - `timestamp=msg.timestamp`
-    - `normalized_timestamp=datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc)`
-    - `entity_id=str(msg.message_id)`, `entity_type="message"`
-    - `description=f"Message: {msg.body[:60]}"`
-  - This makes Dashboard's "Timeline Summary" section show actual event counts
-
 - [x] **B10** Create `DeletedMessage` records in demo builder
-  - File: `backend/api/demo.py` inside `_create_demo_whatsapp` and `_create_demo_telegram`
-  - After saving messages, create 2-3 `DeletedMessage` records with:
-    - Varied `confidence_score` values (0.75, 0.85, 0.60)
-    - `detection_method="sequence_gap_analysis"`
-  - This makes Dashboard's "Deletions Detected" stat non-zero
 
 ---
 
 ## Phase 3 — Demo UX (Frontend)
 
-The demo flow needs a proper UI. This is a new component.
-
-### Frontend
-
-- [x] **F7** Create `DemoModal` component
-  - File: `frontend/src/components/demo/DemoModal.jsx` (NEW — does not exist)
-  - Create directory `frontend/src/components/demo/` if it doesn't exist
-  - Full spec in **FRONTEND.md Section 8.1**
-  - State: `{ caseName, hasWhatsApp, hasTelegram, step, progress, errorMsg }`
-  - Steps: 9 total, advance every 1.2s while API call is in-flight
-  - On success: navigate to `/cases/{case_id}/dashboard`
-  - On error: show error message with retry button
-
-- [x] **F8** Integrate `DemoModal` into HomeScreen
-  - File: `frontend/src/App.jsx` (HomeScreen component at bottom of file)
-  - Add `demoModalOpen` state
-  - "Create Demo Case" button → `setDemoModalOpen(true)`
-  - Render `<DemoModal isOpen={demoModalOpen} onClose={() => setDemoModalOpen(false)} />`
-  - Remove the existing `handleCreateDemo` function and loading state from the button
+- [x] **F7** Create `DemoModal` component (`frontend/src/components/demo/DemoModal.jsx`)
+- [x] **F8** Integrate `DemoModal` into `HomeScreen`
 
 ---
 
 ## Phase 4 — Charts (Frontend)
 
-Visual data representations for the dashboard. Requires installing chart.js.
-
-### Frontend
-
-- [x] **F9** Install chart.js packages
-  - Run in terminal: `cd D:\ArtifactX\frontend && npm install chart.js react-chartjs-2`
-  - Verify it doesn't break existing builds: `npm run dev` should still work
-
+- [x] **F9** Install chart.js packages (`chart.js` + `react-chartjs-2`)
 - [x] **F10** Create `MessageVolumeChart` component
-  - File: `frontend/src/components/dashboard/MessageVolumeChart.jsx` (NEW)
-  - Full spec in **FRONTEND.md Section 8.2**
-  - Line chart: WA (emerald) and TG (blue) messages per day
-  - Data derived from `overview.recent_events` by grouping by `date(normalized_timestamp)` + `source_app`
-  - Add a `buildVolumeData(events)` utility function in the component file
-
 - [x] **F11** Create `MessageDistributionChart` component
-  - File: `frontend/src/components/dashboard/MessageDistributionChart.jsx` (NEW)
-  - Full spec in **FRONTEND.md Section 8.3**
-  - Doughnut chart: WA vs TG total message counts
-
 - [x] **F12** Export new charts from dashboard index
-  - File: `frontend/src/components/dashboard/index.js`
-  - Add exports for `MessageVolumeChart` and `MessageDistributionChart`
-
-- [x] **F13** Integrate charts into DashboardPage
-  - File: `frontend/src/pages/DashboardPage.jsx`
-  - Add a new grid row after the 4-stat row (before the "Two Column Layout" section)
-  - Row: `MessageDistributionChart` on left, `MessageVolumeChart` on right
-  - Only render when `stats.total_messages > 0`
+- [x] **F13** Integrate charts into `DashboardPage`
 
 ---
 
 ## Phase 5 — Validate Forensic Parsers
 
-The forensic engine is the core of the app. These parsers must work correctly on real evidence files.
-
-### Backend / Forensic
-
 - [x] **B11** Audit and fix `forensic/whatsapp/contact_parser.py`
-  - If file doesn't exist: create it with schema-adaptive query (same pattern as `message_parser.py`)
-  - If file exists but doesn't handle both legacy (`wa_contacts`) and modern WhatsApp schemas: fix it
-  - Return dicts with: `evidence_id`, `jid`, `display_name`, `phone_number`, `status`
-
 - [x] **B12** Audit and fix `forensic/whatsapp/group_parser.py`
-  - Same existence and schema-adaptive check
-  - Return dicts with: `evidence_id`, `group_jid`, `subject`, `creator_jid`, `creation_timestamp`
-
 - [x] **B13** Audit and fix `forensic/whatsapp/media_parser.py`
-  - Same existence check
-  - Return dicts with: `message_id`, `media_path`, `message_type`
-
 - [x] **B14** Audit `forensic/telegram/` — all four parsers
-  - For each of `detector.py`, `message_parser.py`, `contact_parser.py`, `group_parser.py`:
-  - Verify they handle Telegram's schema (`messages`, `users`, `dialogs`, `chats` tables)
-  - Fix or create any that are missing or broken
-
 - [x] **B15** Audit `forensic/timeline/builder.py`
-  - Verify `TimelineBuilder.build_timeline_for_case(db, case_id)` queries both WA and TG messages
-  - Verify it creates events with `normalized_timestamp` as a Python `datetime` object (not a string or int)
-  - Fix if `normalized_timestamp` is not being computed correctly
-
 - [x] **B16** Audit `forensic/correlation/matcher.py` dataclass field alignment
-  - Run a demo case creation, then trigger correlation via `POST /api/correlation/cases/{id}/correlation/build`
-  - If it crashes with `AttributeError` or `TypeError`: the dataclass fields don't match what the service provides
-  - Fix the dataclass definitions to match the ORM field names
 
 ---
 
-## Phase 6 — End-to-End Smoke Test
-
-Test the full application workflow from scratch. Do this after Phases 1-5.
-
-### Backend Smoke Tests
+## Phase 6 — Initial End-to-End Smoke Test
 
 - [x] **T1** Backend starts without errors
-  ```powershell
-  $env:PYTHONPATH = "D:\ArtifactX"
-  cd D:\ArtifactX\backend
-  uvicorn app.main:app --port 8080 --reload
-  # → Should print: Application startup complete. No import errors.
-  ```
-
-- [x] **T2** Health endpoint returns demo_mode=true
-  ```
-  GET http://localhost:8080/api/health
-  # → { "status": "ok", "demo_mode": true, ... }
-  ```
-
+- [x] **T2** Health endpoint returns `demo_mode=true`
 - [x] **T3** Demo case creation produces complete data
-  ```
-  POST http://localhost:8080/api/demo/create-demo-case
-  Body: { "case_name": "Test", "has_whatsapp": true, "has_telegram": true }
-  # → Verify: response has case_id, WA stats, TG stats (all non-zero)
-  # → Verify DB: SELECT COUNT(*) FROM timeline_events WHERE case_id=N → non-zero
-  # → Verify DB: SELECT COUNT(*) FROM deleted_messages WHERE case_id=N → 2-3 rows
-  ```
-
 - [x] **T4** Dashboard overview returns all data
-  ```
-  GET http://localhost:8080/api/cases/{id}/overview
-  # → stats.total_messages > 0
-  # → stats.total_contacts > 0
-  # → timeline_stats.total_events > 0
-  # → stats.total_deleted > 0
-  ```
-
 - [x] **T5** Search returns results from demo data
-  ```
-  GET http://localhost:8080/api/search?case_id={id}&query=meeting
-  # → Returns message results
-  ```
-
 - [x] **T6** Report generation produces a PDF file
-  ```
-  POST http://localhost:8080/api/cases/{id}/reports
-  Body: { "report_type": "full" }
-  # → Returns filename
-  # → Verify file exists at reports/{id}/*.pdf
-  ```
-
-### Frontend Smoke Tests
-
 - [x] **T7** Full demo workflow end-to-end
-  1. Open `http://localhost:5173`
-  2. Click "Create Demo Case"
-  3. `DemoModal` opens with WhatsApp + Telegram checked
-  4. Click "Start Demo Analysis"
-  5. Progress steps animate, one by one
-  6. Redirected to `/cases/{id}/dashboard`
-  7. Dashboard shows non-zero stats for messages, contacts, deletions
-  8. Charts render (WA + TG data visible)
-  9. Timeline Summary section is visible (events > 0)
-
 - [x] **T8** Sidebar shows case-specific navigation
-  - When on dashboard page, sidebar shows: All Cases / Dashboard / Search / Reports / Logs
-  - All links are enabled and navigate correctly
-  - Header does NOT show duplicate nav buttons
-
 - [x] **T9** Search page returns results
-  - Navigate to Search page
-  - Type "meeting" → results appear from WA and TG messages
-
 - [x] **T10** Reports page works
-  - All three summary cards show data
-  - "Generate PDF" button creates a report
-  - Download link appears
+
+---
+
+## Phase 7 — Workstation UI/UX Overhaul & Redundancy Removal
+
+Revamp the UI into a high-density, professional Forensic Workstation (`ForensicStudio`) and eliminate all redundant links, broken buttons, and senseless redirects.
+
+### Backend
+- [ ] **B17** Add `CaseWorkspace` API summary endpoint (`GET /api/cases/{id}/workspace`) returning unified state (case details, active evidence list, hash integrity score, analysis stage).
+
+### Frontend
+- [ ] **F14** Create `CaseWorkspacePage.jsx` container to wrap case tools with unified sub-route / tab navigation (`/cases/:caseId/*`).
+- [ ] **F15** Create `ForensicWorkflowStepper.jsx` header showing progress through the 4 forensic stages (Ingest & Hash -> Extract & Parse -> Analyze & Correlate -> Court Export).
+- [ ] **F16** Remove duplicate action buttons across all page headers that replicate sidebar navigation.
+- [ ] **F17** Clean up all quick-action buttons on `DashboardPage.jsx` and `CaseDetailPage.jsx` to navigate cleanly to sub-routes without dummy query params.
+
+---
+
+## Phase 8 — Cryptographic Hash Verification & Chain-of-Custody Manifest
+
+Ensure full evidence integrity, multi-hash calculation (SHA-256, MD5, SHA-1), and audit trail logging.
+
+### Backend
+- [ ] **B18** Implement SHA-256, MD5, and SHA-1 calculation on evidence upload in `backend/api/evidence.py`.
+- [ ] **B19** Implement hash verification endpoint (`POST /api/evidence/{id}/verify-hashes`) to verify on-disk evidence files against recorded `EvidenceFile` manifest.
+- [ ] **B20** Implement Chain-of-Custody logging service (`log_activity`) recording evidence ingest, hash verification, analysis runs, and report exports in `activity_logs`.
+
+### Frontend
+- [ ] **F18** Create `EvidenceHashBadge.jsx` displaying SHA-256 hash in JetBrains Mono cyan text with click-to-copy and verification status badge (`VERIFIED_INTACT` / `HASH_MISMATCH`).
+- [ ] **F19** Add "Verify Evidence Hashes" button on evidence views triggering real-time re-hashing and displaying an integrity manifest modal.
+
+---
+
+## Phase 9 — Artifact Extraction & EXIF Metadata Inspector
+
+Provide rich inspection of extracted mobile app databases, media attachments, and EXIF metadata.
+
+### Backend
+- [ ] **B21** Implement EXIF metadata extraction service using Pillow/ExifRead in `backend/api/evidence.py` (`GET /api/evidence/{id}/exif`).
+- [ ] **B22** Implement raw SQLite table inspector endpoint (`GET /api/evidence/{id}/sqlite-inspect`) to allow direct inspection of extracted `msgstore.db` and `cache4.db` table structures.
+
+### Frontend
+- [ ] **F20** Overhaul `EvidencePage.jsx` with tree/table view, file size, MIME type, SHA-256 hash badges, and raw SQLite inspector modal.
+- [ ] **F21** Create `ExifMetadataDrawer.jsx` slide-out drawer rendering image previews, camera make/model, ISO, capture timestamp, and GPS coordinates with map link.
+
+---
+
+## Phase 10 — Interactive Chat Message Thread Viewer with Deletion Indicators
+
+Replace static data tables with an interactive, rich chat view for extracted WhatsApp and Telegram messages.
+
+### Backend
+- [ ] **B23** Create `Chat` API endpoints (`GET /api/cases/{id}/chats` and `GET /api/cases/{id}/chats/{jid}/messages`) returning thread message lists with inline deletion flags and media info.
+
+### Frontend
+- [ ] **F22** Create `ChatViewerPage.jsx` (`/cases/:caseId/chat`):
+  - Left pane: Contact / Group thread list with green (WA) / blue (TG) app badges and message counts.
+  - Center pane: Interactive chat message bubble stream displaying sender name, JID, timestamp, body text, attachment previews, and EXIF trigger.
+  - Center pane: Render prominent red/amber deletion warning badges (`[DELETED MESSAGE DETECTED]`) on detected message sequence/time gaps.
+  - Right pane: Selected message raw metadata & cryptographic signature drawer.
+
+---
+
+## Phase 11 — Reconstructed Chronological Timeline & Density Histogram
+
+Provide a filterable multi-app event stream with visualization.
+
+### Backend
+- [ ] **B24** Optimize `timeline_service.py` and `TimelineBuilder` to support time-range filtering, app filtering, and density aggregation (`GET /api/timeline/cases/{id}/histogram`).
+
+### Frontend
+- [ ] **F23** Overhaul `TimelinePage.jsx` (`/cases/:caseId/timeline`):
+  - Chart.js time-density histogram showing message/event volume over time.
+  - Filter toolbar: Date Range picker, Source App selector, Event Type filter, Search query.
+  - High-density chronological event stream with timestamps, app badges, entity JIDs, and hash fingerprints.
+
+---
+
+## Phase 12 — Evidence Correlation Engine & Visualizer
+
+Map cross-platform identity resolution and message correlations.
+
+### Backend
+- [ ] **B25** Enhance `correlation_service.py` to perform phone number normalization (E.164), handle matching, and cross-app message time-window correlation.
+
+### Frontend
+- [ ] **F24** Overhaul `CorrelationPage.jsx` (`/cases/:caseId/correlation`):
+  - Entity Resolution Table: Maps WhatsApp JIDs to Telegram handles and phone numbers.
+  - Cross-App Message Thread Matrix: Displays correlated message exchanges across platforms within time windows.
+
+---
+
+## Phase 13 — In-Memory Court-Ready PDF Generator & In-App Report History Tracker
+
+Overhaul the PDF generator into a zero-workspace storage engine that streams PDFs directly to the browser while tracking generated report history in the database.
+
+### Backend
+- [ ] **B26** Update `report_service.py` and `reports.py` to generate court PDFs into an in-memory `io.BytesIO()` buffer and return `StreamingResponse` for direct download — **zero PDF files written to project workspace directory**.
+- [ ] **B27** Create `GeneratedReport` model and `GET /api/cases/{id}/reports/history` endpoint to track generated report metadata (Report ID, Case ID, Report Type, Lead Analyst, Timestamp, Verification SHA-256 Hash of PDF bytes, Total Pages, Size Bytes) in the database.
+- [ ] **B28** Overhaul ReportLab PDF layout (Cover Page, Custody Log, Evidence Hashes, Timeline, Deletions, Correlated Entities, Sworn Analyst Sign-off Block).
+
+### Frontend
+- [ ] **F25** Overhaul `ReportsPage.jsx` (`/cases/:caseId/reports`):
+  - Report configuration section toggles.
+  - Lead Analyst name, agency, and case notes input fields.
+  - Sworn integrity declaration checkbox.
+  - `ReportPdfPreview.jsx` live layout previewer.
+  - Direct Blob streaming download trigger (`responseType: 'blob'`).
+  - In-App Report History Tracker Table displaying past generated reports, SHA-256 signatures, and re-download/re-generate buttons.
+
+---
+
+## Phase 14 — Workstation Validation & End-to-End Smoke Test
+
+- [ ] **T11** Verify zero broken buttons or non-functional routes across all sub-views.
+- [ ] **T12** Execute full evidence ingestion, hash verification, EXIF inspection, chat thread viewing, deletion badge checking, timeline filtering, correlation building, and streaming court-ready PDF generation (confirming zero `.pdf` files written to workspace) end-to-end.
 
 ---
 
@@ -362,5 +234,3 @@ cd D:\ArtifactX\frontend
 npm install
 npm run dev
 ```
-
-> If Vite uses port 5174 instead of 5173: add `"http://localhost:5174"` to backend CORS `allow_origins` (this is already in B1 fix above).

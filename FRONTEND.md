@@ -17,478 +17,279 @@
 | HTTP | Axios ✅ | Axios |
 | Routing | React Router v6 ✅ | React Router v6 |
 | Icons | Lucide React ✅ | Lucide React |
-| Charts | NOT INSTALLED ❌ | chart.js + react-chartjs-2 |
+| Charts | chart.js + react-chartjs-2 ✅ | chart.js + react-chartjs-2 |
 | Date helpers | date-fns ✅ | date-fns |
 
 ---
 
 ## 2. Vite Config
 
-**Must have API proxy.** Without it, all API calls fail in development because the browser cannot reach `localhost:8000` from a different port.
+**Must have API proxy.** Without it, all API calls fail in development because the browser cannot reach `localhost:8000` (or `8080`) from a different port.
 
 **File:** `frontend/vite.config.js`
 
 ```javascript
-// Required:
 server: {
+  port: 5173,
   proxy: {
-    '/api': 'http://localhost:8000'
+    '/api': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+    }
   }
 }
 ```
 
-**Verify this exists.** If missing, add it.
-
 ---
 
-## 3. Routing — `frontend/src/App.jsx`
+## 3. Architecture & Routing — `frontend/src/App.jsx`
 
-**Current state:** All routes defined and wired. ✅
+### Current Issues & Overhaul Plan
 
-| Route | Component | Status |
-|-------|-----------|--------|
-| `/` | `HomeScreen` (inline in App.jsx) | ✅ Working |
-| `/cases` | `CaseListPage` | ✅ Working |
-| `/cases/create` | `CaseForm` | ✅ Working |
-| `/cases/:id` | `CaseDetailPage` | ✅ Working |
-| `/cases/:id/edit` | `CaseForm` | ✅ Working |
-| `/cases/:caseId/dashboard` | `DashboardPage` | ✅ Working |
-| `/cases/:caseId/search` | `SearchPage` | ✅ Working |
-| `/cases/:caseId/reports` | `ReportsPage` | ✅ Working |
-| `/cases/:caseId/logs` | `LogsPage` | ✅ Working |
+1. **Broken / Misleading Redirections:** Dashboard links (`?tab=timeline`, `?tab=correlation`) redirect out of place because `CaseDetailPage` does not handle tabs properly.
+2. **Redundant Header Navigation:** Header actions duplicate sidebar links.
+3. **Unfriendly UX:** Lack of a unified Forensic Workstation container. No interactive message viewer, timeline stream, or court report generator UI.
 
-**Bug — HomeScreen demo button:** The "Create Demo Case" button fires an API call immediately with no UX. User sees the button spin and then a redirect with no explanation of what happened. Needs a `DemoModal` component (see Section 8).
+### Unified Workstation Route Map
+
+All case operations are consolidated under a clean tab-aware or sub-route aware **Forensic Workspace Container** (`CaseWorkspacePage.jsx`):
+
+| Route | Component | Purpose | Status |
+|-------|-----------|---------|--------|
+| `/` | `HomeScreen` | Landing, quick stats, demo workflow trigger | ✅ Working (needs DemoModal) |
+| `/cases` | `CaseListPage` | Case registry, intake, hash search | ✅ Working |
+| `/cases/create` | `CaseForm` | Create case & record initial chain of custody | ✅ Working |
+| `/cases/:caseId` | `CaseWorkspacePage` | **Unified Workstation Container** with tab navigation | 🔄 Overhauled |
+| `/cases/:caseId/dashboard` | `DashboardPage` | Executive Overview, Message Volume & App Distribution Charts | 🔄 Overhauled |
+| `/cases/:caseId/evidence` | `EvidencePage` | Ingestion, artifact extraction, EXIF & hash inspector | 🔄 Overhauled |
+| `/cases/:caseId/chat` | `ChatViewerPage` | Interactive WA/TG chat message thread viewer with deletion tags | 🆕 New View |
+| `/cases/:caseId/timeline` | `TimelinePage` | Reconstructed chronological event stream & density histogram | 🔄 Overhauled |
+| `/cases/:caseId/correlation` | `CorrelationPage` | Cross-platform entity resolution & time correlation matrix | 🔄 Overhauled |
+| `/cases/:caseId/deletions` | `DeletionsPage` | Sequence/time gap detector & confidence scoring breakdown | 🔄 Overhauled |
+| `/cases/:caseId/reports` | `ReportsPage` | Court-Ready PDF generator, in-app report history tracker, & direct download | 🔄 Overhauled |
+| `/cases/:caseId/logs` | `LogsPage` | Chain-of-custody audit log & system diagnostics | ✅ Working |
 
 ---
 
 ## 4. Design System — `frontend/src/index.css`
 
-**Current state:** Fully implemented and correct. ✅
-
-The Tailwind dark forensic theme is complete:
-- 407 lines of base/component/utility layers
-- All component classes exist: `.card`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.badge-*`, `.nav-item`, `.data-table`, `.metric-card`, `.alert-*`, `.animate-in`, `.stagger-children`, `.text-gradient`, `.hash-text`, etc.
-- Custom scrollbar, `::selection`, focus rings defined
-- Keyframe animations: `fadeIn`, `slideUp`, `slideDown`, `pulse-soft`
-
-**No fix required.**
-
-**Color system** (from `tailwind.config.js`):
-- `forensic-950/900/800/700/600/500/400/300/100` — background + text hierarchy
-- `accent-cyan` — primary (CTAs, active links)
-- `accent-emerald` — success, WhatsApp
-- `accent-blue` — Telegram
-- `accent-amber` — warnings, archived
-- `accent-rose` — errors, danger, deletions
-- `accent-violet` — correlations, logs
+The Tailwind dark forensic workstation theme:
+- `forensic-950` (`#0b0f17`) — deep background
+- `forensic-900` (`#111827`) — card & container surfaces
+- `forensic-800` (`#1f2937`) — borders, dividers, dark inputs
+- `accent-cyan` (`#06b6d4`) — primary CTA, active tabs, cryptographic hashes
+- `accent-emerald` (`#10b981`) — WhatsApp data, verified integrity (`VERIFIED_INTACT`)
+- `accent-blue` (`#3b82f6`) — Telegram data, general media
+- `accent-violet` (`#8b5cf6`) — Cross-platform correlations, entity links
+- `accent-rose` (`#f43f5e`) — Deleted messages, sequence gaps, tamper warnings (`HASH_MISMATCH`)
+- `accent-amber` (`#f59e0b`) — Warnings, unverified evidence, missing metadata
 
 **Typography:**
-- `Inter` — body (Google Fonts)
-- `JetBrains Mono` — monospace (hashes, IDs, data)
+- `Inter` — body & UI elements
+- `JetBrains Mono` — SHA-256/MD5/SHA-1 hashes, entity IDs, timestamps, hex viewer
 
 ---
 
-## 5. Layout — `frontend/src/components/layout/index.jsx`
+## 5. Layout & Navigation System — `frontend/src/components/layout/`
 
-### Sidebar (lines 16–95)
+### Sidebar (`Sidebar.jsx`)
+- Must derive active `caseId` from `useLocation()`.
+- When in a case context (`/cases/:caseId/*`), render active case workflow links:
+  - Overview (`/cases/:caseId/dashboard`)
+  - Evidence & Artifacts (`/cases/:caseId/evidence`)
+  - Chat Viewer (`/cases/:caseId/chat`)
+  - Chronological Timeline (`/cases/:caseId/timeline`)
+  - Evidence Correlations (`/cases/:caseId/correlation`)
+  - Deleted Messages (`/cases/:caseId/deletions`)
+  - Court Reports (`/cases/:caseId/reports`)
+  - Custody Logs (`/cases/:caseId/logs`)
+- When not in case context: show Case List link enabled, disabled placeholders for case tools.
 
-**Current state — broken navigation:**
+### Header (`Header.jsx`)
+- Displays breadcrumbs, active case title, evidence verification status badge (`VERIFIED_INTACT`), and active investigator profile.
+- **Rule:** Do NOT put duplicate navigation links in header actions. Header actions are strictly for primary page triggers (e.g. "Export Report", "Re-Verify Hashes", "Ingest Evidence").
 
-The `navItems` array is defined as a **static constant** (lines 16–21):
-```javascript
-const navItems = [
-  { path: '/cases', icon: FolderKanban, label: 'Cases', exact: true },
-  { path: '/search', icon: Search, label: 'Search', disabled: true },     // always disabled
-  { path: '/reports', icon: FileText, label: 'Reports', disabled: true },  // always disabled
-  { path: '/logs', icon: ClipboardList, label: 'Logs', disabled: true },   // always disabled
-];
-```
-
-This means: **when a user is on `/cases/5/dashboard`, the sidebar still shows Search/Reports/Logs as disabled links**. The sidebar has no awareness of what case is currently active.
-
-**Required fix — context-aware sidebar:**
-
-Move `navItems` logic inside the `Sidebar` component and derive `caseId` from `useLocation()`:
-
-```javascript
-const Sidebar = ({ collapsed, onToggle }) => {
-  const location = useLocation();
-  
-  // Extract caseId from any case-specific route
-  const caseIdMatch = location.pathname.match(/\/cases\/(\d+)/);
-  const activeCaseId = caseIdMatch ? caseIdMatch[1] : null;
-
-  const navItems = activeCaseId ? [
-    { path: '/cases', icon: FolderKanban, label: 'All Cases' },
-    { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
-    { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
-    { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
-    { path: `/cases/${activeCaseId}/logs`, icon: ClipboardList, label: 'Logs' },
-  ] : [
-    { path: '/cases', icon: FolderKanban, label: 'Cases' },
-    { path: '#', icon: Search, label: 'Search', disabled: true },
-    { path: '#', icon: FileText, label: 'Reports', disabled: true },
-    { path: '#', icon: ClipboardList, label: 'Logs', disabled: true },
-  ];
-
-  // Active detection: exact match for case-context items, prefix for global
-  const isActive = (path) => {
-    if (path === '#') return false;
-    return location.pathname === path || (path !== '/cases' && location.pathname.startsWith(path));
-  };
-  
-  // ... rest of render unchanged
-};
-```
-
-**Also add `LayoutDashboard` to the imports at the top of this file.**
-
-### Header (lines 97–129)
-
-**Current state:** Working. Accepts `breadcrumbs` array and `actions` slot. ✅
-
-**Bug in `CaseDetailPage`:** The Header's `actions` prop is used to show Dashboard/Search/Reports/Logs nav buttons (lines 114–145 of CaseDetailPage). This duplicates the sidebar navigation and clutters the header. After the sidebar is made context-aware, these header action buttons are redundant.
-
-**Fix required in `CaseDetailPage.jsx` lines 114–146:** Remove the `actions={...}` prop from the `<Header>` call. The header should only show breadcrumbs in this page.
-
-### Layout (lines 131–144)
-
-**Current state:** Working. Offsets content by sidebar width. ✅
+### Guided Stepper Header (`ForensicWorkflowStepper.jsx`)
+- Rendered inside `CaseWorkspacePage.jsx`.
+- 4-stage progression indicator:
+  1. **Ingest & Hash** (Upload ZIP/DB, SHA-256 manifest)
+  2. **Extract & Parse** (WhatsApp `msgstore.db`, Telegram `cache4.db`, EXIF)
+  3. **Analyze & Correlate** (Timeline, Chat viewer, Correlations, Deletions)
+  4. **Court Export** (Generate Court-Ready PDF with Direct Streaming & In-App History Tracker)
 
 ---
 
-## 6. Pages
+## 6. Page Specifications
 
-### HomeScreen (inline in `App.jsx`)
+### 6.1 `HomeScreen.jsx`
+- Hero dashboard introducing ArtifactX Digital Forensics Workstation.
+- "Create Demo Case" button opens `DemoModal.jsx` (Section 8.1).
+- Quick Stats cards showing total cases, analyzed messages, verified hash integrity rate.
 
-**Current state:** Works. Has "Access Dashboard" and "Create Demo Case" buttons. Loading state exists.
+### 6.2 `CaseListPage.jsx`
+- Case management table showing Case Name, Investigator, Created Date, Evidence Count, Cryptographic Hash Status, Actions (View, Delete).
+- Null-guard on `created_at` dates: `case.created_at ? new Date(case.created_at).toLocaleDateString() : '—'`.
 
-**Bug — silent demo creation:** `handleCreateDemo` calls `demoService.createDemoCase(...)` and immediately redirects on success with no staged UX. User has no visibility into what's being created.
+### 6.3 `CaseWorkspacePage.jsx` (Container)
+- Master workstation wrapper for all case sub-views.
+- Top bar with `ForensicWorkflowStepper`.
+- Tab bar for seamless switching between Dashboard, Evidence, Chat, Timeline, Correlations, Deletions, Court Reports, Logs without page reloads.
 
-**Required:** `DemoModal` component (see Section 8.1). The HomeScreen should:
-1. On "Create Demo Case" click → set `demoModalOpen = true`
-2. The `DemoModal` handles the rest (config input, API call, progress, redirect)
+### 6.4 `DashboardPage.jsx`
+- Executive forensic overview:
+  - 4 Key Metrics: Total Messages, Parsed Contacts, Correlated Entities, Detected Deletions.
+  - `MessageDistributionChart` (Doughnut: WhatsApp vs Telegram split).
+  - `MessageVolumeChart` (Line chart: Messages per day over time).
+  - Recent Events Feed & Integrity Verification Status widget.
 
-### CaseListPage
+### 6.5 `EvidencePage.jsx`
+- Artifact Extraction & Metadata Analysis workstation:
+  - Drag-and-drop evidence ingestion (`EvidenceUploader.jsx`).
+  - Extracted files tree/table with SHA-256, MD5, SHA-1 cryptographic hashes, file size, MIME type.
+  - EXIF metadata slide-out panel (`ExifMetadataDrawer.jsx`) showing camera model, timestamp, GPS coordinates on map.
+  - SQLite table inspector for WhatsApp (`msgstore.db`) and Telegram (`cache4.db`).
 
-**Current state:** Working. Lists cases, "New Case" button, delete with confirm. ✅
+### 6.6 `ChatViewerPage.jsx` (NEW)
+- Interactive Chat Message Thread Viewer:
+  - Left pane: Contact / Group list with app badges (WhatsApp green, Telegram blue) and message counts.
+  - Center pane: Interactive chat bubble stream:
+    - Sender name / JID / handle
+    - Message body text
+    - Formatted timestamp
+    - Attachment preview (images, audio, video) with EXIF inspection button
+    - **Deleted Message Badge:** `[DELETED MESSAGE DETECTED]` with sequence gap info
+  - Right pane: Selected message raw metadata & cryptographic signature.
 
-**Minor bug:** If `case.created_at` is null (shouldn't happen but defensive check needed):
-```javascript
-// CURRENT (crashes on null):
-new Date(case.created_at).toLocaleDateString()
+### 6.7 `TimelinePage.jsx`
+- Reconstructed Chronological Event Stream:
+  - Time density histogram chart (chart.js bar chart).
+  - Filter bar: Date Range picker, App Selector (All, WhatsApp, Telegram), Search Query, Event Type (Message, Call, Media, File Creation).
+  - Event Stream Cards with timestamp, app badge, sender/receiver, message excerpt, hash fingerprint.
 
-// REQUIRED:
-case.created_at ? new Date(case.created_at).toLocaleDateString('en-US', { 
-  year: 'numeric', month: 'short', day: 'numeric' 
-}) : '—'
-```
-Verify this null guard is present. If not, add it.
+### 6.8 `CorrelationPage.jsx`
+- Cross-Platform Evidence Correlation Engine:
+  - Entity Resolution Table: Maps phone numbers, JIDs, and Telegram handles across platforms.
+  - Cross-App Message Threads: Correlates WhatsApp & Telegram messages exchanged between same entities within time windows.
+  - Time Window Matrix: Identifies simultaneous activity across multiple accounts.
 
-### CaseDetailPage
+### 6.9 `DeletionsPage.jsx`
+- Sequence & Time Gap Anomaly Detector:
+  - Summary stats: Total Deletions Detected, High Confidence Deletions, Missing Message Estimate.
+  - Deletion Gap List: Source App, Chat JID, Missing ID Range (e.g. MSG #102 to MSG #108), Estimated Time Gap, Confidence Score (e.g. 92%), Detection Method explanation.
+  - Forensic Impact Notes.
 
-**Current state:** Working. Accordion sections for evidence, WhatsApp analysis, Telegram analysis. Quick Actions card at bottom.
+### 6.10 `ReportsPage.jsx` (Court-Ready Reports & In-App Report Tracker)
+- Professional Legal Report Generator & Tracker:
+  - Report Configuration: Select sections (Executive Summary, Chain of Custody, Hash Verification Manifest, Evidence Findings, Timeline, Deletions, Correlated Entities).
+  - Investigator Inputs: Lead Analyst Name, Agency/Dept, Case Notes, Sworn Integrity Declaration.
+  - Live PDF Previewer (`ReportPdfPreview.jsx`).
+  - **Direct Download Execution:** Calls API with `{ responseType: 'blob' }`, creating a temporary Blob URL in memory to trigger instant browser file download — **zero disk storage in the project workspace directory**.
+  - **In-App Report History Tracker Table:** Renders historical log of generated reports for the case (Report ID, Type, Lead Analyst, Generation Date, Verification SHA-256 Hash of report bytes, Download / Re-generate button).
 
-**Bug:** Header actions duplicate navigation (see Section 5). Remove them.
-
-**No other bugs found.**
-
-### DashboardPage
-
-**Current state:** Fully implemented (260 lines). Renders stats, app breakdown, correlation summary, recent events, timeline summary. All data comes from `useCaseOverview()`.
-
-**Bug — "Full Timeline" and "Correlation Graph" quick links (lines 234–254):**
-```javascript
-// CURRENT (broken — adds a ?tab= query param that CaseDetailPage doesn't read):
-to={`/cases/${caseId}?tab=timeline`}
-to={`/cases/${caseId}?tab=correlation`}
-
-// REQUIRED (correct — these sections don't exist in CaseDetailPage currently,
-// keep links to evidence upload until timeline/correlation tabs are built):
-to={`/cases/${caseId}`}
-```
-Or: add tab reading to `CaseDetailPage` (but that's scope expansion). For now, fix to valid routes.
-
-**Missing features (NOT bugs — these are new components to build):**
-- `MessageVolumeChart` — line chart of messages per day (requires chart.js install)
-- `MessageDistributionChart` — doughnut chart WA vs TG split (requires chart.js install)
-
-### SearchPage
-
-**Current state:** Fully implemented. Uses `useGlobalSearch()`. SearchBar + SearchResults components. ✅
-
-**No bugs found.**
-
-### ReportsPage
-
-**Needs audit** — verify the page file exists at `frontend/src/pages/ReportsPage.jsx` with:
-- Left col: `ReportPanel` component
-- Right col: three summary cards calling summary APIs
-- All three summary API calls use GET (not POST)
-
-### LogsPage
-
-**Current state:** Implemented. Passes `caseId` to `LogsViewer`. ✅
-
-**No bugs found.**
+### 6.11 `LogsPage.jsx`
+- Complete Chain of Custody Audit Log:
+  - Log entries for file upload, hash calculation, analysis execution, report generation, investigator access.
+  - Filterable by log severity (INFO, WARNING, ERROR).
 
 ---
 
 ## 7. Services — `frontend/src/services/`
 
-**All services use:** `const API_BASE = '/api'` proxied by Vite to `http://localhost:8000`.
+All API requests proxy through `/api` (Vite proxy to `http://localhost:8080`).
 
-### `demoService.js`
-
-**Audit needed** — Verify it calls `POST /api/demo/create-demo-case` with the correct body shape:
-```javascript
-{
-  case_name: string,
-  has_whatsapp: boolean,
-  has_telegram: boolean,  // must be true by default
-  message_count: number,
-  contact_count: number
-}
-```
-If `has_telegram` is hardcoded to `false`, change to `true`.
-
-### `caseService.js`, `evidenceService.js`, `searchService.js`, `logService.js`, `dashboardService.js`, `whatsappService.js`, `telegramService.js`, `reportService.js`
-
-**All assumed working.** No bugs found in the API routing or method choices.
-
-**Verify one specific thing in `reportService.js`:** The summary fetching functions must use `GET`, not `POST`. A previous bug report mentioned POST/GET mismatch — verify this is fixed:
-```javascript
-// Required:
-getEvidenceSummary: (caseId) => axios.get(`${API_BASE}/cases/${caseId}/reports/summary`),
-getTimelineSummary: (caseId) => axios.get(`${API_BASE}/cases/${caseId}/reports/timeline`),
-getDeletedSummary: (caseId) => axios.get(`${API_BASE}/cases/${caseId}/reports/deleted`),
-```
+- `caseService.js` — Case CRUD operations.
+- `evidenceService.js` — File upload, extracted file list, hash verification, EXIF inspection.
+- `chatService.js` — WhatsApp/Telegram message threads, chat list, message details.
+- `timelineService.js` — Timeline event stream, time histogram data, export.
+- `correlationService.js` — Entity correlation triggers, entity mapping list.
+- `deletedService.js` — Deletion detection trigger, deletion gap records.
+- `reportService.js` — Summary stats (GET requests), PDF streaming download handler (`responseType: 'blob'`), report history tracker fetching (`GET /api/cases/{id}/reports/history`).
+- `demoService.js` — Demo case creation with full config (`has_whatsapp`, `has_telegram`, `message_count`).
 
 ---
 
-## 8. Components — New Ones Required
+## 8. Essential Components
 
-### 8.1 `DemoModal` — `frontend/src/components/demo/DemoModal.jsx`
+### 8.1 `DemoModal.jsx` (`components/demo/DemoModal.jsx`)
+- Props: `{ isOpen, onClose }`
+- State: Config form inputs -> 9-step progress bar -> Done / Nav to Case Workspace -> Error display.
 
-**Status:** Does NOT exist. Must be created.
+### 8.2 `MessageVolumeChart.jsx` & `MessageDistributionChart.jsx`
+- Built using `react-chartjs-2`.
+- Dark theme styled with grid colors `#1f2937` and custom tooltips.
 
-**Specification:**
-```
-Props: { isOpen: bool, onClose: () => void }
-State:
-  - caseName: string (default: `Demo Case - ${Date.now()}`)
-  - hasWhatsApp: bool (default: true)
-  - hasTelegram: bool (default: true)
-  - step: 'idle' | 'running' | 'done' | 'error'
-  - progress: number (0 to STEPS.length)
-  - errorMsg: string | null
-```
+### 8.3 `EvidenceHashBadge.jsx` (`components/evidence/EvidenceHashBadge.jsx`)
+- Renders SHA-256 hash in JetBrains Mono cyan text.
+- Click to copy hash with toast notification.
+- Displays integrity state: `VERIFIED` (emerald), `UNVERIFIED` (amber), `TAMPERED` (rose).
 
-**Progress steps** (shown sequentially with ~1.2s delay each):
-```javascript
-const STEPS = [
-  'Creating case...',
-  'Setting up WhatsApp evidence...',
-  'Generating message history...',
-  'Extracting contact book...',
-  'Setting up Telegram evidence...',
-  'Generating Telegram messages...',
-  'Building timeline...',
-  'Detecting deleted messages...',
-  'Finalizing analysis...',
-];
-```
+### 8.4 `ExifMetadataDrawer.jsx` (`components/evidence/ExifMetadataDrawer.jsx`)
+- Slide-out drawer displaying image preview, camera make/model, ISO, aperture, software, creation date, GPS coordinates with OpenStreetMap link.
 
-**Behavior:**
-1. User fills case name, checks WhatsApp/Telegram
-2. Click "Start Demo Analysis" → `step = 'running'`
-3. Call `demoService.createDemoCase({ case_name, has_whatsapp, has_telegram, message_count: 100, contact_count: 15 })`
-4. While API call is in flight, advance `progress` every 1.2s using `setInterval`
-5. When API resolves (success): clear interval, set `progress = STEPS.length`, set `step = 'done'`
-6. After 600ms delay: navigate to `/cases/{case_id}/dashboard`
-7. When API resolves (error): clear interval, set `step = 'error'`, set `errorMsg`
-
-**UI structure:**
-```jsx
-<Modal backdrop>
-  <div class="card max-w-md mx-auto">
-    {step === 'idle' && <ConfigForm />}
-    {step === 'running' && <ProgressList steps={STEPS} progress={progress} />}
-    {step === 'done' && <SuccessState />}
-    {step === 'error' && <ErrorState message={errorMsg} onRetry={reset} />}
-  </div>
-</Modal>
-```
-
-**Progress list item style:**
-- Completed: `text-accent-emerald` + checkmark icon
-- Current: `text-accent-cyan` + spinning Loader2 icon
-- Pending: `text-forensic-500`
-
-### 8.2 `MessageVolumeChart` — `frontend/src/components/dashboard/MessageVolumeChart.jsx`
-
-**Status:** Does NOT exist. Must be created after chart.js is installed.
-
-**Install:**
-```bash
-cd frontend && npm install chart.js react-chartjs-2
-```
-
-**Specification:**
-```
-Props: { data: [{ date: string, whatsapp: number, telegram: number }] }
-```
-
-**Implementation:**
-```javascript
-import { Line } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
-
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
-
-const chartData = {
-  labels: data.map(d => d.date),
-  datasets: [
-    {
-      label: 'WhatsApp',
-      data: data.map(d => d.whatsapp),
-      borderColor: '#10b981',   // accent-emerald
-      backgroundColor: '#10b98115',
-      tension: 0.4,
-    },
-    {
-      label: 'Telegram',
-      data: data.map(d => d.telegram),
-      borderColor: '#3b82f6',   // accent-blue
-      backgroundColor: '#3b82f615',
-      tension: 0.4,
-    }
-  ]
-};
-
-// Chart.js options must set dark background, no grid lines, custom font colors
-const options = {
-  responsive: true,
-  scales: {
-    x: { ticks: { color: '#6b7280' }, grid: { color: '#1f2937' } },
-    y: { ticks: { color: '#6b7280' }, grid: { color: '#1f2937' } }
-  },
-  plugins: { legend: { labels: { color: '#d1d5db' } } }
-};
-```
-
-**Data source:** Derive from `overview.recent_events` by grouping events by date and `source_app`. Add a `buildChartData(events)` utility function.
-
-### 8.3 `MessageDistributionChart` — `frontend/src/components/dashboard/MessageDistributionChart.jsx`
-
-**Status:** Does NOT exist. Must be created with chart.js.
-
-**Specification:**
-```
-Props: { whatsappCount: number, telegramCount: number }
-```
-
-**Implementation:**
-```javascript
-import { Doughnut } from 'react-chartjs-2';
-import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
-
-Chart.register(ArcElement, Tooltip, Legend);
-
-const chartData = {
-  labels: ['WhatsApp', 'Telegram'],
-  datasets: [{
-    data: [whatsappCount, telegramCount],
-    backgroundColor: ['#10b981', '#3b82f6'],
-    borderColor: ['#065f46', '#1e40af'],
-    borderWidth: 2,
-  }]
-};
-```
+### 8.5 `ReportPdfPreview.jsx` (`components/reports/ReportPdfPreview.jsx`)
+- Render court report layout preview showing official cover header, custody log table, evidence hash table, and sworn analyst signature block.
 
 ---
 
-## 9. Hooks — `frontend/src/hooks/`
+## 9. Custom Hooks — `frontend/src/hooks/`
 
-### `useCases.js`
-
-**Current state:** Fully working. Loads on mount, provides CRUD methods. ✅
-
-**Minor issue:** No `loadCases` call is made after `createCase`/`updateCase`/`deleteCase` succeeds for the list page. State is updated optimistically in-place (e.g., `setCases(prev => [...prev, newCase])`). This is correct behavior — no fix needed.
-
-### `useDashboard.js`
-
-**Audit needed** — Verify `useCaseOverview()` hook:
-- Exposes `{ overview, loading, error, loadOverview }`
-- `loadOverview(caseId)` calls `GET /api/cases/{id}/overview`
-- Does NOT trigger a re-fetch loop (`loadOverview` must be stable with `useCallback`)
-
-**If `loadOverview` is NOT wrapped in `useCallback`, it causes an infinite re-render loop** because `DashboardPage` has it in `useEffect`'s dependency array (line 31 of DashboardPage.jsx).
-
-**Required (if not already done):**
-```javascript
-const loadOverview = useCallback(async (caseId) => {
-  // ... fetch logic
-}, []);  // empty deps = stable reference
-```
-
-### `useSearch.js`
-
-**Audit needed** — Verify `useGlobalSearch()` hook exposes: `{ results, loading, error, query, search, clear }`.
-
-### `useWhatsApp.js`, `useTelegram.js`
-
-**Audit needed** — Verify these hooks correctly call `analyze` endpoint and fetch results, with `loading` state per operation.
+- `useCases.js` — Case list, active case state, creation, deletion.
+- `useDashboard.js` — Wraps `loadOverview` in `useCallback` to prevent infinite re-render loops.
+- `useChat.js` — Active chat selection, message pagination, search within thread.
+- `useTimeline.js` — Timeline event fetching, filtering, date bounds.
+- `useCorrelation.js` — Correlation matrix state & entity matching actions.
+- `useDeletions.js` — Deletion detection execution & gap list state.
+- `useReports.js` — PDF generation streaming download status, Blob handler, & in-app report history tracker state.
 
 ---
 
 ## 10. Complete Bug Register
 
-| ID | Severity | File | Description | Fix |
-|----|----------|------|-------------|-----|
-| F1 | HIGH | `components/layout/index.jsx` L16-21 | Sidebar nav is static — always shows Search/Reports/Logs as disabled regardless of current route | Make `navItems` dynamic inside component using `useLocation()` |
-| F2 | HIGH | `pages/CaseDetailPage.jsx` L114-145 | Header actions duplicate sidebar nav — shows same 4 links twice | Remove `actions` prop from `<Header>` call |
-| F3 | HIGH | `App.jsx` HomeScreen | Demo creation has no UX — silent API call + redirect | Build and integrate `DemoModal` component |
-| F4 | MEDIUM | `pages/DashboardPage.jsx` L235,241 | "Full Timeline" and "Correlation Graph" links go to `/cases/${caseId}?tab=*` which does nothing | Change to `/cases/${caseId}` until tab routing is implemented |
-| F5 | MEDIUM | `hooks/useDashboard.js` | `loadOverview` may not be in `useCallback` → infinite re-render loop on dashboard | Wrap with `useCallback(async (id) => {...}, [])` |
-| F6 | LOW | `pages/CaseListPage.jsx` | `new Date(case.created_at)` may crash if `created_at` is null | Add null guard |
-| F7 | MISSING | `components/demo/DemoModal.jsx` | File does not exist | Create per spec in Section 8.1 |
-| F8 | MISSING | `components/dashboard/MessageVolumeChart.jsx` | File does not exist | Create after installing chart.js |
-| F9 | MISSING | `components/dashboard/MessageDistributionChart.jsx` | File does not exist | Create after installing chart.js |
-| F10 | MISSING | chart.js, react-chartjs-2 | npm packages not installed | `npm install chart.js react-chartjs-2` in frontend/ |
+| ID | Severity | File | Description | Required Fix |
+|----|----------|------|-------------|--------------|
+| F1 | HIGH | `components/layout/index.jsx` | Sidebar nav is static — disabled links regardless of route | Make `navItems` dynamic using `useLocation()` and active `caseId` |
+| F2 | HIGH | `pages/CaseDetailPage.jsx` | Duplicate navigation in header actions | Remove `actions` prop from `<Header>` |
+| F3 | HIGH | `App.jsx` | Demo creation has no UX — silent API call + sudden redirect | Build and integrate `DemoModal.jsx` |
+| F4 | MEDIUM | `pages/DashboardPage.jsx` | Quick links `?tab=timeline` redirect out of place | Update routes to `/cases/${caseId}/timeline` & `/cases/${caseId}/correlation` |
+| F5 | MEDIUM | `hooks/useDashboard.js` | `loadOverview` missing `useCallback` causing infinite render loop | Wrap in `useCallback(async (id) => {...}, [])` |
+| F6 | LOW | `pages/CaseListPage.jsx` | Date formatting crashes if `created_at` is null | Add null guard check before `toLocaleDateString()` |
+| F7 | MISSING | `components/demo/DemoModal.jsx` | Demo modal component missing | Build per Section 8.1 spec |
+| F8 | MISSING | `components/dashboard/MessageVolumeChart.jsx` | Chart component missing | Build using chart.js |
+| F9 | MISSING | `components/dashboard/MessageDistributionChart.jsx` | Chart component missing | Build using chart.js |
+| F10 | MISSING | `pages/ChatViewerPage.jsx` | Chat message thread viewer missing | Build interactive chat viewer per Section 6.6 |
+| F11 | MISSING | `components/evidence/ExifMetadataDrawer.jsx` | EXIF metadata slide-out panel missing | Build EXIF inspector drawer |
+| F12 | MISSING | `components/reports/ReportPdfPreview.jsx` | Court report preview component missing | Build court report previewer |
 
 ---
 
-## 11. Required Audit Tasks (Unverified Files)
+## 11. Required Audit Tasks
 
-| File | What to Verify |
-|------|---------------|
-| `frontend/src/pages/ReportsPage.jsx` | Exists; uses GET for summary calls; ReportPanel component present |
-| `frontend/src/services/reportService.js` | Summary functions use GET not POST |
-| `frontend/src/services/demoService.js` | `has_telegram` defaults to `true` |
-| `frontend/src/hooks/useDashboard.js` | `loadOverview` wrapped in `useCallback`; no re-render loop |
-| `frontend/src/hooks/useSearch.js` | `useGlobalSearch()` hook exposes correct interface |
-| `frontend/src/components/evidence/EvidenceUploader.jsx` | Drag-and-drop works; shows upload progress; calls `evidenceService.uploadEvidence(caseId, file)` |
-| `frontend/src/components/evidence/EvidenceInventory.jsx` | Lists files with SHA-256 hash, delete button, analysis trigger |
-| `frontend/src/components/whatsapp/WhatsAppAnalysis.jsx` | Runs analysis, shows messages/contacts/groups tables |
-| `frontend/src/components/telegram/TelegramAnalysis.jsx` | Same as WhatsApp |
-| `frontend/vite.config.js` | Has `/api` proxy to `http://localhost:8000` |
+| File | Verification Criteria |
+|------|-----------------------|
+| `frontend/vite.config.js` | API proxy configured for `/api` targetting `http://localhost:8080` |
+| `frontend/src/services/reportService.js` | Summary endpoints use `axios.get`; PDF export uses `responseType: 'blob'` for direct download |
+| `frontend/src/components/evidence/EvidenceUploader.jsx` | Multi-file drag & drop, upload progress bar, SHA-256 display |
+| `frontend/src/components/whatsapp/WhatsAppAnalysis.jsx` | Renders message threads, contacts, group tables |
+| `frontend/src/components/telegram/TelegramAnalysis.jsx` | Renders Telegram messages, contacts, dialogs |
+| `frontend/src/pages/ReportsPage.jsx` | Court report inputs, PDF section toggles, in-app report tracker, streaming download handler |
 
 ---
 
-## 12. Package.json Dependencies (Frontend)
+## 12. Dependencies (`package.json`)
 
 ```json
 {
-  "react": "^18.3",
-  "react-dom": "^18.3",
-  "react-router-dom": "^6.24",
-  "axios": "^1.7",
-  "date-fns": "^3.0",
-  "lucide-react": "^0.400",
-  "tailwindcss": "^3.4",
-  "vite": "^5.4",
-  "chart.js": "^4.4.0",          ← MISSING, must install
-  "react-chartjs-2": "^5.2.0"   ← MISSING, must install
+  "dependencies": {
+    "react": "^18.3",
+    "react-dom": "^18.3",
+    "react-router-dom": "^6.24",
+    "axios": "^1.7",
+    "date-fns": "^3.0",
+    "lucide-react": "^0.400",
+    "tailwindcss": "^3.4",
+    "vite": "^5.4",
+    "chart.js": "^4.4.0",
+    "react-chartjs-2": "^5.2.0"
+  }
 }
 ```
