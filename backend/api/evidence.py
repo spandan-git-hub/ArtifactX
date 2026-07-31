@@ -7,6 +7,7 @@ import shutil
 import traceback
 import uuid
 import zipfile
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -27,6 +28,7 @@ from backend.utils.file_storage import delete_file
 from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
 from backend.services.log_service import get_log_service
+from forensic.media.metadata import extract_image_metadata
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -894,3 +896,236 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
             method="DELETE"
         )
         raise HTTPException(status_code=500, detail=f"Failed to delete evidence: {str(e)}")
+
+
+@router.get("/{evidence_id}/exif")
+def get_evidence_exif(
+    evidence_id: int,
+    file_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """B21: Extract EXIF metadata (camera, specs, GPS, resolution) for evidence image files."""
+    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(status_code=404, detail=f"Evidence {evidence_id} not found")
+
+    results = []
+
+    if file_id:
+        file_row = db.query(EvidenceFile).filter(
+            EvidenceFile.id == file_id,
+            EvidenceFile.evidence_id == evidence_id
+        ).first()
+        if not file_row:
+            raise HTTPException(status_code=404, detail="Requested file not found in evidence")
+
+        target_path = Path(evidence.extracted_path or evidence.storage_path) / file_row.relative_path
+        if not target_path.exists() and evidence.storage_path:
+            target_path = Path(evidence.storage_path)
+
+        meta = extract_image_metadata(target_path)
+        results.append({
+            "file_id": file_row.id,
+            "relative_path": file_row.relative_path,
+            "mime_type": file_row.mime_type,
+            "file_size": file_row.file_size,
+            "metadata": meta,
+        })
+    else:
+        # Scan image files in this evidence
+        image_files = db.query(EvidenceFile).filter(
+            EvidenceFile.evidence_id == evidence_id,
+            EvidenceFile.is_media == True,
+            EvidenceFile.media_type == "image"
+        ).all()
+
+        if image_files:
+            for f in image_files:
+                base_dir = Path(evidence.extracted_path) if evidence.extracted_path else Path(evidence.storage_path).parent
+                target_path = base_dir / f.relative_path
+                if target_path.exists():
+                    meta = extract_image_metadata(target_path)
+                    results.append({
+                        "file_id": f.id,
+                        "relative_path": f.relative_path,
+                        "mime_type": f.mime_type,
+                        "file_size": f.file_size,
+                        "metadata": meta,
+                    })
+        else:
+            # Check main evidence storage path if it's an image
+            p = Path(evidence.storage_path)
+            if p.exists() and (evidence.content_type or "").startswith("image/"):
+                meta = extract_image_metadata(p)
+                results.append({
+                    "file_id": None,
+                    "relative_path": evidence.original_filename,
+                    "mime_type": evidence.content_type,
+                    "file_size": p.stat().st_size,
+                    "metadata": meta,
+                })
+
+    return {
+        "evidence_id": evidence_id,
+        "case_id": evidence.case_id,
+        "total_images": len(results),
+        "exif_records": results,
+    }
+
+
+@router.get("/{evidence_id}/sqlite-inspect")
+def inspect_sqlite_database(
+    evidence_id: int,
+    file_id: Optional[int] = None,
+    table_name: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """B22: Raw SQLite table inspector endpoint allowing direct inspection of msgstore.db, cache4.db, etc."""
+    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(status_code=404, detail=f"Evidence {evidence_id} not found")
+
+    # 1. Locate available database files in evidence
+    db_files = db.query(EvidenceFile).filter(
+        EvidenceFile.evidence_id == evidence_id,
+        (EvidenceFile.relative_path.ilike("%.db") |
+         EvidenceFile.relative_path.ilike("%.sqlite") |
+         EvidenceFile.relative_path.ilike("%.sqlite3"))
+    ).all()
+
+    available_databases = [
+        {"id": f.id, "relative_path": f.relative_path, "size": f.file_size}
+        for f in db_files
+    ]
+
+    target_file_path = None
+    target_rel_path = evidence.original_filename
+    selected_file_id = None
+
+    if file_id:
+        file_row = db.query(EvidenceFile).filter(
+            EvidenceFile.id == file_id,
+            EvidenceFile.evidence_id == evidence_id
+        ).first()
+        if not file_row:
+            raise HTTPException(status_code=404, detail="Database file not found in evidence")
+        selected_file_id = file_row.id
+        target_rel_path = file_row.relative_path
+        if evidence.extracted_path:
+            target_file_path = Path(evidence.extracted_path) / file_row.relative_path
+        else:
+            target_file_path = Path(evidence.storage_path)
+    elif db_files:
+        # Default to first database file found
+        first_db = db_files[0]
+        selected_file_id = first_db.id
+        target_rel_path = first_db.relative_path
+        if evidence.extracted_path:
+            target_file_path = Path(evidence.extracted_path) / first_db.relative_path
+        else:
+            target_file_path = Path(evidence.storage_path)
+    else:
+        # Check main storage file
+        target_file_path = Path(evidence.storage_path)
+
+    if not target_file_path or not target_file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"SQLite database file not found on disk: {target_rel_path}"
+        )
+
+    # 2. Inspect SQLite Database
+    try:
+        uri_path = f"file:{target_file_path.resolve()}?mode=ro"
+        conn = sqlite3.connect(uri_path, uri=True)
+        cursor = conn.cursor()
+
+        # List tables & schemas
+        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC")
+        raw_tables = cursor.fetchall()
+
+        tables_meta = []
+        for t_name, ddl in raw_tables:
+            try:
+                count_cur = conn.cursor()
+                count_cur.execute(f'SELECT COUNT(*) FROM "{t_name}"')
+                row_cnt = count_cur.fetchone()[0]
+            except Exception:
+                row_cnt = 0
+            tables_meta.append({
+                "name": t_name,
+                "sql": ddl or "",
+                "row_count": row_cnt
+            })
+
+        active_table = table_name
+        if not active_table and tables_meta:
+            active_table = tables_meta[0]["name"]
+
+        columns_meta = []
+        rows_data = []
+        total_rows = 0
+
+        if active_table:
+            # PRAGMA table_info
+            cursor.execute(f'PRAGMA table_info("{active_table}")')
+            col_rows = cursor.fetchall()
+            # col_rows tuple: (cid, name, type, notnull, dflt_value, pk)
+            columns_meta = [
+                {
+                    "cid": col[0],
+                    "name": col[1],
+                    "type": col[2] or "TEXT",
+                    "notnull": bool(col[3]),
+                    "dflt_value": col[4],
+                    "pk": bool(col[5])
+                }
+                for col in col_rows
+            ]
+
+            # Total rows for active table
+            for tm in tables_meta:
+                if tm["name"] == active_table:
+                    total_rows = tm["row_count"]
+                    break
+
+            # Fetch rows
+            cursor.execute(f'SELECT * FROM "{active_table}" LIMIT ? OFFSET ?', (limit, offset))
+            raw_rows = cursor.fetchall()
+
+            col_names = [c["name"] for c in columns_meta]
+            for r in raw_rows:
+                row_dict = {}
+                for idx, col_name in enumerate(col_names):
+                    val = r[idx]
+                    if isinstance(val, bytes):
+                        try:
+                            val = val.decode('utf-8', errors='ignore')
+                        except Exception:
+                            val = f"<BLOB {len(val)} bytes>"
+                    row_dict[col_name] = val
+                rows_data.append(row_dict)
+
+        conn.close()
+
+        return {
+            "evidence_id": evidence_id,
+            "file_id": selected_file_id,
+            "database_name": target_rel_path,
+            "available_databases": available_databases,
+            "tables": tables_meta,
+            "selected_table": active_table,
+            "columns": columns_meta,
+            "rows": rows_data,
+            "total_rows": total_rows,
+            "limit": limit,
+            "offset": offset,
+        }
+    except sqlite3.Error as err:
+        logger.error(f"SQLite inspect error for {target_file_path}: {err}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to inspect SQLite database: {str(err)}"
+        )

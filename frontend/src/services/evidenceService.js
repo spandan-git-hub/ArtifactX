@@ -46,6 +46,25 @@ export const downloadEvidenceFile = async (evidenceId, fileId) => {
   return response.data;
 };
 
+// Extract EXIF metadata for an evidence file or all images in evidence
+export const getExifMetadata = async (evidenceId, fileId = null) => {
+  const query = fileId ? `?file_id=${fileId}` : '';
+  const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/exif${query}`);
+  return response.data;
+};
+
+// Inspect raw SQLite database tables, schemas, and rows
+export const inspectSqliteDatabase = async (evidenceId, { fileId = null, tableName = null, limit = 50, offset = 0 } = {}) => {
+  const params = new URLSearchParams();
+  if (fileId) params.append('file_id', fileId);
+  if (tableName) params.append('table_name', tableName);
+  params.append('limit', limit);
+  params.append('offset', offset);
+
+  const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/sqlite-inspect?${params.toString()}`);
+  return response.data;
+};
+
 // Delete evidence
 export const deleteEvidence = async (evidenceId) => {
   await axios.delete(`${API_BASE}/evidence/${evidenceId}`);
@@ -59,5 +78,7 @@ export default {
   getEvidenceFiles,
   verifyEvidenceHashes,
   downloadEvidenceFile,
+  getExifMetadata,
+  inspectSqliteDatabase,
   deleteEvidence,
 };

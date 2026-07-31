@@ -72,7 +72,7 @@ const CaseWorkspacePage = ({ children, activeTab }) => {
   const { case: caseData, hash_integrity_score, analysis_stage } = workspace;
 
   const tabs = [
-    { id: 'overview', label: 'Evidence', path: `/cases/${caseId}`, icon: Database },
+    { id: 'overview', label: 'Evidence & Artifacts', path: `/cases/${caseId}/evidence`, icon: Database },
     { id: 'dashboard', label: 'Dashboard', path: `/cases/${caseId}/dashboard`, icon: LayoutDashboard },
     { id: 'search', label: 'Search', path: `/cases/${caseId}/search`, icon: Search },
     { id: 'reports', label: 'Reports', path: `/cases/${caseId}/reports`, icon: FileText },

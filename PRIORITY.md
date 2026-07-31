@@ -128,12 +128,12 @@ Ensure full evidence integrity, multi-hash calculation (SHA-256, MD5, SHA-1), an
 Provide rich inspection of extracted mobile app databases, media attachments, and EXIF metadata.
 
 ### Backend
-- [ ] **B21** Implement EXIF metadata extraction service using Pillow/ExifRead in `backend/api/evidence.py` (`GET /api/evidence/{id}/exif`).
-- [ ] **B22** Implement raw SQLite table inspector endpoint (`GET /api/evidence/{id}/sqlite-inspect`) to allow direct inspection of extracted `msgstore.db` and `cache4.db` table structures.
+- [x] **B21** Implement EXIF metadata extraction service using Pillow/ExifRead in `backend/api/evidence.py` (`GET /api/evidence/{id}/exif`).
+- [x] **B22** Implement raw SQLite table inspector endpoint (`GET /api/evidence/{id}/sqlite-inspect`) to allow direct inspection of extracted `msgstore.db` and `cache4.db` table structures.
 
 ### Frontend
-- [ ] **F22** Overhaul `EvidencePage.jsx` with tree/table view, file size, MIME type, SHA-256 hash badges, and raw SQLite inspector modal.
-- [ ] **F23** Create `ExifMetadataDrawer.jsx` slide-out drawer rendering image previews, camera make/model, ISO, capture timestamp, and GPS coordinates with map link.
+- [x] **F22** Overhaul `EvidencePage.jsx` with tree/table view, file size, MIME type, SHA-256 hash badges, and raw SQLite inspector modal.
+- [x] **F23** Create `ExifMetadataDrawer.jsx` slide-out drawer rendering image previews, camera make/model, ISO, capture timestamp, and GPS coordinates with map link.
 
 ---
 

@@ -11,41 +11,126 @@ except ImportError:
     PIL_AVAILABLE = False
 
 
+def _convert_to_degrees(value) -> float:
+    """Convert GPS degree/minute/second tuple or IFD tag value to decimal degrees."""
+    try:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if hasattr(value, '__len__') and len(value) == 3:
+            d = float(value[0])
+            m = float(value[1])
+            s = float(value[2])
+            return d + (m / 60.0) + (s / 360.0)
+    except Exception:
+        pass
+    return 0.0
+
+
 def extract_image_metadata(file_path: Path) -> Dict[str, Any]:
     """
-    Extract metadata from image files including EXIF data.
+    Extract metadata from image files including EXIF data, camera details, and GPS.
 
     Args:
         file_path: Path to the image file
 
     Returns:
-        Dictionary containing width, height, and exif_data
+        Dictionary containing width, height, camera details, GPS, and sanitized exif_data
     """
-    if not PIL_AVAILABLE:
-        return {"width": None, "height": None, "exif_data": {}}
-
-    if not file_path.exists():
-        return {"width": None, "height": None, "exif_data": {}}
+    if not PIL_AVAILABLE or not file_path.exists():
+        return {
+            "width": None,
+            "height": None,
+            "exif_data": {},
+            "camera": {},
+            "gps": {"has_gps": False},
+        }
 
     try:
         with Image.open(file_path) as img:
             width, height = img.size
+            raw_exif = {}
+            sanitized_exif = {}
+            gps_info = {}
 
-            # Extract EXIF data
-            exif_data = {}
             if hasattr(img, '_getexif') and img._getexif() is not None:
                 for tag_id, value in img._getexif().items():
                     tag = TAGS.get(tag_id, tag_id)
-                    exif_data[tag] = value
+                    raw_exif[tag] = value
+
+                    # Stringify non-serializable objects for JSON
+                    if isinstance(value, bytes):
+                        try:
+                            sanitized_exif[str(tag)] = value.decode('utf-8', errors='ignore')
+                        except Exception:
+                            sanitized_exif[str(tag)] = str(value)
+                    elif isinstance(value, (tuple, list)):
+                        sanitized_exif[str(tag)] = [str(v) if not isinstance(v, (int, float, str)) else v for v in value]
+                    elif isinstance(value, (int, float, str, bool)):
+                        sanitized_exif[str(tag)] = value
+                    else:
+                        sanitized_exif[str(tag)] = str(value)
+
+                    if tag == "GPSInfo" and isinstance(value, dict):
+                        gps_info = value
+
+            # Extract structured camera details
+            camera = {
+                "make": str(raw_exif.get("Make", "")).strip() or None,
+                "model": str(raw_exif.get("Model", "")).strip() or None,
+                "software": str(raw_exif.get("Software", "")).strip() or None,
+                "date_time": str(raw_exif.get("DateTimeOriginal") or raw_exif.get("DateTime", "")).strip() or None,
+                "iso": raw_exif.get("ISOSpeedRatings"),
+                "f_number": str(raw_exif.get("FNumber")) if raw_exif.get("FNumber") else None,
+                "focal_length": str(raw_exif.get("FocalLength")) if raw_exif.get("FocalLength") else None,
+                "exposure_time": str(raw_exif.get("ExposureTime")) if raw_exif.get("ExposureTime") else None,
+            }
+
+            # Parse GPS data if available (Tag 1 = LatRef, Tag 2 = Lat, Tag 3 = LongRef, Tag 4 = Long, Tag 6 = Alt)
+            gps_data = {"has_gps": False, "latitude": None, "longitude": None, "altitude": None, "map_url": None}
+            if gps_info:
+                try:
+                    lat_val = gps_info.get(2)
+                    lat_ref = gps_info.get(1)
+                    lng_val = gps_info.get(4)
+                    lng_ref = gps_info.get(3)
+                    alt_val = gps_info.get(6)
+
+                    if lat_val and lng_val:
+                        lat = _convert_to_degrees(lat_val)
+                        if lat_ref and str(lat_ref).upper() == 'S':
+                            lat = -lat
+                        lng = _convert_to_degrees(lng_val)
+                        if lng_ref and str(lng_ref).upper() == 'W':
+                            lng = -lng
+                        
+                        alt = float(alt_val) if alt_val else None
+
+                        gps_data = {
+                            "has_gps": True,
+                            "latitude": round(lat, 6),
+                            "longitude": round(lng, 6),
+                            "altitude": alt,
+                            "map_url": f"https://www.google.com/maps?q={lat},{lng}",
+                            "osm_url": f"https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=15/{lat}/{lng}"
+                        }
+                except Exception:
+                    pass
 
             return {
                 "width": width,
                 "height": height,
-                "exif_data": exif_data
+                "camera": camera,
+                "gps": gps_data,
+                "exif_data": sanitized_exif,
             }
     except Exception:
-        # If we can't read the image, return None values
-        return {"width": None, "height": None, "exif_data": {}}
+        return {
+            "width": None,
+            "height": None,
+            "exif_data": {},
+            "camera": {},
+            "gps": {"has_gps": False},
+        }
 
 
 def extract_video_metadata(file_path: Path) -> Dict[str, Any]:

@@ -10,9 +10,13 @@ import {
   FolderOpen,
   FileText,
   ShieldCheck,
+  Camera,
+  Database,
 } from 'lucide-react';
 import EvidenceHashBadge from './EvidenceHashBadge';
 import EvidenceHashVerificationModal from './EvidenceHashVerificationModal';
+import ExifMetadataDrawer from './ExifMetadataDrawer';
+import SqliteInspectorModal from './SqliteInspectorModal';
 
 const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propSelectedId, onSelectEvidence, onDeleteSuccess }) => {
   const { evidences, loading, error, loadEvidences, deleteEvidence } = useEvidence();
@@ -27,6 +31,14 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
   const [verifyingEvidenceId, setVerifyingEvidenceId] = useState(null);
   const [verificationData, setVerificationData] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // EXIF Drawer state
+  const [exifDrawerOpen, setExifDrawerOpen] = useState(false);
+  const [activeExifFile, setActiveExifFile] = useState(null);
+
+  // SQLite Inspector Modal state
+  const [sqliteModalOpen, setSqliteModalOpen] = useState(false);
+  const [activeSqliteFile, setActiveSqliteFile] = useState(null);
 
   const selectedEvidenceId = propSelectedId !== undefined ? propSelectedId : internalSelectedId;
   const setSelectedEvidenceId = propSelectedId !== undefined ? onSelectEvidence : setInternalSelectedId;
@@ -294,13 +306,41 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
                         </span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => handleDownloadFile(f.id, f.relative_path.split('/').pop())}
-                          className="btn-ghost p-1.5"
-                          title="Download"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {(f.is_media || f.mime_type?.startsWith('image/') || /\.(jpg|jpeg|png|heic|webp)$/i.test(f.relative_path)) && (
+                            <button
+                              onClick={() => {
+                                setActiveExifFile({ fileId: f.id, fileName: f.relative_path });
+                                setExifDrawerOpen(true);
+                              }}
+                              className="btn-ghost p-1.5 text-accent-cyan hover:bg-accent-cyan/10"
+                              title="Inspect Image EXIF Metadata"
+                            >
+                              <Camera className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {(/\.(db|sqlite|sqlite3)$/i.test(f.relative_path) || f.mime_type?.includes('sqlite')) && (
+                            <button
+                              onClick={() => {
+                                setActiveSqliteFile({ fileId: f.id, fileName: f.relative_path });
+                                setSqliteModalOpen(true);
+                              }}
+                              className="btn-ghost p-1.5 text-accent-violet hover:bg-accent-violet/10"
+                              title="Inspect Raw SQLite Database"
+                            >
+                              <Database className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleDownloadFile(f.id, f.relative_path.split('/').pop())}
+                            className="btn-ghost p-1.5"
+                            title="Download"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -323,6 +363,24 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
         verificationData={verificationData}
         loading={verifyLoading}
         onReverify={() => handleVerifyHashes(verifyingEvidenceId)}
+      />
+
+      {/* EXIF Metadata Drawer */}
+      <ExifMetadataDrawer
+        isOpen={exifDrawerOpen}
+        onClose={() => setExifDrawerOpen(false)}
+        evidenceId={selectedEvidenceId}
+        fileId={activeExifFile?.fileId}
+        fileName={activeExifFile?.fileName}
+      />
+
+      {/* SQLite Inspector Modal */}
+      <SqliteInspectorModal
+        isOpen={sqliteModalOpen}
+        onClose={() => setSqliteModalOpen(false)}
+        evidenceId={selectedEvidenceId}
+        fileId={activeSqliteFile?.fileId}
+        fileName={activeSqliteFile?.fileName}
       />
     </div>
   );
