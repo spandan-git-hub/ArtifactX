@@ -231,14 +231,14 @@ def correlate_cross_app_contact(
     wa_phone_lookup = {}
     for contact in wa_contacts:
         # Normalize phone number: remove non-digits
-        phone = ''.join(filter(str.isdigit, contact.phone_number))
+        phone = "".join(filter(str.isdigit, str(contact.phone_number or "")))
         if phone:
             wa_phone_lookup.setdefault(phone, []).append(contact)
 
     # Build lookup for Telegram contacts by phone number
     tg_phone_lookup = {}
     for contact in tg_contacts:
-        phone = ''.join(filter(str.isdigit, contact.phone))
+        phone = "".join(filter(str.isdigit, str(contact.phone or "")))
         if phone:
             tg_phone_lookup.setdefault(phone, []).append(contact)
 

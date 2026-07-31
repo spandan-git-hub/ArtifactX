@@ -224,30 +224,30 @@ The forensic engine is the core of the app. These parsers must work correctly on
 
 ### Backend / Forensic
 
-- [ ] **B11** Audit and fix `forensic/whatsapp/contact_parser.py`
+- [x] **B11** Audit and fix `forensic/whatsapp/contact_parser.py`
   - If file doesn't exist: create it with schema-adaptive query (same pattern as `message_parser.py`)
   - If file exists but doesn't handle both legacy (`wa_contacts`) and modern WhatsApp schemas: fix it
   - Return dicts with: `evidence_id`, `jid`, `display_name`, `phone_number`, `status`
 
-- [ ] **B12** Audit and fix `forensic/whatsapp/group_parser.py`
+- [x] **B12** Audit and fix `forensic/whatsapp/group_parser.py`
   - Same existence and schema-adaptive check
   - Return dicts with: `evidence_id`, `group_jid`, `subject`, `creator_jid`, `creation_timestamp`
 
-- [ ] **B13** Audit and fix `forensic/whatsapp/media_parser.py`
+- [x] **B13** Audit and fix `forensic/whatsapp/media_parser.py`
   - Same existence check
   - Return dicts with: `message_id`, `media_path`, `message_type`
 
-- [ ] **B14** Audit `forensic/telegram/` — all four parsers
+- [x] **B14** Audit `forensic/telegram/` — all four parsers
   - For each of `detector.py`, `message_parser.py`, `contact_parser.py`, `group_parser.py`:
   - Verify they handle Telegram's schema (`messages`, `users`, `dialogs`, `chats` tables)
   - Fix or create any that are missing or broken
 
-- [ ] **B15** Audit `forensic/timeline/builder.py`
+- [x] **B15** Audit `forensic/timeline/builder.py`
   - Verify `TimelineBuilder.build_timeline_for_case(db, case_id)` queries both WA and TG messages
   - Verify it creates events with `normalized_timestamp` as a Python `datetime` object (not a string or int)
   - Fix if `normalized_timestamp` is not being computed correctly
 
-- [ ] **B16** Audit `forensic/correlation/matcher.py` dataclass field alignment
+- [x] **B16** Audit `forensic/correlation/matcher.py` dataclass field alignment
   - Run a demo case creation, then trigger correlation via `POST /api/correlation/cases/{id}/correlation/build`
   - If it crashes with `AttributeError` or `TypeError`: the dataclass fields don't match what the service provides
   - Fix the dataclass definitions to match the ORM field names
