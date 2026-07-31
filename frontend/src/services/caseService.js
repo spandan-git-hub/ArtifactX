@@ -30,5 +30,11 @@ export const caseService = {
   // Delete case
   deleteCase: async (id) => {
     await axios.delete(`${API_BASE}/cases/${id}`);
+  },
+
+  // Get case workspace summary
+  getCaseWorkspace: async (id) => {
+    const response = await axios.get(`${API_BASE}/cases/${id}/workspace`);
+    return response.data;
   }
 };

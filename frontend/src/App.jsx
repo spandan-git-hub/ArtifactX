@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
 import EvidencePage from './pages/EvidencePage';
+import ChatViewerPage from './pages/ChatViewerPage';
 import CaseForm from './components/cases/CaseForm';
 import { Layout } from './components/layout';
 import DemoModal from './components/demo/DemoModal';
@@ -66,6 +67,7 @@ function App() {
         <Route path="/cases/:id" element={<CaseDetailPage />} />
         <Route path="/cases/:id/edit" element={<CaseForm />} />
         <Route path="/cases/:caseId/evidence" element={<EvidencePage />} />
+        <Route path="/cases/:caseId/chat" element={<ChatViewerPage />} />
         <Route path="/cases/:caseId/search" element={<SearchPage />} />
         <Route path="/cases/:caseId/dashboard" element={<DashboardPage />} />
         <Route path="/cases/:caseId/reports" element={<ReportsPage />} />

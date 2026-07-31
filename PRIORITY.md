@@ -142,10 +142,10 @@ Provide rich inspection of extracted mobile app databases, media attachments, an
 Replace static data tables with an interactive, rich chat view for extracted WhatsApp and Telegram messages.
 
 ### Backend
-- [ ] **B23** Create `Chat` API endpoints (`GET /api/cases/{id}/chats` and `GET /api/cases/{id}/chats/{jid}/messages`) returning thread message lists with inline deletion flags and media info.
+- [x] **B23** Create `Chat` API endpoints (`GET /api/cases/{id}/chats` and `GET /api/cases/{id}/chats/{jid}/messages`) returning thread message lists with inline deletion flags and media info.
 
 ### Frontend
-- [ ] **F24** Create `ChatViewerPage.jsx` (`/cases/:caseId/chat`):
+- [x] **F24** Create `ChatViewerPage.jsx` (`/cases/:caseId/chat`):
   - Left pane: Contact / Group thread list with green (WA) / blue (TG) app badges and message counts.
   - Center pane: Interactive chat bubble stream displaying sender name, JID, timestamp, body text, attachment previews, and EXIF trigger.
   - Center pane: Render prominent red/amber deletion warning badges (`[DELETED MESSAGE DETECTED]`) on detected message sequence/time gaps.

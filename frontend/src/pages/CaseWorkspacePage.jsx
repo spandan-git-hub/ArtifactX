@@ -1,24 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { caseService } from '../services/caseService';
 import { Header } from '../components/layout';
-import ForensicWorkflowStepper from '../components/workspace/ForensicWorkflowStepper';
-import {
-  Database,
-  LayoutDashboard,
-  Search,
-  FileText,
-  ClipboardList,
-  Loader2,
-  AlertCircle,
-  ArrowLeft,
-  ShieldCheck,
-} from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 
-const CaseWorkspacePage = ({ children, activeTab }) => {
+const CaseWorkspacePage = ({ children }) => {
   const params = useParams();
   const caseId = params.id || params.caseId;
-  const location = useLocation();
 
   const [workspace, setWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -69,15 +57,7 @@ const CaseWorkspacePage = ({ children, activeTab }) => {
     );
   }
 
-  const { case: caseData, hash_integrity_score, analysis_stage } = workspace;
-
-  const tabs = [
-    { id: 'overview', label: 'Evidence & Artifacts', path: `/cases/${caseId}/evidence`, icon: Database },
-    { id: 'dashboard', label: 'Dashboard', path: `/cases/${caseId}/dashboard`, icon: LayoutDashboard },
-    { id: 'search', label: 'Search', path: `/cases/${caseId}/search`, icon: Search },
-    { id: 'reports', label: 'Reports', path: `/cases/${caseId}/reports`, icon: FileText },
-    { id: 'logs', label: 'Audit Logs', path: `/cases/${caseId}/logs`, icon: ClipboardList },
-  ];
+  const { case: caseData, hash_integrity_score } = workspace;
 
   return (
     <div className="min-h-screen bg-forensic-950">
@@ -90,8 +70,8 @@ const CaseWorkspacePage = ({ children, activeTab }) => {
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Sleek Minimal Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-forensic-800">
+        {/* Sleek Minimal Header - Case Name & Integrity Status Only */}
+        <div className="flex items-center justify-between pb-3 border-b border-forensic-800">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-bold font-mono text-forensic-50">{caseData.name}</h1>
             <span
@@ -105,50 +85,15 @@ const CaseWorkspacePage = ({ children, activeTab }) => {
             >
               {caseData.status || 'active'}
             </span>
-            <span className="text-xs font-mono text-accent-emerald bg-accent-emerald/10 px-2 py-0.5 rounded border border-accent-emerald/20 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {hash_integrity_score}% Integrity Verified
-            </span>
           </div>
 
-          {/* Compact Workflow Stepper Inline */}
-          <ForensicWorkflowStepper
-            currentStage={analysis_stage.stage_number}
-            caseId={caseId}
-            currentPath={location.pathname}
-          />
+          <span className="text-xs font-mono text-accent-emerald bg-accent-emerald/10 px-2.5 py-1 rounded border border-accent-emerald/20 flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4" />
+            {hash_integrity_score}% Integrity Verified
+          </span>
         </div>
 
-        {/* Clean Sub-Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-forensic-800 pb-px">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive =
-              activeTab === tab.id ||
-              (tab.id === 'overview' && location.pathname === `/cases/${caseId}`) ||
-              location.pathname === tab.path;
-
-            return (
-              <Link
-                key={tab.id}
-                to={tab.path}
-                className={`
-                  flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px
-                  ${
-                    isActive
-                      ? 'border-accent-cyan text-accent-cyan font-semibold'
-                      : 'border-transparent text-forensic-400 hover:text-forensic-200'
-                  }
-                `}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Direct Child View */}
+        {/* Child View */}
         <div>{children}</div>
       </div>
     </div>

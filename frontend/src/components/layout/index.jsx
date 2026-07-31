@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   FolderKanban,
   LayoutDashboard,
+  MessageSquare,
   Search,
   FileText,
   ClipboardList,
@@ -23,6 +24,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const navItems = activeCaseId
     ? [
       { path: '/cases', icon: FolderKanban, label: 'All Cases' },
+      { path: `/cases/${activeCaseId}/evidence`, icon: Database, label: 'Evidence & Artifacts' },
+      { path: `/cases/${activeCaseId}/chat`, icon: MessageSquare, label: 'Chat Viewer' },
       { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
       { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
       { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
