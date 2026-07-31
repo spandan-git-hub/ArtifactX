@@ -22,18 +22,18 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   const navItems = activeCaseId
     ? [
-        { path: '/cases', icon: FolderKanban, label: 'All Cases' },
-        { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
-        { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
-        { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
-        { path: `/cases/${activeCaseId}/logs`, icon: ClipboardList, label: 'Logs' },
-      ]
+      { path: '/cases', icon: FolderKanban, label: 'All Cases' },
+      { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },
+      { path: `/cases/${activeCaseId}/search`, icon: Search, label: 'Search' },
+      { path: `/cases/${activeCaseId}/reports`, icon: FileText, label: 'Reports' },
+      { path: `/cases/${activeCaseId}/logs`, icon: ClipboardList, label: 'Logs' },
+    ]
     : [
-        { path: '/cases', icon: FolderKanban, label: 'Cases' },
-        { path: '#', icon: Search, label: 'Search', disabled: true },
-        { path: '#', icon: FileText, label: 'Reports', disabled: true },
-        { path: '#', icon: ClipboardList, label: 'Logs', disabled: true },
-      ];
+      { path: '/cases', icon: FolderKanban, label: 'Cases' },
+      { path: '#', icon: Search, label: 'Search', disabled: true },
+      { path: '#', icon: FileText, label: 'Reports', disabled: true },
+      { path: '#', icon: ClipboardList, label: 'Logs', disabled: true },
+    ];
 
   const isActive = (path) => {
     if (path === '#') return false;
@@ -145,9 +145,8 @@ const Layout = ({ children, sidebarCollapsed, onSidebarToggle }) => {
     <div className="min-h-screen bg-forensic-950">
       <Sidebar collapsed={sidebarCollapsed} onToggle={onSidebarToggle} />
       <main
-        className={`transition-all duration-300 min-h-screen ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
+        className={`transition-all duration-300 min-h-screen ${sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}
       >
         {children}
       </main>

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from backend.app.config import UPLOADS_DIR
 from backend.app.database import get_db
 from backend.models.models import Case, CorrelationEdge, AnalysisLog, ErrorLog
-from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate
+from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
 from backend.services.log_service import get_log_service
 from backend.utils.file_storage import delete_file
 
@@ -51,6 +51,90 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
 @router.get("", response_model=list[CaseRead])
 def get_cases(db: Session = Depends(get_db)):
     return db.query(Case).all()
+
+
+@router.get("/{case_id}/workspace", response_model=CaseWorkspaceRead)
+def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    from backend.models.models import (
+        Evidence, EvidenceFile, WhatsAppMessage, TelegramMessage,
+        WhatsAppContact, TelegramContact, TimelineEvent, DeletedMessage, CorrelationEdge
+    )
+
+    evidence_items = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+    evidence_summaries = []
+    total_evidence_files = 0
+    valid_hash_count = 0
+
+    for ev in evidence_items:
+        file_count = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == ev.id).count()
+        total_evidence_files += 1
+        if ev.sha256 and len(ev.sha256) == 64:
+            valid_hash_count += 1
+        evidence_summaries.append({
+            "id": ev.id,
+            "original_filename": ev.original_filename,
+            "sha256": ev.sha256 or "",
+            "evidence_type": ev.evidence_type,
+            "file_count": file_count,
+            "uploaded_at": ev.uploaded_at,
+            "analyzed_at": ev.analyzed_at
+        })
+
+    hash_integrity_score = 100.0 if total_evidence_files == 0 else round((valid_hash_count / total_evidence_files) * 100.0, 1)
+
+    evidence_ids = [ev.id for ev in evidence_items]
+    wa_msgs = db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).count() if evidence_ids else 0
+    tg_msgs = db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).count() if evidence_ids else 0
+    wa_contacts = db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).count() if evidence_ids else 0
+    tg_contacts = db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).count() if evidence_ids else 0
+
+    total_msgs = wa_msgs + tg_msgs
+    total_cnts = wa_contacts + tg_contacts
+    timeline_cnt = db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).count()
+    deleted_cnt = db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).count()
+    corr_cnt = db.query(CorrelationEdge).filter(CorrelationEdge.case_id == case_id).count()
+
+    if len(evidence_items) == 0:
+        stage_num = 1
+        stage_name = "Ingest & Hash"
+        stage_desc = "Awaiting evidence ingestion and SHA-256 hash verification."
+    elif total_msgs == 0 and timeline_cnt == 0:
+        stage_num = 2
+        stage_name = "Extract & Parse"
+        stage_desc = "Evidence file ingested; ready for WhatsApp/Telegram extraction."
+    elif timeline_cnt > 0 or corr_cnt > 0 or total_msgs > 0:
+        stage_num = 3
+        stage_name = "Analyze & Correlate"
+        stage_desc = "Forensic messages, timeline, and identity correlation active."
+    else:
+        stage_num = 4
+        stage_name = "Court Export"
+        stage_desc = "Forensic audit complete; ready for court PDF report export."
+
+    return {
+        "case": case,
+        "active_evidence": evidence_summaries,
+        "hash_integrity_score": hash_integrity_score,
+        "analysis_stage": {
+            "stage_number": stage_num,
+            "stage_name": stage_name,
+            "description": stage_desc
+        },
+        "summary_counts": {
+            "evidence_count": len(evidence_items),
+            "whatsapp_messages": wa_msgs,
+            "telegram_messages": tg_msgs,
+            "total_messages": total_msgs,
+            "total_contacts": total_cnts,
+            "timeline_events": timeline_cnt,
+            "deleted_messages": deleted_cnt,
+            "correlation_edges": corr_cnt
+        }
+    }
 
 
 @router.get("/{case_id}", response_model=CaseRead)

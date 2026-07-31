@@ -16,6 +16,7 @@
 | DB | PostgreSQL (Neon cloud) via `.env` ✅ | PostgreSQL |
 | Validation | Pydantic v2 ✅ | Pydantic v2 |
 | PDF Engine | ReportLab (In-Memory Court PDF Generator) ✅ | ReportLab |
+| AI / Sentiment Engine | Rule-based & NLP keyword sentiment engine ✅ | Rule-based & NLP keyword sentiment engine |
 | Logging | structlog ✅ | structlog |
 | Image EXIF | Pillow + ExifRead ✅ | Pillow + ExifRead |
 | Hashing | hashlib (SHA-256, MD5, SHA-1) ✅ | hashlib |
@@ -72,7 +73,7 @@ All database tables and their forensic purpose:
 | `deleted_messages` | Detected sequence/timestamp gaps, missing message counts, confidence | ✅ Correct |
 | `media_items` | Extracted media attachments, EXIF data (GPS, camera, creation date) | ✅ Correct |
 | `correlation_edges` | Cross-platform entity links & cross-app message correlation nodes | ✅ Correct |
-| `generated_reports` | **In-App Report History Tracker**: tracks generated report ID, case ID, report type, analyst, timestamp, size bytes, and SHA-256 verification hash | 🆕 New Model |
+| `generated_reports` | **In-App Report History Tracker**: tracks generated report ID, case ID, report type, analyst, timestamp, size bytes, and SHA-256 verification hash | ✅ Correct |
 | `analysis_logs` | Deep diagnostic logs during evidence parsing runs | ✅ Correct |
 | `activity_logs` | **Chain-of-Custody Audit Log** (ingest, hash verify, parse, report export events) | ✅ Correct |
 | `error_logs` | System exception logs and stack traces | ✅ Correct |
@@ -82,107 +83,68 @@ All database tables and their forensic purpose:
 ## 5. API Layer Specifications — `backend/api/`
 
 ### 5.1 `evidence.py` — Ingestion & Cryptographic Integrity
-- **Multipart Upload:** Supports `.zip`, `.db`, `.sqlite`, `.tar.gz`.
-- **Cryptographic Hashing:** Computes SHA-256, MD5, and SHA-1 for every file during extraction.
-- **`POST /api/evidence/{id}/verify-hashes`:** Re-calculates on-disk file hashes and compares against recorded `EvidenceFile` manifest. Returns integrity report (`VERIFIED_INTACT` or list of mismatched files).
-- **`GET /api/evidence/{id}/exif`:** Extracts and returns EXIF metadata for image/video files (GPS coordinates, camera model, date taken).
+- Multipart Upload with SHA-256, MD5, and SHA-1 calculation.
+- `POST /api/evidence/{id}/verify-hashes`: On-disk hash verification.
+- `GET /api/evidence/{id}/exif`: EXIF metadata extraction.
 
 ### 5.2 `demo.py` — Realistic Workstation Demo Ingestion
-- Accepts `DemoData`: `{ case_name, has_whatsapp: true, has_telegram: true, message_count: 100, contact_count: 15 }`.
-- **DEMO_MODE Guard:** `if not settings.demo_mode: raise HTTPException(403)`.
-- Generates complete dataset: `Case`, `Evidence`, `WhatsAppMessage`, `TelegramMessage`, `TimelineEvent` records (1 per message), and `DeletedMessage` records (2-3 realistic gaps).
+- Generates complete demo case with messages, timeline events, and deletion gap records.
 
 ### 5.3 `whatsapp.py` & `telegram.py` — Artifact Extraction APIs
-- `POST /api/whatsapp/evidence/{id}/analyze/whatsapp`: Executes WhatsApp sqlite parser on extracted `.db` files.
-- `POST /api/telegram/evidence/{id}/analyze/telegram`: Executes Telegram `cache4.db` parser.
+- WhatsApp `msgstore.db` and Telegram `cache4.db` sqlite parsers.
 
 ### 5.4 `timeline.py` — Timeline Reconstruction API
-- `POST /api/timeline/cases/{id}/timeline/build`: Triggers `TimelineBuilder` to aggregate and normalize all message and media events into `timeline_events`.
-- `GET /api/timeline/cases/{id}/timeline`: Queries reconstructed timeline with filters (`start_date`, `end_date`, `app`, `query`).
+- Multiapp timeline reconstruction and density queries.
 
 ### 5.5 `deleted.py` — Deleted Message Detection API
-- `POST /api/deleted/cases/{id}/deleted/detect`: Triggers gap detection engine.
-- `GET /api/deleted/cases/{id}/deleted`: Returns detected deletion records with gap range, confidence score, and explanation.
+- Sequence and timestamp gap detection.
 
 ### 5.6 `correlation.py` — Evidence Correlation Engine API
-- `POST /api/correlation/cases/{id}/correlation/build`: Runs cross-platform entity resolution and message time-window matching.
-- `GET /api/correlation/cases/{id}/correlation`: Returns correlated entity nodes and edge lists.
+- Cross-platform entity resolution and time-window correlation matching.
 
-### 5.7 `reports.py` — Forensic Court PDF Generator & Report Tracker API
-- **Zero Workspace Disk Storage Rule:** PDF reports are generated in-memory (`io.BytesIO`) and streamed directly to the HTTP response (`StreamingResponse`) as an attachment download (`Content-Disposition: attachment; filename="..."`). PDF files MUST NOT be stored in `reports/` inside the project workspace directory.
-- `POST /api/cases/{id}/reports`: Generates official court PDF into memory buffer, calculates SHA-256 hash of PDF bytes, logs entry in `generated_reports` table & `activity_logs` chain of custody, and returns `StreamingResponse`.
-- `GET /api/cases/{id}/reports/history`: Returns historical log of generated reports for the case (Report ID, Type, Lead Analyst, Generation Date, Verification SHA-256 Hash of report bytes, Total Pages, Size Bytes).
-- `GET /api/cases/{id}/reports/summary`: Returns summary metrics for report preview.
+### 5.7 `assistant.py` (NEW) — Investigative AI Copilot & Chat Sentiment API
+- **`POST /api/cases/{id}/assistant/query`:** Accepts natural language investigator questions (e.g. *"Find threat keywords in suspect chats"*). Searches case messages, executes sentiment classification, and returns AI copilot analysis and relevant message citations.
+- **`POST /api/cases/{id}/assistant/sentiment`:** Analyzes suspect chat threads or selected messages for sentiment classification (Aggressive, Suspicious, Deceptive, Urgent, Evasive, Neutral), intention markers (financial demand, coercion, deletion awareness), and calculates suspicion confidence scores (0% to 100%).
+- **LEGAL COURT REPORT ISOLATION:** Copilot query results and sentiment scores are kept transient or in-memory for investigator UI display only — **they are strictly excluded from the PDF report generation engine**.
+
+### 5.8 `reports.py` — Forensic Court PDF Generator & Report Tracker API
+- **Zero Workspace Disk Storage:** PDF reports generated in-memory (`io.BytesIO`) and returned via `StreamingResponse`.
+- **Strict Legal Exclusion:** Excludes all AI assistant responses and sentiment metrics to maintain judicial admissibility.
 
 ---
 
 ## 6. Service Layer Specifications — `backend/services/`
 
-### 6.1 `whatsapp_service.py` & `telegram_service.py`
-- Calls forensic parser modules in `forensic/`.
-- Saves extracted messages, contacts, groups, and media to database.
-- Records chain-of-custody entry in `activity_logs`.
-- Stack trace error handling: uses `traceback.format_exc()` for all log calls.
+### 6.1 `assistant_service.py` (NEW) — Investigative AI & Sentiment Service
+- Performs keyword-based NLP sentiment scoring, emotional tone detection, and suspicion score calculation on extracted WhatsApp and Telegram message text.
+- Generates natural language summaries and highlights intent markers (e.g. monetary transactions, threat language, evasive behavior).
+- Computes suspicion confidence ratings based on message frequency, sentiment intensity, and deletion gap proximity.
 
-### 6.2 `timeline_service.py`
-- Invokes `TimelineBuilder.build_timeline_for_case()`.
-- Generates `normalized_timestamp` datetime objects for timezone-aware chronological sorting.
-
-### 6.3 `deleted_service.py`
-- Invokes `DeletedDetector.detect_deletions()`.
-- Handles sequence gap analysis for Telegram integer IDs.
-- Performs timestamp gap analysis for WhatsApp.
-
-### 6.4 `correlation_service.py`
-- Converts ORM objects to matcher dataclasses.
-- Discovers cross-platform entity links (phone number matching, handle matching).
-- Generates `CorrelationEdge` records.
-
-### 6.5 `report_service.py` — In-Memory Court PDF Generator Engine
-Constructs formal legal PDF documents using ReportLab `SimpleDocTemplate` targetting an in-memory `io.BytesIO` buffer:
-1. **In-Memory Generation:** Compiles PDF into `io.BytesIO()` memory buffer. Computes SHA-256 hash of output bytes.
-2. **In-App Database Record:** Creates a `GeneratedReport` database record capturing `case_id`, `report_type`, `lead_analyst`, `created_at`, `size_bytes`, and `sha256_hash`.
-3. **Cover Page:** Official header, seal, case reference, investigator details, report verification hash.
-4. **Chain of Custody Manifest:** Table listing all evidence files, upload timestamps, SHA-256, MD5, SHA-1 hashes, and verification status.
-5. **Executive Summary:** High-level case statistics and analyst notes.
-6. **Artifact Analysis:** Detailed breakdown of extracted WhatsApp & Telegram messages, contacts, and media.
-7. **Reconstructed Chronological Timeline:** Formatted timeline table.
-8. **Deletion & Anomaly Log:** Gap analysis table with confidence ratings.
-9. **Correlated Entities Matrix:** Cross-platform identity links.
-10. **Legal Declaration & Sign-off Block:** Formal sworn statement of forensic integrity, signature line, analyst title, agency stamp, and document SHA-256 verification signature.
+### 6.2 `report_service.py` — In-Memory Court PDF Generator Engine
+- Compiles official court PDF report into `io.BytesIO()` memory buffer.
+- Strictly parses deterministic evidence tables (`wa_messages`, `tg_messages`, `evidence_files`, `timeline_events`, `deleted_messages`, `correlation_edges`). **Excludes AI copilot output and sentiment scores**.
 
 ---
 
 ## 7. Forensic Engine — `forensic/`
 
-### 7.1 `forensic/whatsapp/`
-- `detector.py`: Detects legacy (`messages`, `wa_contacts`) and modern (`message`, `jid`, `chat`) WhatsApp database schemas.
-- `message_parser.py`: Schema-adaptive SQL query builder. Parses text, timestamps, sender/receiver JIDs, media paths, and deleted message flags.
-- `contact_parser.py`, `group_parser.py`, `media_parser.py`: Extracts contact book, group metadata, and media attachment references.
+### 7.1 `forensic/whatsapp/` & `forensic/telegram/`
+- Schema-adaptive database parsers for WhatsApp and Telegram.
 
-### 7.2 `forensic/telegram/`
-- `detector.py`: Detects Telegram `cache4.db` database schemas (`messages`, `users`, `dialogs`, `chats`).
-- `message_parser.py`: Parses Telegram message IDs, user IDs, text, dates, media references.
-- `contact_parser.py`, `group_parser.py`: Parses Telegram user directory and group channels.
+### 7.2 `forensic/deleted/detector.py`
+- Sequence & timestamp gap detection for deleted messages.
 
-### 7.3 `forensic/deleted/detector.py`
-- `_get_expected_next_id()`: Sequence gap detection for Telegram sequential integer IDs. Returns `None` for WhatsApp hex IDs.
-- Calculates deletion confidence scores (0.0 to 1.0) based on gap size and time deltas.
+### 7.3 `forensic/timeline/builder.py`
+- Chronological event builder with UTC timestamp normalization.
 
-### 7.4 `forensic/timeline/builder.py`
-- `build_timeline_for_case()`: Merges WA messages, TG messages, EXIF media creation dates into normalized `TimelineEvent` records with ISO-8601 UTC timestamps.
-
-### 7.5 `forensic/correlation/matcher.py`
-- Matches contacts across platforms via normalized phone numbers (E.164 format) and handles.
-- Matches cross-app messages exchanged within configurable time windows.
+### 7.4 `forensic/correlation/matcher.py`
+- Entity resolution and cross-platform message matcher.
 
 ---
 
 ## 8. Repository Layer — `backend/repositories/`
 
-- `dashboard_repo.py`: Aggregates case statistics, message volumes, app splits.
-- `report_repo.py`: Fetches formatted data blocks for PDF report generation.
-- `search_repo.py`: Multi-field full-text search across messages, contacts, files, and timeline. Fix: `_get_evidence_ids` filters by `metadata_["app"]` when app filter is specified.
+- `dashboard_repo.py`, `report_repo.py`, `search_repo.py`.
 
 ---
 
@@ -196,8 +158,6 @@ Constructs formal legal PDF documents using ReportLab `SimpleDocTemplate` target
 | B4 | MEDIUM | `demo.py` | Missing `DEMO_MODE` guard | Add `if not settings.demo_mode: raise HTTPException(403)` |
 | B5 | MEDIUM | `whatsapp_service.py`, `telegram_service.py`, `timeline_service.py`, `deleted_service.py`, `correlation_service.py` | `str(e.__traceback__)` stringification | Replace with `import traceback; traceback.format_exc()` |
 | B6 | MEDIUM | `search_repo.py` L444 | `_get_evidence_ids` ignores `app` filter | Filter by `Evidence.metadata_["app"].astext == app` |
-| B7 | HIGH | `forensic/deleted/detector.py` L84 | WhatsApp hex ID gap detection produces invalid results | Return `None` for WhatsApp IDs; gap analysis valid for Telegram sequential integer IDs |
-| B8 | LOW | `forensic/whatsapp/message_parser.py` | Silent `sqlite3.Error` swallows parsing failures | Add logger output before returning empty list |
 
 ---
 
@@ -205,12 +165,9 @@ Constructs formal legal PDF documents using ReportLab `SimpleDocTemplate` target
 
 | File | Verification Item |
 |------|-------------------|
-| `forensic/whatsapp/contact_parser.py` | Schema-adaptive query returning `WhatsAppContact` dicts |
-| `forensic/whatsapp/group_parser.py` | Schema-adaptive query returning `WhatsAppGroup` dicts |
-| `forensic/telegram/detector.py` | Correctly identifies Telegram `cache4.db` tables |
-| `forensic/telegram/message_parser.py` | Parses Telegram messages and returns dicts matching `TelegramMessage` |
-| `forensic/timeline/builder.py` | Returns `normalized_timestamp` as Python `datetime` object |
-| `backend/services/log_service.py` | `log_analysis` with `evidence_id=None` does not violate FK constraint |
+| `backend/api/assistant.py` | Endpoints `/query` and `/sentiment` exist and process case messages |
+| `backend/services/assistant_service.py` | Performs sentiment classification (Aggressive, Suspicious, Deceptive, Urgent) and suspicion scoring |
+| `backend/services/report_service.py` | Verifies that AI copilot data is strictly excluded from ReportLab PDF rendering |
 
 ---
 
@@ -227,18 +184,20 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 
 ---
 
-## 12. Data Flow: In-Memory Evidence PDF Generation to Download
+## 12. Data Flow: Investigative AI Assistant vs. Court PDF Pipeline
 
 ```
-User triggers "Export Court-Ready PDF Report":
+Investigator Workflow:
   │
-  ├──► POST /api/cases/{id}/reports (with ReportConfig)
-  ├──► report_service.py -> ReportLab Engine compiles PDF into io.BytesIO() in-memory buffer
-  ├──► Compute SHA-256 hash signature of generated PDF bytes
-  ├──► Save metadata entry to DB `generated_reports` table & `activity_logs` Chain-of-Custody
-  └──► FastAPI returns StreamingResponse(io.BytesIO, media_type="application/pdf")
+  ├──► Uses AI Assistant Drawer (ForensicAssistantDrawer.jsx)
+  ├──► Sends Query / Triggers Chat Sentiment Analysis
+  ├──► assistant_service.py computes sentiment tones, intent markers, suspicion confidence
+  └──► UI displays copilot insights with badge: "Internal Investigative Aid Only — Excluded from Court Reports"
+
+Court Report Export Pipeline:
   │
-User Browser:
-  ├──► Receives binary stream with header `Content-Disposition: attachment; filename="..."`
-  └──► Browser triggers instant file download — zero PDF files written to project workspace directory
+  ├──► POST /api/cases/{id}/reports
+  ├──► report_service.py pulls ONLY deterministic evidence tables (Messages, EXIF, Hashes, Timeline, Deletions)
+  ├──► Strictly EXCLUDES AI copilot chat responses & sentiment ratings
+  └──► Streams signed, legally admissible court PDF to browser download
 ```

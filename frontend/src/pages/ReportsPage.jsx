@@ -43,25 +43,7 @@ const ReportsPage = () => {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto animate-in">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-forensic-500 mb-3">
-          <Link to="/cases" className="hover:text-accent-cyan flex items-center gap-1 transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            Cases
-          </Link>
-          <span className="text-forensic-700">/</span>
-          <Link to={`/cases/${caseId}`} className="hover:text-accent-cyan transition-colors">
-            {caseData?.name || 'Case'}
-          </Link>
-          <span className="text-forensic-700">/</span>
-          <span className="text-accent-cyan">Reports</span>
-        </div>
-        <h1 className="text-2xl font-bold text-forensic-50 mb-1">Forensic Reports</h1>
-        <p className="text-forensic-500">Generate PDF reports for: <span className="text-forensic-300">{caseData?.name}</span></p>
-      </div>
-
+    <div className="animate-in space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Report Generation Panel */}
         <div className="lg:col-span-1">

@@ -179,20 +179,13 @@ const CaseListPage = () => {
                     to={`/cases/${caseItem.id}`}
                     className="btn-secondary flex-1 text-center text-sm"
                   >
-                    View Details
-                  </Link>
-                  <Link
-                    to={`/cases/${caseItem.id}/dashboard`}
-                    className="btn-ghost p-2"
-                    title="Dashboard"
-                  >
-                    <Search className="h-4 w-4" />
+                    Open Case
                   </Link>
                   <button
                     onClick={() => handleDelete(caseItem)}
                     disabled={deleteLoading === caseItem.id}
                     className="btn-ghost p-2 text-accent-rose hover:bg-accent-rose/10"
-                    title="Delete"
+                    title="Delete Case"
                   >
                     {deleteLoading === caseItem.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

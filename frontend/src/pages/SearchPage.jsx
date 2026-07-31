@@ -43,36 +43,9 @@ const SearchPage = () => {
   }
 
   return (
-    <div className="p-6 animate-in max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-forensic-500 mb-3">
-          <Link to="/cases" className="hover:text-accent-cyan flex items-center gap-1 transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            Cases
-          </Link>
-          <span className="text-forensic-700">/</span>
-          <Link to={`/cases/${caseId}`} className="hover:text-accent-cyan transition-colors">
-            {caseData?.name || 'Case'}
-          </Link>
-          <span className="text-forensic-700">/</span>
-          <span className="text-accent-cyan">Search</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-accent-cyan/20">
-            <Search className="h-6 w-6 text-accent-cyan" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-forensic-50">Search Evidence</h1>
-            <p className="text-forensic-500">
-              Search messages, contacts, and media for case: <span className="text-forensic-300">{caseData?.name}</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="animate-in space-y-6">
       {/* Search Bar */}
-      <div className="mb-6">
+      <div>
         <SearchBar
           onSearch={handleSearch}
           onClear={clear}

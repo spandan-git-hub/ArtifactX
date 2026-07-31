@@ -105,10 +105,9 @@ const DashboardPage = () => {
               {overview.case_name}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className={`badge ${
-                overview.case_status === 'active' ? 'badge-emerald' :
-                overview.case_status === 'archived' ? 'badge-amber' : 'badge-gray'
-              }`}>
+              <span className={`badge ${overview.case_status === 'active' ? 'badge-emerald' :
+                  overview.case_status === 'archived' ? 'badge-amber' : 'badge-gray'
+                }`}>
                 {overview.case_status}
               </span>
               {overview.date_range_start && (
@@ -247,31 +246,6 @@ const DashboardPage = () => {
           </div>
         </div>
       )}
-
-      {/* Quick Links */}
-      <div className="flex flex-wrap gap-3">
-        <Link
-          to={`/cases/${caseId}`}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <Activity className="h-4 w-4" />
-          Full Timeline
-        </Link>
-        <Link
-          to={`/cases/${caseId}`}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <Hash className="h-4 w-4" />
-          Correlation Graph
-        </Link>
-        <Link
-          to={`/cases/${caseId}`}
-          className="btn-ghost flex items-center gap-2"
-        >
-          <Zap className="h-4 w-4" />
-          Case Details
-        </Link>
-      </div>
     </div>
   );
 };

@@ -46,9 +46,9 @@ server: {
 
 ### Current Issues & Overhaul Plan
 
-1. **Broken / Misleading Redirections:** Dashboard links (`?tab=timeline`, `?tab=correlation`) redirect out of place because `CaseDetailPage` does not handle tabs properly.
-2. **Redundant Header Navigation:** Header actions duplicate sidebar links.
-3. **Unfriendly UX:** Lack of a unified Forensic Workstation container. No interactive message viewer, timeline stream, or court report generator UI.
+1. **Eliminated Redundant & Senseless Buttons:** Removed all duplicate "Quick Actions" cards, misleading "Full Timeline" / "Correlation Graph" / "Case Details" buttons on dashboard, and confusing magnifying glass buttons next to case items in the case registry.
+2. **Unified Navigation:** All case navigation is cleanly handled by the context-aware sidebar and workstation tabs.
+3. **Forensic Workstation Container:** Case tools are consolidated under `CaseWorkspacePage.jsx`.
 
 ### Unified Workstation Route Map
 
@@ -57,16 +57,16 @@ All case operations are consolidated under a clean tab-aware or sub-route aware 
 | Route | Component | Purpose | Status |
 |-------|-----------|---------|--------|
 | `/` | `HomeScreen` | Landing, quick stats, demo workflow trigger | ✅ Working (needs DemoModal) |
-| `/cases` | `CaseListPage` | Case registry, intake, hash search | ✅ Working |
+| `/cases` | `CaseListPage` | Case registry, intake, hash search (clean Open Case & Delete actions) | 🔄 Overhauled |
 | `/cases/create` | `CaseForm` | Create case & record initial chain of custody | ✅ Working |
 | `/cases/:caseId` | `CaseWorkspacePage` | **Unified Workstation Container** with tab navigation | 🔄 Overhauled |
-| `/cases/:caseId/dashboard` | `DashboardPage` | Executive Overview, Message Volume & App Distribution Charts | 🔄 Overhauled |
+| `/cases/:caseId/dashboard` | `DashboardPage` | Executive Overview, Message Volume & App Distribution Charts (no redundant buttons) | 🔄 Overhauled |
 | `/cases/:caseId/evidence` | `EvidencePage` | Ingestion, artifact extraction, EXIF & hash inspector | 🔄 Overhauled |
-| `/cases/:caseId/chat` | `ChatViewerPage` | Interactive WA/TG chat message thread viewer with deletion tags | 🆕 New View |
+| `/cases/:caseId/chat` | `ChatViewerPage` | Interactive WA/TG chat message thread viewer with deletion tags & sentiment overlays | 🔄 Overhauled |
 | `/cases/:caseId/timeline` | `TimelinePage` | Reconstructed chronological event stream & density histogram | 🔄 Overhauled |
 | `/cases/:caseId/correlation` | `CorrelationPage` | Cross-platform entity resolution & time correlation matrix | 🔄 Overhauled |
 | `/cases/:caseId/deletions` | `DeletionsPage` | Sequence/time gap detector & confidence scoring breakdown | 🔄 Overhauled |
-| `/cases/:caseId/reports` | `ReportsPage` | Court-Ready PDF generator, in-app report history tracker, & direct download | 🔄 Overhauled |
+| `/cases/:caseId/reports` | `ReportsPage` | Court-Ready PDF generator, in-app report history tracker, & direct download (AI excluded) | 🔄 Overhauled |
 | `/cases/:caseId/logs` | `LogsPage` | Chain-of-custody audit log & system diagnostics | ✅ Working |
 
 ---
@@ -80,9 +80,9 @@ The Tailwind dark forensic workstation theme:
 - `accent-cyan` (`#06b6d4`) — primary CTA, active tabs, cryptographic hashes
 - `accent-emerald` (`#10b981`) — WhatsApp data, verified integrity (`VERIFIED_INTACT`)
 - `accent-blue` (`#3b82f6`) — Telegram data, general media
-- `accent-violet` (`#8b5cf6`) — Cross-platform correlations, entity links
-- `accent-rose` (`#f43f5e`) — Deleted messages, sequence gaps, tamper warnings (`HASH_MISMATCH`)
-- `accent-amber` (`#f59e0b`) — Warnings, unverified evidence, missing metadata
+- `accent-violet` (`#8b5cf6`) — Cross-platform correlations, entity links, AI Assistant badge
+- `accent-rose` (`#f43f5e`) — Deleted messages, sequence gaps, tamper warnings (`HASH_MISMATCH`), high suspicion score
+- `accent-amber` (`#f59e0b`) — Warnings, unverified evidence, aggressive/deceptive chat sentiment
 
 **Typography:**
 - `Inter` — body & UI elements
@@ -103,19 +103,10 @@ The Tailwind dark forensic workstation theme:
   - Deleted Messages (`/cases/:caseId/deletions`)
   - Court Reports (`/cases/:caseId/reports`)
   - Custody Logs (`/cases/:caseId/logs`)
-- When not in case context: show Case List link enabled, disabled placeholders for case tools.
 
 ### Header (`Header.jsx`)
 - Displays breadcrumbs, active case title, evidence verification status badge (`VERIFIED_INTACT`), and active investigator profile.
 - **Rule:** Do NOT put duplicate navigation links in header actions. Header actions are strictly for primary page triggers (e.g. "Export Report", "Re-Verify Hashes", "Ingest Evidence").
-
-### Guided Stepper Header (`ForensicWorkflowStepper.jsx`)
-- Rendered inside `CaseWorkspacePage.jsx`.
-- 4-stage progression indicator:
-  1. **Ingest & Hash** (Upload ZIP/DB, SHA-256 manifest)
-  2. **Extract & Parse** (WhatsApp `msgstore.db`, Telegram `cache4.db`, EXIF)
-  3. **Analyze & Correlate** (Timeline, Chat viewer, Correlations, Deletions)
-  4. **Court Export** (Generate Court-Ready PDF with Direct Streaming & In-App History Tracker)
 
 ---
 
@@ -127,12 +118,14 @@ The Tailwind dark forensic workstation theme:
 - Quick Stats cards showing total cases, analyzed messages, verified hash integrity rate.
 
 ### 6.2 `CaseListPage.jsx`
-- Case management table showing Case Name, Investigator, Created Date, Evidence Count, Cryptographic Hash Status, Actions (View, Delete).
+- Case management table showing Case Name, Investigator, Created Date, Evidence Count, Cryptographic Hash Status.
+- **Clean Action Bar:** Each case item card features a clean `Open Case` primary button and a `Delete Case` icon button — redundant magnifying glass icons and duplicate "View Details" links are removed.
 - Null-guard on `created_at` dates: `case.created_at ? new Date(case.created_at).toLocaleDateString() : '—'`.
 
 ### 6.3 `CaseWorkspacePage.jsx` (Container)
 - Master workstation wrapper for all case sub-views.
 - Top bar with `ForensicWorkflowStepper`.
+- Docked/Floating `ForensicAssistantDrawer.jsx` (AI Copilot chat + sentiment overlay trigger).
 - Tab bar for seamless switching between Dashboard, Evidence, Chat, Timeline, Correlations, Deletions, Court Reports, Logs without page reloads.
 
 ### 6.4 `DashboardPage.jsx`
@@ -141,6 +134,7 @@ The Tailwind dark forensic workstation theme:
   - `MessageDistributionChart` (Doughnut: WhatsApp vs Telegram split).
   - `MessageVolumeChart` (Line chart: Messages per day over time).
   - Recent Events Feed & Integrity Verification Status widget.
+  - **No Redundant Quick Links:** Removed misleading bottom buttons (`Full Timeline`, `Correlation Graph`, `Case Details`).
 
 ### 6.5 `EvidencePage.jsx`
 - Artifact Extraction & Metadata Analysis workstation:
@@ -149,97 +143,44 @@ The Tailwind dark forensic workstation theme:
   - EXIF metadata slide-out panel (`ExifMetadataDrawer.jsx`) showing camera model, timestamp, GPS coordinates on map.
   - SQLite table inspector for WhatsApp (`msgstore.db`) and Telegram (`cache4.db`).
 
-### 6.6 `ChatViewerPage.jsx` (NEW)
+### 6.6 `ChatViewerPage.jsx`
 - Interactive Chat Message Thread Viewer:
   - Left pane: Contact / Group list with app badges (WhatsApp green, Telegram blue) and message counts.
-  - Center pane: Interactive chat bubble stream:
-    - Sender name / JID / handle
-    - Message body text
-    - Formatted timestamp
-    - Attachment preview (images, audio, video) with EXIF inspection button
-    - **Deleted Message Badge:** `[DELETED MESSAGE DETECTED]` with sequence gap info
-  - Right pane: Selected message raw metadata & cryptographic signature.
+  - Center pane: Interactive chat bubble stream with deletion badges and optional sentiment overlays.
+  - Right pane: Selected message raw metadata, cryptographic signature, and investigator notes.
 
 ### 6.7 `TimelinePage.jsx`
-- Reconstructed Chronological Event Stream:
-  - Time density histogram chart (chart.js bar chart).
-  - Filter bar: Date Range picker, App Selector (All, WhatsApp, Telegram), Search Query, Event Type (Message, Call, Media, File Creation).
-  - Event Stream Cards with timestamp, app badge, sender/receiver, message excerpt, hash fingerprint.
+- Reconstructed Chronological Event Stream with time density histogram chart.
 
 ### 6.8 `CorrelationPage.jsx`
-- Cross-Platform Evidence Correlation Engine:
-  - Entity Resolution Table: Maps phone numbers, JIDs, and Telegram handles across platforms.
-  - Cross-App Message Threads: Correlates WhatsApp & Telegram messages exchanged between same entities within time windows.
-  - Time Window Matrix: Identifies simultaneous activity across multiple accounts.
+- Cross-Platform Evidence Correlation Engine.
 
 ### 6.9 `DeletionsPage.jsx`
-- Sequence & Time Gap Anomaly Detector:
-  - Summary stats: Total Deletions Detected, High Confidence Deletions, Missing Message Estimate.
-  - Deletion Gap List: Source App, Chat JID, Missing ID Range (e.g. MSG #102 to MSG #108), Estimated Time Gap, Confidence Score (e.g. 92%), Detection Method explanation.
-  - Forensic Impact Notes.
+- Sequence & Time Gap Anomaly Detector.
 
 ### 6.10 `ReportsPage.jsx` (Court-Ready Reports & In-App Report Tracker)
-- Professional Legal Report Generator & Tracker:
-  - Report Configuration: Select sections (Executive Summary, Chain of Custody, Hash Verification Manifest, Evidence Findings, Timeline, Deletions, Correlated Entities).
-  - Investigator Inputs: Lead Analyst Name, Agency/Dept, Case Notes, Sworn Integrity Declaration.
-  - Live PDF Previewer (`ReportPdfPreview.jsx`).
-  - **Direct Download Execution:** Calls API with `{ responseType: 'blob' }`, creating a temporary Blob URL in memory to trigger instant browser file download — **zero disk storage in the project workspace directory**.
-  - **In-App Report History Tracker Table:** Renders historical log of generated reports for the case (Report ID, Type, Lead Analyst, Generation Date, Verification SHA-256 Hash of report bytes, Download / Re-generate button).
+- Professional Legal Report Generator & Tracker with direct streaming downloads and database metadata tracking (AI copilot output strictly excluded).
 
 ### 6.11 `LogsPage.jsx`
-- Complete Chain of Custody Audit Log:
-  - Log entries for file upload, hash calculation, analysis execution, report generation, investigator access.
-  - Filterable by log severity (INFO, WARNING, ERROR).
+- Complete Chain of Custody Audit Log.
 
 ---
 
 ## 7. Services — `frontend/src/services/`
 
-All API requests proxy through `/api` (Vite proxy to `http://localhost:8080`).
-
-- `caseService.js` — Case CRUD operations.
-- `evidenceService.js` — File upload, extracted file list, hash verification, EXIF inspection.
-- `chatService.js` — WhatsApp/Telegram message threads, chat list, message details.
-- `timelineService.js` — Timeline event stream, time histogram data, export.
-- `correlationService.js` — Entity correlation triggers, entity mapping list.
-- `deletedService.js` — Deletion detection trigger, deletion gap records.
-- `reportService.js` — Summary stats (GET requests), PDF streaming download handler (`responseType: 'blob'`), report history tracker fetching (`GET /api/cases/{id}/reports/history`).
-- `demoService.js` — Demo case creation with full config (`has_whatsapp`, `has_telegram`, `message_count`).
+- `caseService.js`, `evidenceService.js`, `chatService.js`, `timelineService.js`, `correlationService.js`, `deletedService.js`, `reportService.js`, `assistantService.js`, `demoService.js`.
 
 ---
 
 ## 8. Essential Components
 
-### 8.1 `DemoModal.jsx` (`components/demo/DemoModal.jsx`)
-- Props: `{ isOpen, onClose }`
-- State: Config form inputs -> 9-step progress bar -> Done / Nav to Case Workspace -> Error display.
-
-### 8.2 `MessageVolumeChart.jsx` & `MessageDistributionChart.jsx`
-- Built using `react-chartjs-2`.
-- Dark theme styled with grid colors `#1f2937` and custom tooltips.
-
-### 8.3 `EvidenceHashBadge.jsx` (`components/evidence/EvidenceHashBadge.jsx`)
-- Renders SHA-256 hash in JetBrains Mono cyan text.
-- Click to copy hash with toast notification.
-- Displays integrity state: `VERIFIED` (emerald), `UNVERIFIED` (amber), `TAMPERED` (rose).
-
-### 8.4 `ExifMetadataDrawer.jsx` (`components/evidence/ExifMetadataDrawer.jsx`)
-- Slide-out drawer displaying image preview, camera make/model, ISO, aperture, software, creation date, GPS coordinates with OpenStreetMap link.
-
-### 8.5 `ReportPdfPreview.jsx` (`components/reports/ReportPdfPreview.jsx`)
-- Render court report layout preview showing official cover header, custody log table, evidence hash table, and sworn analyst signature block.
+- `DemoModal.jsx`, `MessageVolumeChart.jsx`, `MessageDistributionChart.jsx`, `EvidenceHashBadge.jsx`, `ExifMetadataDrawer.jsx`, `ForensicAssistantDrawer.jsx`, `ReportPdfPreview.jsx`.
 
 ---
 
 ## 9. Custom Hooks — `frontend/src/hooks/`
 
-- `useCases.js` — Case list, active case state, creation, deletion.
-- `useDashboard.js` — Wraps `loadOverview` in `useCallback` to prevent infinite re-render loops.
-- `useChat.js` — Active chat selection, message pagination, search within thread.
-- `useTimeline.js` — Timeline event fetching, filtering, date bounds.
-- `useCorrelation.js` — Correlation matrix state & entity matching actions.
-- `useDeletions.js` — Deletion detection execution & gap list state.
-- `useReports.js` — PDF generation streaming download status, Blob handler, & in-app report history tracker state.
+- `useCases.js`, `useDashboard.js`, `useChat.js`, `useTimeline.js`, `useCorrelation.js`, `useDeletions.js`, `useReports.js`, `useAiAssistant.js`.
 
 ---
 
@@ -247,18 +188,12 @@ All API requests proxy through `/api` (Vite proxy to `http://localhost:8080`).
 
 | ID | Severity | File | Description | Required Fix |
 |----|----------|------|-------------|--------------|
-| F1 | HIGH | `components/layout/index.jsx` | Sidebar nav is static — disabled links regardless of route | Make `navItems` dynamic using `useLocation()` and active `caseId` |
-| F2 | HIGH | `pages/CaseDetailPage.jsx` | Duplicate navigation in header actions | Remove `actions` prop from `<Header>` |
-| F3 | HIGH | `App.jsx` | Demo creation has no UX — silent API call + sudden redirect | Build and integrate `DemoModal.jsx` |
-| F4 | MEDIUM | `pages/DashboardPage.jsx` | Quick links `?tab=timeline` redirect out of place | Update routes to `/cases/${caseId}/timeline` & `/cases/${caseId}/correlation` |
-| F5 | MEDIUM | `hooks/useDashboard.js` | `loadOverview` missing `useCallback` causing infinite render loop | Wrap in `useCallback(async (id) => {...}, [])` |
-| F6 | LOW | `pages/CaseListPage.jsx` | Date formatting crashes if `created_at` is null | Add null guard check before `toLocaleDateString()` |
-| F7 | MISSING | `components/demo/DemoModal.jsx` | Demo modal component missing | Build per Section 8.1 spec |
-| F8 | MISSING | `components/dashboard/MessageVolumeChart.jsx` | Chart component missing | Build using chart.js |
-| F9 | MISSING | `components/dashboard/MessageDistributionChart.jsx` | Chart component missing | Build using chart.js |
-| F10 | MISSING | `pages/ChatViewerPage.jsx` | Chat message thread viewer missing | Build interactive chat viewer per Section 6.6 |
-| F11 | MISSING | `components/evidence/ExifMetadataDrawer.jsx` | EXIF metadata slide-out panel missing | Build EXIF inspector drawer |
-| F12 | MISSING | `components/reports/ReportPdfPreview.jsx` | Court report preview component missing | Build court report previewer |
+| F1 | HIGH | `components/layout/index.jsx` | Sidebar nav static — disabled links | Make `navItems` dynamic using `useLocation()` and active `caseId` |
+| F2 | HIGH | `pages/CaseDetailPage.jsx` | Duplicate navigation & Quick Actions card | Removed duplicate header actions & removed bottom Quick Actions card |
+| F3 | HIGH | `App.jsx` | Demo creation missing UX | Integrate `DemoModal.jsx` |
+| F4 | MEDIUM | `pages/DashboardPage.jsx` | Redundant Quick Links buttons at bottom | Removed bottom Quick Links section |
+| F5 | MEDIUM | `hooks/useDashboard.js` | `loadOverview` missing `useCallback` | Wrap in `useCallback` |
+| F6 | LOW | `pages/CaseListPage.jsx` | Confusing magnifying glass button & date formatting | Cleaned up card actions to `Open Case` & `Delete Case` |
 
 ---
 
@@ -266,12 +201,9 @@ All API requests proxy through `/api` (Vite proxy to `http://localhost:8080`).
 
 | File | Verification Criteria |
 |------|-----------------------|
-| `frontend/vite.config.js` | API proxy configured for `/api` targetting `http://localhost:8080` |
-| `frontend/src/services/reportService.js` | Summary endpoints use `axios.get`; PDF export uses `responseType: 'blob'` for direct download |
-| `frontend/src/components/evidence/EvidenceUploader.jsx` | Multi-file drag & drop, upload progress bar, SHA-256 display |
-| `frontend/src/components/whatsapp/WhatsAppAnalysis.jsx` | Renders message threads, contacts, group tables |
-| `frontend/src/components/telegram/TelegramAnalysis.jsx` | Renders Telegram messages, contacts, dialogs |
-| `frontend/src/pages/ReportsPage.jsx` | Court report inputs, PDF section toggles, in-app report tracker, streaming download handler |
+| `frontend/src/pages/CaseListPage.jsx` | Confusing magnifying glass button removed; clean Open Case & Delete actions |
+| `frontend/src/pages/CaseDetailPage.jsx` | Redundant Quick Actions card removed |
+| `frontend/src/pages/DashboardPage.jsx` | Redundant Quick Links buttons removed |
 
 ---
 

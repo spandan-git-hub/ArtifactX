@@ -96,13 +96,15 @@
 Revamp the UI into a high-density, professional Forensic Workstation (`ForensicStudio`) and eliminate all redundant links, broken buttons, and senseless redirects.
 
 ### Backend
-- [ ] **B17** Add `CaseWorkspace` API summary endpoint (`GET /api/cases/{id}/workspace`) returning unified state (case details, active evidence list, hash integrity score, analysis stage).
+- [x] **B17** Add `CaseWorkspace` API summary endpoint (`GET /api/cases/{id}/workspace`) returning unified state (case details, active evidence list, hash integrity score, analysis stage).
 
 ### Frontend
-- [ ] **F14** Create `CaseWorkspacePage.jsx` container to wrap case tools with unified sub-route / tab navigation (`/cases/:caseId/*`).
-- [ ] **F15** Create `ForensicWorkflowStepper.jsx` header showing progress through the 4 forensic stages (Ingest & Hash -> Extract & Parse -> Analyze & Correlate -> Court Export).
-- [ ] **F16** Remove duplicate action buttons across all page headers that replicate sidebar navigation.
-- [ ] **F17** Clean up all quick-action buttons on `DashboardPage.jsx` and `CaseDetailPage.jsx` to navigate cleanly to sub-routes without dummy query params.
+- [x] **F14** Create `CaseWorkspacePage.jsx` container to wrap case tools with unified sub-route / tab navigation (`/cases/:caseId/*`).
+- [x] **F15** Create `ForensicWorkflowStepper.jsx` header showing progress through the 4 forensic stages (Ingest & Hash -> Extract & Parse -> Analyze & Correlate -> Court Export).
+- [x] **F16** Remove duplicate action buttons across all page headers that replicate sidebar navigation.
+- [x] **F17** Clean up all quick-action buttons on `DashboardPage.jsx` and `CaseDetailPage.jsx` to navigate cleanly to sub-routes without dummy query params.
+- [x] **F18** Remove redundant "Quick Actions" card from `CaseDetailPage.jsx` and redundant "Quick Links" from `DashboardPage.jsx`.
+- [x] **F19** Simplify `CaseListPage.jsx` row actions to clean `Open Case` and `Delete Case` buttons, removing the confusing magnifying glass icon button.
 
 ---
 
@@ -116,8 +118,8 @@ Ensure full evidence integrity, multi-hash calculation (SHA-256, MD5, SHA-1), an
 - [ ] **B20** Implement Chain-of-Custody logging service (`log_activity`) recording evidence ingest, hash verification, analysis runs, and report exports in `activity_logs`.
 
 ### Frontend
-- [ ] **F18** Create `EvidenceHashBadge.jsx` displaying SHA-256 hash in JetBrains Mono cyan text with click-to-copy and verification status badge (`VERIFIED_INTACT` / `HASH_MISMATCH`).
-- [ ] **F19** Add "Verify Evidence Hashes" button on evidence views triggering real-time re-hashing and displaying an integrity manifest modal.
+- [ ] **F20** Create `EvidenceHashBadge.jsx` displaying SHA-256 hash in JetBrains Mono cyan text with click-to-copy and verification status badge (`VERIFIED_INTACT` / `HASH_MISMATCH`).
+- [ ] **F21** Add "Verify Evidence Hashes" button on evidence views triggering real-time re-hashing and displaying an integrity manifest modal.
 
 ---
 
@@ -130,8 +132,8 @@ Provide rich inspection of extracted mobile app databases, media attachments, an
 - [ ] **B22** Implement raw SQLite table inspector endpoint (`GET /api/evidence/{id}/sqlite-inspect`) to allow direct inspection of extracted `msgstore.db` and `cache4.db` table structures.
 
 ### Frontend
-- [ ] **F20** Overhaul `EvidencePage.jsx` with tree/table view, file size, MIME type, SHA-256 hash badges, and raw SQLite inspector modal.
-- [ ] **F21** Create `ExifMetadataDrawer.jsx` slide-out drawer rendering image previews, camera make/model, ISO, capture timestamp, and GPS coordinates with map link.
+- [ ] **F22** Overhaul `EvidencePage.jsx` with tree/table view, file size, MIME type, SHA-256 hash badges, and raw SQLite inspector modal.
+- [ ] **F23** Create `ExifMetadataDrawer.jsx` slide-out drawer rendering image previews, camera make/model, ISO, capture timestamp, and GPS coordinates with map link.
 
 ---
 
@@ -143,9 +145,9 @@ Replace static data tables with an interactive, rich chat view for extracted Wha
 - [ ] **B23** Create `Chat` API endpoints (`GET /api/cases/{id}/chats` and `GET /api/cases/{id}/chats/{jid}/messages`) returning thread message lists with inline deletion flags and media info.
 
 ### Frontend
-- [ ] **F22** Create `ChatViewerPage.jsx` (`/cases/:caseId/chat`):
+- [ ] **F24** Create `ChatViewerPage.jsx` (`/cases/:caseId/chat`):
   - Left pane: Contact / Group thread list with green (WA) / blue (TG) app badges and message counts.
-  - Center pane: Interactive chat message bubble stream displaying sender name, JID, timestamp, body text, attachment previews, and EXIF trigger.
+  - Center pane: Interactive chat bubble stream displaying sender name, JID, timestamp, body text, attachment previews, and EXIF trigger.
   - Center pane: Render prominent red/amber deletion warning badges (`[DELETED MESSAGE DETECTED]`) on detected message sequence/time gaps.
   - Right pane: Selected message raw metadata & cryptographic signature drawer.
 
@@ -159,7 +161,7 @@ Provide a filterable multi-app event stream with visualization.
 - [ ] **B24** Optimize `timeline_service.py` and `TimelineBuilder` to support time-range filtering, app filtering, and density aggregation (`GET /api/timeline/cases/{id}/histogram`).
 
 ### Frontend
-- [ ] **F23** Overhaul `TimelinePage.jsx` (`/cases/:caseId/timeline`):
+- [ ] **F25** Overhaul `TimelinePage.jsx` (`/cases/:caseId/timeline`):
   - Chart.js time-density histogram showing message/event volume over time.
   - Filter toolbar: Date Range picker, Source App selector, Event Type filter, Search query.
   - High-density chronological event stream with timestamps, app badges, entity JIDs, and hash fingerprints.
@@ -174,7 +176,7 @@ Map cross-platform identity resolution and message correlations.
 - [ ] **B25** Enhance `correlation_service.py` to perform phone number normalization (E.164), handle matching, and cross-app message time-window correlation.
 
 ### Frontend
-- [ ] **F24** Overhaul `CorrelationPage.jsx` (`/cases/:caseId/correlation`):
+- [ ] **F26** Overhaul `CorrelationPage.jsx` (`/cases/:caseId/correlation`):
   - Entity Resolution Table: Maps WhatsApp JIDs to Telegram handles and phone numbers.
   - Cross-App Message Thread Matrix: Displays correlated message exchanges across platforms within time windows.
 
@@ -187,10 +189,10 @@ Overhaul the PDF generator into a zero-workspace storage engine that streams PDF
 ### Backend
 - [ ] **B26** Update `report_service.py` and `reports.py` to generate court PDFs into an in-memory `io.BytesIO()` buffer and return `StreamingResponse` for direct download — **zero PDF files written to project workspace directory**.
 - [ ] **B27** Create `GeneratedReport` model and `GET /api/cases/{id}/reports/history` endpoint to track generated report metadata (Report ID, Case ID, Report Type, Lead Analyst, Timestamp, Verification SHA-256 Hash of PDF bytes, Total Pages, Size Bytes) in the database.
-- [ ] **B28** Overhaul ReportLab PDF layout (Cover Page, Custody Log, Evidence Hashes, Timeline, Deletions, Correlated Entities, Sworn Analyst Sign-off Block).
+- [ ] **B28** Overhaul ReportLab PDF layout (Cover Page, Custody Log, Evidence Hashes, Timeline, Deletions, Correlated Entities, Sworn Analyst Sign-off Block). **Strictly exclude AI Assistant responses and sentiment scores**.
 
 ### Frontend
-- [ ] **F25** Overhaul `ReportsPage.jsx` (`/cases/:caseId/reports`):
+- [ ] **F27** Overhaul `ReportsPage.jsx` (`/cases/:caseId/reports`):
   - Report configuration section toggles.
   - Lead Analyst name, agency, and case notes input fields.
   - Sworn integrity declaration checkbox.
@@ -204,6 +206,26 @@ Overhaul the PDF generator into a zero-workspace storage engine that streams PDF
 
 - [ ] **T11** Verify zero broken buttons or non-functional routes across all sub-views.
 - [ ] **T12** Execute full evidence ingestion, hash verification, EXIF inspection, chat thread viewing, deletion badge checking, timeline filtering, correlation building, and streaming court-ready PDF generation (confirming zero `.pdf` files written to workspace) end-to-end.
+
+---
+
+## Phase 15 — AI Forensic Assistant & Chat Sentiment Analyzer (FINAL PHASE)
+
+*Note: This phase will be executed as the very last addition after the entire application and core workstation are fully built.*
+
+### Backend
+- [ ] **B29** Create `assistant.py` router and `assistant_service.py`:
+  - `POST /api/cases/{id}/assistant/query`: Processes investigator natural language questions over case messages and evidence metadata.
+  - `POST /api/cases/{id}/assistant/sentiment`: Executes chat sentiment classification (Aggressive, Suspicious, Deceptive, Urgent, Evasive, Neutral), intention marker detection (financial demand, coercion, deletion awareness), and suspicion confidence scoring (0-100%).
+- [ ] **B30** Enforce Court Report Exclusion: Ensure `report_service.py` completely ignores `assistant.py` datasets to preserve judicial admissibility of court reports.
+
+### Frontend
+- [ ] **F28** Create `ForensicAssistantDrawer.jsx` (`components/assistant/ForensicAssistantDrawer.jsx`):
+  - Slide-out copilot chat UI for investigator prompts and assistance.
+  - Sentiment & Intention Breakdown widget.
+  - Visual disclaimer badge: *"Internal Investigative Aid Only — Excluded from Legal Court Reports"*.
+- [ ] **F29** Add optional Sentiment Overlay toggle in `ChatViewerPage.jsx` to display emotional tone badges and suspicion confidence indicators directly on chat messages.
+- [ ] **F30** Create `useAiAssistant.js` hook to handle copilot queries, sentiment requests, and confidence score states.
 
 ---
 
