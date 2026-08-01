@@ -50,39 +50,27 @@ const CorrelationPage = () => {
     if (!caseId) return;
     try {
       setLoading(true);
-      const [edgesData, entitiesData, matrixData, evidencesData] = await Promise.all([
+      const [edgesData, entitiesData, matrixData, statusData] = await Promise.all([
         correlationService.getCorrelationEdges(caseId).catch(() => []),
         correlationService.getEntityResolutions(caseId).catch(() => []),
         correlationService.getMessageMatrix(caseId, windowSeconds).catch(() => []),
-        getEvidences(caseId).catch(() => []),
+        correlationService.getCorrelationStatus(caseId).catch(() => ({ has_whatsapp: false, has_telegram: false, evidence_count: 0 })),
       ]);
       setEdges(edgesData || []);
       setEntities(entitiesData || []);
       setMatrix(matrixData || []);
 
-      const list = evidencesData || [];
-      setEvidenceCount(list.length);
-
-      const containsWa = list.some((e) => {
-        const meta = e.metadata_ || {};
-        const fn = (e.original_filename || '').toLowerCase();
-        return meta.app === 'whatsapp' || fn.includes('whatsapp') || fn.includes('wa') || e.evidence_type === 'demo';
-      });
-
-      const containsTg = list.some((e) => {
-        const meta = e.metadata_ || {};
-        const fn = (e.original_filename || '').toLowerCase();
-        return meta.app === 'telegram' || fn.includes('telegram') || fn.includes('tg') || e.evidence_type === 'demo';
-      });
-
-      setHasWa(containsWa);
-      setHasTg(containsTg);
+      const status = statusData || {};
+      setEvidenceCount(status.evidence_count || 0);
+      setHasWa(Boolean(status.has_whatsapp));
+      setHasTg(Boolean(status.has_telegram));
     } catch (err) {
       console.error('Failed to load correlation data:', err);
     } finally {
       setLoading(false);
     }
   }, [caseId, windowSeconds]);
+
 
   useEffect(() => {
     loadCorrelationData();
@@ -322,17 +310,19 @@ const CorrelationPage = () => {
               <div>
                 <h4 className="text-sm font-bold font-mono text-forensic-100 mb-1">
                   {evidenceCount === 0
-                    ? 'No Evidence Files Uploaded for this Case'
+                    ? 'No Evidence Files Ingested'
                     : (!hasWa || !hasTg)
-                    ? `Cross-Platform Correlation Not Possible — Both WhatsApp & Telegram Files Required`
-                    : `Both WhatsApp & Telegram Evidence Ingested (${evidenceCount} files) — Analysis Required`}
+                    ? 'Cross-Platform Correlation Not Possible'
+                    : `Both WhatsApp & Telegram Evidence Present — Analysis Required`}
                 </h4>
                 <p className="text-xs text-forensic-400">
                   {evidenceCount === 0
-                    ? 'This case currently has no ingested evidence files. Upload WhatsApp and Telegram files under Evidence & Artifacts, or create a Demo Case from the home screen.'
+                    ? 'No evidence files have been uploaded for this case. Upload WhatsApp and Telegram evidence under Evidence & Artifacts, or create a Demo Case from the home screen.'
                     : (!hasWa || !hasTg)
-                    ? `Cross-platform identity resolution and message exchange matching requires evidence files from BOTH platforms. Currently, ${hasWa ? 'only WhatsApp' : 'only Telegram'} evidence is present. Upload the missing platform file under Evidence & Artifacts.`
-                    : 'Evidence files from both platforms are ingested. Click the "Run Correlation Engine" button above to run cross-platform identity resolution and message matrix correlation.'}
+                    ? `Cross-platform identity resolution and message matrix matching requires evidence files from BOTH WhatsApp and Telegram. Currently, ${
+                        hasWa ? 'only WhatsApp' : 'only Telegram'
+                      } evidence is present. Please upload ${hasWa ? 'Telegram' : 'WhatsApp'} evidence under Evidence & Artifacts.`
+                    : 'Evidence files from both platforms are ingested. Click "Run Correlation Engine" in the header above to perform the analysis before expecting correlation results.'}
                 </p>
               </div>
             </div>
@@ -347,6 +337,7 @@ const CorrelationPage = () => {
             ) : null}
           </div>
         )}
+
 
 
 

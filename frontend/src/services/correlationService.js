@@ -28,6 +28,14 @@ export const correlationService = {
     );
     return response.data;
   },
+
+  // Get accurate evidence platform status for a case (has_whatsapp, has_telegram, evidence_count)
+  getCorrelationStatus: async (caseId) => {
+    const response = await axios.get(`${API_BASE}/cases/${caseId}/correlation/status`);
+    return response.data;
+  },
 };
+
+
 
 export default correlationService;

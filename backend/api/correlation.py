@@ -86,3 +86,20 @@ def get_message_matrix(
         )
 
     return correlation_service.get_cross_app_message_matrix(db, case_id, window_seconds)
+
+
+@router.get("/cases/{case_id}/correlation/status", response_model=dict)
+def get_correlation_status(
+    case_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get accurate platform evidence presence status (has_whatsapp, has_telegram, evidence_count) for a case."""
+    from backend.models.models import Case
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+
+    return correlation_service.check_case_evidence_platforms(db, case_id)

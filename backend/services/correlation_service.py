@@ -313,9 +313,54 @@ class CorrelationService:
         matrix.sort(key=lambda x: (x["time_delta_seconds"], -x["confidence_score"]))
         return matrix
 
+    def check_case_evidence_platforms(self, db: Session, case_id: int) -> dict:
+        """Accurately inspect evidence records, files, and parsed tables to determine WhatsApp and Telegram presence."""
+        from backend.models.models import Evidence, EvidenceFile, WhatsAppMessage, WhatsAppContact, TelegramMessage, TelegramContact
+
+        evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+        if not evidences:
+            return {"has_whatsapp": False, "has_telegram": False, "evidence_count": 0}
+
+        ev_ids = [e.id for e in evidences]
+
+        # 1. Check parsed database records
+        wa_msgs = db.query(WhatsAppMessage.id).filter(WhatsAppMessage.evidence_id.in_(ev_ids)).first()
+        wa_cnts = db.query(WhatsAppContact.id).filter(WhatsAppContact.evidence_id.in_(ev_ids)).first()
+        tg_msgs = db.query(TelegramMessage.id).filter(TelegramMessage.evidence_id.in_(ev_ids)).first()
+        tg_cnts = db.query(TelegramContact.id).filter(TelegramContact.evidence_id.in_(ev_ids)).first()
+
+        has_whatsapp = bool(wa_msgs or wa_cnts)
+        has_telegram = bool(tg_msgs or tg_cnts)
+
+        # 2. Check metadata, filenames, paths, and extracted files
+        for e in evidences:
+            app = ((e.metadata_ or {}).get("app") or "").lower()
+            fn = (e.original_filename or "").lower()
+            sp = (e.storage_path or "").lower()
+
+            if app == "whatsapp" or "whatsapp" in fn or "wa_demo" in sp or "msgstore" in fn or "wa.db" in sp:
+                has_whatsapp = True
+            if app == "telegram" or "telegram" in fn or "tg_demo" in sp or "cache4" in fn or "tg.db" in sp or "userconf" in fn:
+                has_telegram = True
+
+            files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == e.id).all()
+            for f in files:
+                rp = (f.file_path or "").lower()
+                if "msgstore" in rp or "wa.db" in rp or "whatsapp" in rp:
+                    has_whatsapp = True
+                if "cache4" in rp or "tg.db" in rp or "telegram" in rp or "userconf" in rp:
+                    has_telegram = True
+
+        return {
+            "has_whatsapp": has_whatsapp,
+            "has_telegram": has_telegram,
+            "evidence_count": len(evidences),
+        }
+
 
 # Singleton instance
 correlation_service = CorrelationService()
+
 
 # Singleton instance
 correlation_service = CorrelationService()
