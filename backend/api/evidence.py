@@ -396,6 +396,16 @@ def upload_evidence(
         db.refresh(evidence)
         logger.info("Evidence upload committed evidence_id=%s", evidence.id)
 
+        # Auto-trigger forensic parsers on uploaded evidence
+        try:
+            from backend.services.whatsapp_service import WhatsAppService
+            from backend.services.telegram_service import TelegramService
+            WhatsAppService().analyze_evidence_sync(evidence.id, db)
+            TelegramService().analyze_evidence_sync(evidence.id, db)
+        except Exception as exc:
+            logger.warning("Auto-analysis on upload encountered non-fatal error: %s", exc)
+
+
         return {
             "id": evidence.id,
             "filename": evidence.original_filename,

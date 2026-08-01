@@ -174,12 +174,13 @@ Provide a filterable multi-app event stream with visualization.
 Map cross-platform identity resolution and message correlations.
 
 ### Backend
-- [ ] **B25** Enhance `correlation_service.py` to perform phone number normalization (E.164), handle matching, and cross-app message time-window correlation.
+- [x] **B25** Enhance `correlation_service.py` to perform phone number normalization (E.164), handle matching, and cross-app message time-window correlation.
 
 ### Frontend
-- [ ] **F26** Overhaul `CorrelationPage.jsx` (`/cases/:caseId/correlation`):
+- [x] **F26** Overhaul `CorrelationPage.jsx` (`/cases/:caseId/correlation`):
   - Entity Resolution Table: Maps WhatsApp JIDs to Telegram handles and phone numbers.
   - Cross-App Message Thread Matrix: Displays correlated message exchanges across platforms within time windows.
+
 
 ---
 

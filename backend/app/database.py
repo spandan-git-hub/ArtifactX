@@ -14,16 +14,19 @@ engine_kwargs = {
     "pool_pre_ping": True,  # Verify connections before use
     "pool_recycle": 300,    # Recycle connections every 5 mins to prevent EOF/SSL drops
     "echo": settings.debug,
+    "use_native_hstore": False,
 }
 
 if settings.database_url.startswith("postgresql"):
     engine_kwargs["connect_args"] = {
+        "sslmode": "require",
         "connect_timeout": 10,
         "keepalives": 1,
         "keepalives_idle": 30,
         "keepalives_interval": 10,
         "keepalives_count": 5,
     }
+
 
 engine = create_engine(settings.database_url, **engine_kwargs)
 

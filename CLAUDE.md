@@ -99,5 +99,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 
 # Frontend (new terminal)
 cd D:\ArtifactX\frontend
-npm install && npm run dev
+npm install
+npm run dev
 ```

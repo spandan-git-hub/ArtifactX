@@ -27,9 +27,72 @@ class WhatsAppService:
     def __init__(self):
         self.repository = WhatsAppRepository()
 
+    def analyze_evidence_sync(self, evidence_id: int, db: Session) -> bool:
+        """Synchronously trigger WhatsApp analysis on evidence."""
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            return False
+
+        log_service = get_log_service(db)
+        log_service.log_analysis(
+            evidence_id=evidence_id,
+            log_type="whatsapp_analysis_start",
+            message="Starting WhatsApp analysis",
+            details={"evidence_id": evidence_id}
+        )
+
+        try:
+            db_path = None
+            if not evidence.extracted_path:
+                db_path = Path(evidence.storage_path)
+            else:
+                extracted_dir = Path(evidence.extracted_path)
+                if extracted_dir.exists():
+                    for db_file in extracted_dir.rglob("*.db"):
+                        if is_whatsapp_database(db_file):
+                            db_path = db_file
+                            break
+                    if not db_path:
+                        db_files = list(extracted_dir.rglob("*.db"))
+                        if db_files:
+                            db_path = db_files[0]
+
+            if not db_path or not db_path.exists() or not is_whatsapp_database(db_path):
+                log_service.log_analysis(
+                    evidence_id=evidence_id,
+                    log_type="whatsapp_analysis_failed",
+                    message="WhatsApp analysis failed: No valid WhatsApp database file found",
+                    details={"evidence_id": evidence_id}
+                )
+                return False
+
+            self._perform_analysis(evidence_id, db_path, evidence, db)
+            evidence.analyzed_at = datetime.utcnow()
+            db.commit()
+
+            log_service.log_analysis(
+                evidence_id=evidence_id,
+                log_type="whatsapp_analysis_completed",
+                message="WhatsApp analysis completed successfully",
+                details={"evidence_id": evidence_id}
+            )
+            return True
+        except Exception as e:
+            log_service.log_error(
+                error_type="whatsapp_analysis_error",
+                message=f"Error during WhatsApp analysis: {str(e)}",
+                case_id=evidence.case_id if evidence else None,
+                evidence_id=evidence_id,
+                stack_trace=traceback.format_exc(),
+                endpoint="/api/evidence/{evidence_id}/analyze/whatsapp",
+                method="POST"
+            )
+            return False
+
     async def analyze_evidence(self, evidence_id: int, db: Session) -> bool:
         """
         Trigger WhatsApp analysis on evidence.
+
 
         Args:
             evidence_id: ID of evidence to analyze

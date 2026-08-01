@@ -218,46 +218,187 @@ def correlate_message_to_media_telegram(
     return edges
 
 
+def normalize_phone_number(raw_phone: str) -> str:
+    """Normalize raw phone strings or JIDs into standard E.164 format (+1234567890)."""
+    if not raw_phone:
+        return ""
+    clean = str(raw_phone).split("@")[0].split(":")[0].strip()
+    digits = "".join(ch for ch in clean if ch.isdigit())
+    if not digits:
+        return ""
+    if str(raw_phone).strip().startswith("+"):
+        return f"+{digits}"
+    if len(digits) == 10:
+        return f"+1{digits}"
+    return f"+{digits}"
+
+
 def correlate_cross_app_contact(
     wa_contacts: List[WhatsAppContact],
     tg_contacts: List[TelegramContact],
 ) -> List[Dict[str, Any]]:
-    """Correlate contacts across WhatsApp and Telegram based on phone number.
+    """Correlate contacts across WhatsApp and Telegram based on phone number, handle, and display name.
 
     Returns a list of correlation edges.
     """
     edges = []
-    # Build lookup for WhatsApp contacts by phone number
-    wa_phone_lookup = {}
-    for contact in wa_contacts:
-        # Normalize phone number: remove non-digits
-        phone = "".join(filter(str.isdigit, str(contact.phone_number or "")))
-        if phone:
-            wa_phone_lookup.setdefault(phone, []).append(contact)
+    seen_pairs = set()
 
-    # Build lookup for Telegram contacts by phone number
-    tg_phone_lookup = {}
-    for contact in tg_contacts:
-        phone = "".join(filter(str.isdigit, str(contact.phone or "")))
+    # 1. Match by normalized E.164 phone number (Confidence 1.0)
+    wa_by_phone = {}
+    for wa in wa_contacts:
+        phone = normalize_phone_number(wa.phone_number or wa.jid)
         if phone:
-            tg_phone_lookup.setdefault(phone, []).append(contact)
+            wa_by_phone.setdefault(phone, []).append(wa)
 
-    # For each phone number that appears in both, create edges
-    for phone in set(wa_phone_lookup.keys()) & set(tg_phone_lookup.keys()):
-        for wa_contact in wa_phone_lookup[phone]:
-            for tg_contact in tg_phone_lookup[phone]:
+    tg_by_phone = {}
+    for tg in tg_contacts:
+        phone = normalize_phone_number(tg.phone)
+        if phone:
+            tg_by_phone.setdefault(phone, []).append(tg)
+
+    common_phones = set(wa_by_phone.keys()) & set(tg_by_phone.keys())
+    for phone in common_phones:
+        for wa in wa_by_phone[phone]:
+            for tg in tg_by_phone[phone]:
+                pair_key = (wa.jid, str(tg.user_id))
+                if pair_key not in seen_pairs:
+                    seen_pairs.add(pair_key)
+                    edges.append({
+                        "source_type": "wa_contact",
+                        "source_id": wa.jid,
+                        "target_type": "tg_contact",
+                        "target_id": str(tg.user_id),
+                        "relation_type": "matches_contact",
+                        "metadata": {
+                            "phone_number": phone,
+                            "confidence_score": 1.0,
+                            "match_reason": "Exact E.164 Phone Match",
+                            "wa_name": wa.display_name or wa.jid,
+                            "tg_name": f"{tg.first_name or ''} {tg.last_name or ''}".strip() or tg.username or str(tg.user_id),
+                            "tg_username": tg.username,
+                            "evidence_id": wa.evidence_id,
+                        }
+                    })
+
+    # 2. Match by Username / Handle similarity (Confidence 0.85)
+    for wa in wa_contacts:
+        wa_name_clean = (wa.display_name or "").strip().lower()
+        for tg in tg_contacts:
+            pair_key = (wa.jid, str(tg.user_id))
+            if pair_key in seen_pairs:
+                continue
+            tg_username = (tg.username or "").strip().lower()
+            if tg_username and (tg_username == wa_name_clean or tg_username in wa.jid.lower()):
+                seen_pairs.add(pair_key)
+                phone = normalize_phone_number(wa.phone_number or tg.phone or wa.jid)
                 edges.append({
                     "source_type": "wa_contact",
-                    "source_id": wa_contact.jid,
+                    "source_id": wa.jid,
                     "target_type": "tg_contact",
-                    "target_id": str(tg_contact.user_id),
+                    "target_id": str(tg.user_id),
                     "relation_type": "matches_contact",
                     "metadata": {
                         "phone_number": phone,
-                        "evidence_id": wa_contact.evidence_id,  # Note: they might be from different evidence? We assume same case.
+                        "confidence_score": 0.85,
+                        "match_reason": "Telegram Handle Match",
+                        "wa_name": wa.display_name or wa.jid,
+                        "tg_name": f"{tg.first_name or ''} {tg.last_name or ''}".strip() or tg.username,
+                        "tg_username": tg.username,
+                        "evidence_id": wa.evidence_id,
                     }
                 })
-                # Also the reverse direction? We'll do one direction for now.
+
+    # 3. Match by Display Name Similarity (Confidence 0.75)
+    for wa in wa_contacts:
+        wa_name = (wa.display_name or "").strip().lower()
+        if not wa_name or len(wa_name) < 3:
+            continue
+        for tg in tg_contacts:
+            pair_key = (wa.jid, str(tg.user_id))
+            if pair_key in seen_pairs:
+                continue
+            tg_full_name = f"{tg.first_name or ''} {tg.last_name or ''}".strip().lower()
+            if tg_full_name and (tg_full_name == wa_name):
+                seen_pairs.add(pair_key)
+                phone = normalize_phone_number(wa.phone_number or tg.phone or wa.jid)
+                edges.append({
+                    "source_type": "wa_contact",
+                    "source_id": wa.jid,
+                    "target_type": "tg_contact",
+                    "target_id": str(tg.user_id),
+                    "relation_type": "matches_contact",
+                    "metadata": {
+                        "phone_number": phone,
+                        "confidence_score": 0.75,
+                        "match_reason": "Display Name Match",
+                        "wa_name": wa.display_name or wa.jid,
+                        "tg_name": f"{tg.first_name or ''} {tg.last_name or ''}".strip(),
+                        "tg_username": tg.username,
+                        "evidence_id": wa.evidence_id,
+                    }
+                })
+
+    return edges
+
+
+def correlate_cross_app_messages(
+    wa_messages: List[WhatsAppMessage],
+    tg_messages: List[TelegramMessage],
+    wa_contacts: List[WhatsAppContact],
+    tg_contacts: List[TelegramContact],
+    time_window_seconds: int = 300,
+) -> List[Dict[str, Any]]:
+    """Correlate messages across WhatsApp and Telegram occurring within a specified time window."""
+    edges = []
+
+    # Map contacts to resolved phones for entity check
+    wa_contact_phones = {wa.jid: normalize_phone_number(wa.phone_number or wa.jid) for wa in wa_contacts}
+    tg_contact_phones = {str(tg.user_id): normalize_phone_number(tg.phone) for tg in tg_contacts}
+
+    for wa_msg in wa_messages:
+        wa_ts = wa_msg.timestamp
+        if not wa_ts:
+            continue
+        wa_sec = wa_ts // 1000 if wa_ts > 10_000_000_000 else wa_ts
+        wa_sender_phone = wa_contact_phones.get(wa_msg.sender_jid, "")
+
+        for tg_msg in tg_messages:
+            tg_ts = tg_msg.timestamp
+            if not tg_ts:
+                continue
+            tg_sec = tg_ts // 1000 if tg_ts > 10_000_000_000 else tg_ts
+
+            delta = abs(wa_sec - tg_sec)
+            if delta <= time_window_seconds:
+                tg_sender_id = str(tg_msg.sender_id)
+                tg_sender_phone = tg_contact_phones.get(tg_sender_id, "")
+
+                same_entity = bool(wa_sender_phone and tg_sender_phone and wa_sender_phone == tg_sender_phone)
+                confidence = 0.95 if same_entity else max(0.60, 0.90 - (delta / time_window_seconds) * 0.30)
+
+                edges.append({
+                    "source_type": "wa_message",
+                    "source_id": str(wa_msg.message_id),
+                    "target_type": "tg_message",
+                    "target_id": str(tg_msg.message_id),
+                    "relation_type": "time_window_correlated",
+                    "metadata": {
+                        "time_delta_seconds": delta,
+                        "time_window_seconds": time_window_seconds,
+                        "wa_timestamp": wa_sec,
+                        "tg_timestamp": tg_sec,
+                        "wa_sender_jid": wa_msg.sender_jid,
+                        "tg_sender_id": tg_msg.sender_id,
+                        "wa_body": wa_msg.body,
+                        "tg_body": tg_msg.body,
+                        "same_entity_pair": same_entity,
+                        "confidence_score": round(confidence, 2),
+                        "evidence_id": wa_msg.evidence_id,
+                    }
+                })
+
+
     return edges
 
 
@@ -267,6 +408,7 @@ def correlate_all(
     tg_messages: List[TelegramMessage],
     tg_contacts: List[TelegramContact],
     media_items: List[MediaItem],
+    time_window_seconds: int = 300,
 ) -> List[Dict[str, Any]]:
     """Run all correlation functions and return combined edges."""
     edges = []
@@ -275,5 +417,5 @@ def correlate_all(
     edges.extend(correlate_message_to_contact_telegram(tg_messages, tg_contacts))
     edges.extend(correlate_message_to_media_telegram(tg_messages, media_items))
     edges.extend(correlate_cross_app_contact(wa_contacts, tg_contacts))
-    # TODO: Add group correlations if needed
+    edges.extend(correlate_cross_app_messages(wa_messages, tg_messages, wa_contacts, tg_contacts, time_window_seconds))
     return edges

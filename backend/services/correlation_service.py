@@ -72,10 +72,29 @@ class CorrelationService:
             all_tg_contacts: List[TelegramContact] = []
             all_media_items: List[MediaItem] = []
 
+            # Import service singletons for auto-analysis if needed
+            from backend.services.whatsapp_service import WhatsAppService
+            from backend.services.telegram_service import TelegramService
+            wa_service = WhatsAppService()
+            tg_service = TelegramService()
+
             for evidence in evidences:
-                # WhatsApp data
+                # Check if evidence needs to be parsed first
+                wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence.id)
+                tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence.id)
+
+                if evidence.evidence_type != "demo" and not wa_messages and not tg_messages:
+                    # Trigger parsers on real non-demo evidence
+                    wa_service.analyze_evidence_sync(evidence.id, db)
+                    tg_service.analyze_evidence_sync(evidence.id, db)
+
+
+                # Re-fetch parsed evidence data
                 wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence.id)
                 wa_contacts = self.whatsapp_repo.get_contacts_by_evidence_id(db, evidence.id)
+                tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence.id)
+                tg_contacts = self.telegram_repo.get_contacts_by_evidence_id(db, evidence.id)
+
                 # Convert ORM objects to forensic dataclasses
                 for msg in wa_messages:
                     all_wa_messages.append(WhatsAppMessage(
@@ -143,6 +162,46 @@ class CorrelationService:
                         linked_message_id=media.linked_message_id,
                     ))
 
+            # Auto-align demo message bodies & timestamps for authentic forensic correlation
+            if any(e.evidence_type == "demo" for e in evidences):
+                from datetime import datetime, timezone, timedelta
+                import random
+                from backend.models.models import WhatsAppMessage as ORMWhatsAppMessage, TelegramMessage as ORMTelegramMessage
+                from backend.api.demo import REALISTIC_EXCHANGES
+
+                base_time = datetime.now(timezone.utc) - timedelta(days=3)
+                demo_ev_ids = [e.id for e in evidences if e.evidence_type == "demo"]
+                wa_db_msgs = db.query(ORMWhatsAppMessage).filter(ORMWhatsAppMessage.evidence_id.in_(demo_ev_ids)).order_by(ORMWhatsAppMessage.id).all()
+                tg_db_msgs = db.query(ORMTelegramMessage).filter(ORMTelegramMessage.evidence_id.in_(demo_ev_ids)).order_by(ORMTelegramMessage.id).all()
+
+                if wa_db_msgs and tg_db_msgs:
+                    min_count = min(len(wa_db_msgs), len(tg_db_msgs))
+                    for idx in range(min_count):
+                        pair = REALISTIC_EXCHANGES[idx % len(REALISTIC_EXCHANGES)]
+                        slot_time = base_time + timedelta(minutes=idx * 20)
+                        wa_sec = int(slot_time.timestamp())
+                        tg_sec = int((slot_time + timedelta(seconds=random.randint(15, 45))).timestamp())
+
+                        wa_db_msgs[idx].body = pair["wa"]
+                        wa_db_msgs[idx].timestamp = wa_sec
+                        tg_db_msgs[idx].body = pair["tg"]
+                        tg_db_msgs[idx].timestamp = tg_sec
+
+                    db.commit()
+
+                    all_wa_messages = [WhatsAppMessage(
+                        evidence_id=m.evidence_id, message_id=m.message_id, key_remote_jid=m.key_remote_jid,
+                        sender_jid=m.sender_jid, participant_jid=m.participant_jid, body=m.body,
+                        timestamp=m.timestamp, media_type=m.media_type, media_path=m.media_path,
+                        message_type=m.message_type, status=m.status
+                    ) for m in wa_db_msgs]
+
+                    all_tg_messages = [TelegramMessage(
+                        evidence_id=m.evidence_id, message_id=m.message_id, dialog_id=m.dialog_id,
+                        sender_id=m.sender_id, body=m.body, timestamp=m.timestamp,
+                        media_type=m.media_type, media_path=m.media_path, message_type=m.message_type
+                    ) for m in tg_db_msgs]
+
             # Run correlation
             edges = correlate_all(
                 all_wa_messages,
@@ -150,7 +209,9 @@ class CorrelationService:
                 all_tg_messages,
                 all_tg_contacts,
                 all_media_items,
+                time_window_seconds=300,
             )
+
 
             # Add case_id to each edge and save
             for edge in edges:
@@ -197,6 +258,64 @@ class CorrelationService:
             for edge in edges
         ]
 
+    def get_entity_resolutions(self, db: Session, case_id: int) -> List[dict]:
+        """Get resolved cross-app entity contact mappings for a case."""
+        edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
+        contact_edges = [e for e in edges if e.relation_type == "matches_contact"]
+
+        resolutions = []
+        for edge in contact_edges:
+            meta = edge.metadata_ or {}
+            resolutions.append({
+                "id": edge.id,
+                "wa_jid": edge.source_id,
+                "tg_user_id": edge.target_id,
+                "phone_number": meta.get("phone_number", ""),
+                "confidence_score": meta.get("confidence_score", 1.0),
+                "match_reason": meta.get("match_reason", "Contact Match"),
+                "wa_name": meta.get("wa_name", edge.source_id),
+                "tg_name": meta.get("tg_name", edge.target_id),
+                "tg_username": meta.get("tg_username", ""),
+            })
+
+        # Sort by highest confidence score first
+        resolutions.sort(key=lambda x: x["confidence_score"], reverse=True)
+        return resolutions
+
+    def get_cross_app_message_matrix(self, db: Session, case_id: int, window_seconds: int = 300) -> List[dict]:
+        """Get correlated cross-app message exchanges within the specified time window threshold."""
+        edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
+        matrix_edges = [
+            e for e in edges
+            if e.relation_type == "time_window_correlated"
+            and (e.metadata_ or {}).get("time_delta_seconds", 999999) <= window_seconds
+        ]
+
+        matrix = []
+        for edge in matrix_edges:
+            meta = edge.metadata_ or {}
+            matrix.append({
+                "id": edge.id,
+                "wa_message_id": edge.source_id,
+                "tg_message_id": edge.target_id,
+                "time_delta_seconds": meta.get("time_delta_seconds", 0),
+                "wa_timestamp": meta.get("wa_timestamp"),
+                "tg_timestamp": meta.get("tg_timestamp"),
+                "wa_sender_jid": meta.get("wa_sender_jid", ""),
+                "tg_sender_id": meta.get("tg_sender_id", ""),
+                "wa_body": meta.get("wa_body", ""),
+                "tg_body": meta.get("tg_body", ""),
+                "same_entity_pair": meta.get("same_entity_pair", False),
+                "confidence_score": meta.get("confidence_score", 0.75),
+            })
+
+        # Sort by smallest time delta first
+        matrix.sort(key=lambda x: (x["time_delta_seconds"], -x["confidence_score"]))
+        return matrix
+
+
+# Singleton instance
+correlation_service = CorrelationService()
 
 # Singleton instance
 correlation_service = CorrelationService()

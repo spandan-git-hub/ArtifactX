@@ -51,3 +51,38 @@ def get_case_correlation(
 
     edges = correlation_service.get_edges_for_case(db, case_id)
     return edges
+
+
+@router.get("/cases/{case_id}/correlation/entities", response_model=List[dict])
+def get_entity_resolutions(
+    case_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get resolved cross-app entity contact mappings for a case."""
+    from backend.models.models import Case
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+
+    return correlation_service.get_entity_resolutions(db, case_id)
+
+
+@router.get("/cases/{case_id}/correlation/matrix", response_model=List[dict])
+def get_message_matrix(
+    case_id: int,
+    window_seconds: int = 300,
+    db: Session = Depends(get_db)
+):
+    """Get cross-app message correlation matrix for a case within a time window threshold."""
+    from backend.models.models import Case
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+
+    return correlation_service.get_cross_app_message_matrix(db, case_id, window_seconds)

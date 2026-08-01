@@ -47,23 +47,51 @@ DEMO_CONTACTS = [
     ("+12025551243", "Jack Taylor", "jack_t"),
 ]
 
-DEMO_MESSAGES = [
-    "Hey, how are you doing today?",
-    "Can you send me the documents when you get a chance?",
-    "Meeting at 3pm today, don't forget!",
-    "Did you see the latest update?",
-    "Thanks for your help with that!",
-    "Let's grab lunch tomorrow, works for you?",
-    "The report is ready for review.",
-    "Can you call me back when you're free?",
-    "Happy birthday! Hope you have a great day!",
-    "See you later, take care!",
-    "What time should we meet?",
-    "I've attached the file you requested.",
-    "Let me know if you need anything else.",
-    "This is great news!",
-    "I'll be there in 10 minutes.",
+REALISTIC_EXCHANGES = [
+    {
+        "wa": "Can you check the encrypted file I emailed you?",
+        "tg": "Got it. Downloading the file on Telegram channel now."
+    },
+    {
+        "wa": "Switch to Telegram for the sensitive details.",
+        "tg": "I am on Telegram now. Send the key here."
+    },
+    {
+        "wa": "Are we still meeting at the dock at 4 PM?",
+        "tg": "Yes, standby. Bringing the hardware package."
+    },
+    {
+        "wa": "WhatsApp call keeps dropping, calling on Telegram.",
+        "tg": "Connection is clean here, ringing you back."
+    },
+    {
+        "wa": "Did you verify the transaction hash?",
+        "tg": "Verified on blockchain explorer, transfer of 2.5 BTC confirmed."
+    },
+    {
+        "wa": "Delete the chat history after reading.",
+        "tg": "Timer set to auto-delete after 24 hours."
+    },
+    {
+        "wa": "Need the passport scans for the flight reservation.",
+        "tg": "Sending high-res scan as document on TG."
+    },
+    {
+        "wa": "Where are the server access logs?",
+        "tg": "Archived in the restricted channel, check your admin invite."
+    },
+    {
+        "wa": "Did David confirm the rendezvous point?",
+        "tg": "He just messaged on Telegram, location confirmed near Sector 4."
+    },
+    {
+        "wa": "Can you send the location coordinates?",
+        "tg": "Shared live location on Telegram map."
+    },
 ]
+
+DEMO_MESSAGES = [item["wa"] for item in REALISTIC_EXCHANGES]
+
 
 
 @router.post("/create-demo-case")
@@ -100,16 +128,22 @@ def create_demo_case(data: DemoData, db: Session = Depends(get_db)) -> dict:
 
     db.commit()
 
+    # Automatically run correlation engine for demo data
+    from backend.services.correlation_service import correlation_service
+    edge_count = correlation_service.correlate_case(db, case.id)
+    stats["correlation_edges"] = edge_count
+
     # Log the demo case creation
     from backend.services.log_service import get_log_service
     log_service = get_log_service(db)
     log_service.log_activity(
         case_id=case.id,
         action="create_demo_case",
-        description=f"Demo case created: {case.name}"
+        description=f"Demo case created: {case.name} with {edge_count} correlation edges"
     )
 
     return stats
+
 
 
 def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact_count: int) -> dict:
@@ -144,7 +178,7 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
     db.add_all(contacts)
 
     # Create demo messages
-    base_time = datetime.now(timezone.utc) - timedelta(days=7)
+    base_time = datetime.now(timezone.utc) - timedelta(days=3)
     total_messages = min(message_count, 100)
 
     messages = []
@@ -155,25 +189,29 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
         sender_jid = f"{sender_phone}@s.whatsapp.net"
 
         # Determine chat type (group vs individual)
-        if i % 5 == 0:  # Every 5th message is in a group
+        if i % 5 == 0:
             chat_jid = "+12025551000@g.us"
         else:
             chat_jid = f"+1202555100{random.randint(1, 9)}@s.whatsapp.net"
 
-        # Determine media type (10% of messages have media)
+        # Determine media type
         media_type = None
         media_path = None
         if i % 10 == 0:
             media_type = random.choice(["image", "video", "audio"])
             media_path = f"/demo/wa_media/msg_{i}.{media_type[0]}"
 
+        # Calculate synchronized timestamp in seconds
+        ts_dt = base_time + timedelta(minutes=i * 20)
+        ts_sec = int(ts_dt.timestamp())
+
         msg = WhatsAppMessage(
             evidence_id=evidence_id,
             message_id=f"wa_demo_{i}",
             key_remote_jid=chat_jid,
             sender_jid=sender_jid,
-            body=DEMO_MESSAGES[i % len(DEMO_MESSAGES)],
-            timestamp=int((base_time + timedelta(minutes=i * 30)).timestamp() * 1000),
+            body=REALISTIC_EXCHANGES[i % len(REALISTIC_EXCHANGES)]["wa"],
+            timestamp=ts_sec,
             message_type="text" if not media_type else "media",
             media_type=media_type,
             media_path=media_path,
@@ -187,8 +225,8 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
             evidence_id=evidence_id,
             event_type="message",
             source_app="whatsapp",
-            timestamp=msg.timestamp,
-            normalized_timestamp=datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc),
+            timestamp=ts_sec,
+            normalized_timestamp=datetime.fromtimestamp(ts_sec, tz=timezone.utc),
             entity_id=str(msg.message_id),
             entity_type="message",
             description=f"Message: {msg.body[:60]}"
@@ -204,8 +242,8 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
         evidence_id=evidence_id,
         source_app="whatsapp",
         chat_jid="+12025551234@s.whatsapp.net",
-        gap_start=int((base_time + timedelta(hours=2)).timestamp() * 1000),
-        gap_end=int((base_time + timedelta(hours=3)).timestamp() * 1000),
+        gap_start=int((base_time + timedelta(hours=2)).timestamp()),
+        gap_end=int((base_time + timedelta(hours=3)).timestamp()),
         missing_count=2,
         confidence_score=0.85,
         detection_method="sequence_gap_analysis",
@@ -216,8 +254,8 @@ def _create_demo_whatsapp(db: Session, case_id: int, message_count: int, contact
         evidence_id=evidence_id,
         source_app="whatsapp",
         chat_jid="+12025551000@g.us",
-        gap_start=int((base_time + timedelta(hours=10)).timestamp() * 1000),
-        gap_end=int((base_time + timedelta(hours=11)).timestamp() * 1000),
+        gap_start=int((base_time + timedelta(hours=10)).timestamp()),
+        gap_end=int((base_time + timedelta(hours=11)).timestamp()),
         missing_count=1,
         confidence_score=0.75,
         detection_method="sequence_gap_analysis",
@@ -269,8 +307,8 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
         contacts.append(contact)
     db.add_all(contacts)
 
-    # Create demo messages
-    base_time = datetime.now(timezone.utc) - timedelta(days=5)
+    # Create demo messages synchronized with WhatsApp timeline
+    base_time = datetime.now(timezone.utc) - timedelta(days=3)
     total_messages = min(message_count, 80)
 
     messages = []
@@ -279,24 +317,30 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
         sender_id = 1000 + (i % len(contacts_to_create))
         dialog_id = f"dialog_{random.randint(1, 100)}"
 
-        # Determine media type (15% of messages have media)
+        # Determine media type
         media_type = None
         media_path = None
         if i % 7 == 0:
             media_type = random.choice(["image", "video", "audio"])
             media_path = f"/demo/tg_media/msg_{i}.{media_type[0]}"
 
+        # Correlate timestamp within 15-45 seconds of WhatsApp message slot
+        time_offset = timedelta(minutes=i * 20, seconds=random.randint(15, 45))
+        ts_dt = base_time + time_offset
+        ts_sec = int(ts_dt.timestamp())
+
         msg = TelegramMessage(
             evidence_id=evidence_id,
             message_id=2000 + i,
             dialog_id=dialog_id,
             sender_id=sender_id,
-            body=DEMO_MESSAGES[i % len(DEMO_MESSAGES)],
-            timestamp=int((base_time + timedelta(minutes=i * 20)).timestamp() * 1000),
+            body=REALISTIC_EXCHANGES[i % len(REALISTIC_EXCHANGES)]["tg"],
+            timestamp=ts_sec,
             message_type="text" if not media_type else "media",
             media_type=media_type,
             media_path=media_path,
         )
+
         messages.append(msg)
 
         # Timeline event for message
@@ -305,13 +349,14 @@ def _create_demo_telegram(db: Session, case_id: int, message_count: int, contact
             evidence_id=evidence_id,
             event_type="message",
             source_app="telegram",
-            timestamp=msg.timestamp,
-            normalized_timestamp=datetime.fromtimestamp(msg.timestamp / 1000, tz=timezone.utc),
+            timestamp=ts_sec,
+            normalized_timestamp=datetime.fromtimestamp(ts_sec, tz=timezone.utc),
             entity_id=str(msg.message_id),
             entity_type="message",
             description=f"Message: {msg.body[:60]}"
         )
         events.append(evt)
+
 
     db.add_all(messages)
     db.add_all(events)
