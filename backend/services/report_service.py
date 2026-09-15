@@ -1,4 +1,12 @@
-"""Report service for in-memory court-ready PDF generation."""
+"""Report service for in-memory court-ready PDF generation.
+
+JUDICIAL ADMISSIBILITY GUARANTEE (Phase 15 - B30):
+Official court PDF reports strictly query only deterministic evidence tables
+(evidence files, cryptographic hashes, raw message transcripts, timeline events,
+detected deletion gaps, and chain-of-custody audit logs).
+All AI Forensic Assistant responses, sentiment scores, and copilot outputs
+are STRICTLY EXCLUDED from this service and all generated PDF artifacts.
+"""
 
 import hashlib
 import os

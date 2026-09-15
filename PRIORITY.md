@@ -216,18 +216,18 @@ Overhaul the PDF generator into a zero-workspace storage engine that streams PDF
 *Note: This phase will be executed as the very last addition after the entire application and core workstation are fully built.*
 
 ### Backend
-- [ ] **B29** Create `assistant.py` router and `assistant_service.py`:
+- [x] **B29** Create `assistant.py` router and `assistant_service.py`:
   - `POST /api/cases/{id}/assistant/query`: Processes investigator natural language questions over case messages and evidence metadata.
   - `POST /api/cases/{id}/assistant/sentiment`: Executes chat sentiment classification (Aggressive, Suspicious, Deceptive, Urgent, Evasive, Neutral), intention marker detection (financial demand, coercion, deletion awareness), and suspicion confidence scoring (0-100%).
-- [ ] **B30** Enforce Court Report Exclusion: Ensure `report_service.py` completely ignores `assistant.py` datasets to preserve judicial admissibility of court reports.
+- [x] **B30** Enforce Court Report Exclusion: Ensure `report_service.py` completely ignores `assistant.py` datasets to preserve judicial admissibility of court reports.
 
 ### Frontend
-- [ ] **F28** Create `ForensicAssistantDrawer.jsx` (`components/assistant/ForensicAssistantDrawer.jsx`):
+- [x] **F28** Create `ForensicAssistantDrawer.jsx` (`components/assistant/ForensicAssistantDrawer.jsx`):
   - Slide-out copilot chat UI for investigator prompts and assistance.
   - Sentiment & Intention Breakdown widget.
   - Visual disclaimer badge: *"Internal Investigative Aid Only — Excluded from Legal Court Reports"*.
-- [ ] **F29** Add optional Sentiment Overlay toggle in `ChatViewerPage.jsx` to display emotional tone badges and suspicion confidence indicators directly on chat messages.
-- [ ] **F30** Create `useAiAssistant.js` hook to handle copilot queries, sentiment requests, and confidence score states.
+- [x] **F29** Add optional Sentiment Overlay toggle in `ChatViewerPage.jsx` to display emotional tone badges and suspicion confidence indicators directly on chat messages.
+- [x] **F30** Create `useAiAssistant.js` hook to handle copilot queries, sentiment requests, and confidence score states.
 
 ---
 
