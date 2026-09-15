@@ -1,79 +1,153 @@
 import { useState } from 'react';
-import { FileText, Loader2, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import {
+  FileText,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Download,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  UserCheck,
+  Building,
+  FileSignature,
+} from 'lucide-react';
 import { useReports } from '../../hooks/useReports';
-import { downloadReport } from '../../services/reportService';
 
-const ReportPanel = ({ caseId }) => {
-  const [reportType, setReportType] = useState('full');
-  const [options, setOptions] = useState({
-    includeEvidence: true,
-    includeTimeline: true,
-    includeDeleted: true,
-    includeCorrelations: true,
-  });
+const ReportPanel = ({
+  caseId,
+  caseData,
+  showPreview,
+  setShowPreview,
+  formState,
+  setFormState,
+}) => {
+  const {
+    reportType,
+    options,
+    leadAnalyst,
+    agency,
+    caseNotes,
+    swornDeclaration,
+  } = formState;
 
   const { loading, error, lastReport, generateReport } = useReports();
 
   const handleGenerate = async () => {
     try {
-      await generateReport(caseId, { reportType, ...options });
+      await generateReport(caseId, {
+        reportType,
+        ...options,
+        leadAnalyst,
+        agency,
+        caseNotes,
+        swornDeclaration,
+      });
     } catch (err) {
-      // Error handled by hook
-    }
-  };
-
-  const handleDownload = () => {
-    if (lastReport?.filename) {
-      downloadReport(caseId, lastReport.filename);
-    } else if (lastReport?.message && lastReport.message.includes(': ')) {
-      const filename = lastReport.message.split(': ')[1].trim();
-      downloadReport(caseId, filename);
+      // Handled in hook
     }
   };
 
   const toggleOption = (key) => {
-    setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+    setFormState((prev) => ({
+      ...prev,
+      options: { ...prev.options, [key]: !prev.options[key] },
+    }));
   };
 
   return (
-    <div className="card">
-      <h2 className="text-lg font-semibold text-forensic-100 mb-4 flex items-center gap-2">
-        <FileText className="h-5 w-5 text-accent-cyan" />
-        Generate Report
-      </h2>
+    <div className="card space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-forensic-800">
+        <h2 className="text-base font-semibold text-forensic-100 flex items-center gap-2">
+          <FileText className="h-5 w-5 text-accent-cyan" />
+          Court Report Configuration
+        </h2>
+        <button
+          type="button"
+          onClick={() => setShowPreview(!showPreview)}
+          className="text-xs font-mono text-forensic-400 hover:text-accent-cyan flex items-center gap-1.5 transition-colors"
+        >
+          {showPreview ? (
+            <>
+              <EyeOff className="w-3.5 h-3.5" /> Hide Preview
+            </>
+          ) : (
+            <>
+              <Eye className="w-3.5 h-3.5" /> Show Live Preview
+            </>
+          )}
+        </button>
+      </div>
 
-      {/* Report Type Selection */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-forensic-400 mb-2">
-          Report Type
+      {/* Report Type Selector */}
+      <div>
+        <label className="block text-xs font-medium text-forensic-400 mb-1.5 uppercase font-mono">
+          Report Category
         </label>
         <select
           value={reportType}
-          onChange={(e) => setReportType(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-lg bg-forensic-800 border border-forensic-700
-                     text-forensic-100 focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/20"
+          onChange={(e) => setFormState((prev) => ({ ...prev, reportType: e.target.value }))}
+          className="w-full px-3 py-2 rounded-lg bg-forensic-800 border border-forensic-700
+                     text-forensic-100 text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
         >
-          <option value="full">Full Report — Complete forensic analysis</option>
-          <option value="evidence">Evidence Summary — File inventory and analysis</option>
-          <option value="timeline">Timeline Analysis — Event timeline and patterns</option>
-          <option value="deleted">Deleted Messages — Deletion detection report</option>
-          <option value="summary">Executive Summary — High-level overview</option>
+          <option value="full">Full Forensic Examination (Complete Case Report)</option>
+          <option value="evidence">Evidence Manifest & Hash Verification Only</option>
+          <option value="timeline">Reconstructed Chronological Timeline Only</option>
+          <option value="deleted">Anti-Forensics & Deletion Anomaly Report</option>
+          <option value="summary">Executive Summary & Entity Correlations</option>
         </select>
       </div>
 
-      {/* Options (for full report) */}
-      {reportType === 'full' && (
-        <div className="mb-4 space-y-2">
-          <label className="block text-sm font-medium text-forensic-400 mb-2">
-            Include Sections
+      {/* Lead Analyst & Agency Inputs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-forensic-400 mb-1.5 flex items-center gap-1">
+            <UserCheck className="w-3.5 h-3.5 text-accent-cyan" />
+            Lead Forensic Examiner
           </label>
+          <input
+            type="text"
+            value={leadAnalyst}
+            onChange={(e) => setFormState((prev) => ({ ...prev, leadAnalyst: e.target.value }))}
+            placeholder="e.g. Special Agent J. Miller"
+            className="w-full px-3 py-2 rounded-lg bg-forensic-800 border border-forensic-700
+                       text-forensic-100 text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-forensic-400 mb-1.5 flex items-center gap-1">
+            <Building className="w-3.5 h-3.5 text-accent-cyan" />
+            Law Enforcement Agency / Unit
+          </label>
+          <input
+            type="text"
+            value={agency}
+            onChange={(e) => setFormState((prev) => ({ ...prev, agency: e.target.value }))}
+            placeholder="e.g. State Digital Forensics Lab"
+            className="w-full px-3 py-2 rounded-lg bg-forensic-800 border border-forensic-700
+                       text-forensic-100 text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
+          />
+        </div>
+      </div>
+
+      {/* Section Toggles */}
+      <div className="space-y-2">
+        <label className="block text-xs font-medium text-forensic-400 mb-1 font-mono uppercase">
+          Evidence Modules to Include
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {[
-            { key: 'includeEvidence', label: 'Evidence Analysis' },
-            { key: 'includeTimeline', label: 'Timeline Analysis' },
-            { key: 'includeDeleted', label: 'Deleted Message Detection' },
-            { key: 'includeCorrelations', label: 'Evidence Correlations' },
+            { key: 'includeEvidence', label: '1. Evidence Hashes (SHA-256)' },
+            { key: 'includeCustodyLog', label: '2. Chain of Custody Audit Log' },
+            { key: 'includeTimeline', label: '3. Reconstructed Timeline' },
+            { key: 'includeDeleted', label: '4. Anti-Forensic Deletion Gaps' },
+            { key: 'includeCorrelations', label: '5. Cross-Platform Correlations' },
           ].map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-3 cursor-pointer group">
+            <label
+              key={key}
+              className="flex items-center gap-2.5 p-2 rounded-lg bg-forensic-800/40 border border-forensic-700/60 cursor-pointer hover:bg-forensic-800 transition-colors"
+            >
               <input
                 type="checkbox"
                 checked={options[key]}
@@ -81,63 +155,84 @@ const ReportPanel = ({ caseId }) => {
                 className="w-4 h-4 rounded border-forensic-600 bg-forensic-800 text-accent-cyan
                            focus:ring-accent-cyan focus:ring-offset-0"
               />
-              <span className="text-sm text-forensic-300 group-hover:text-forensic-100 transition-colors">
-                {label}
-              </span>
+              <span className="text-xs text-forensic-200">{label}</span>
             </label>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* Generate Button */}
+      {/* Case Notes / Remarks */}
+      <div>
+        <label className="block text-xs font-medium text-forensic-400 mb-1.5 flex items-center gap-1">
+          <FileSignature className="w-3.5 h-3.5 text-accent-cyan" />
+          Examiner Remarks / Case Notes
+        </label>
+        <textarea
+          rows={2}
+          value={caseNotes}
+          onChange={(e) => setFormState((prev) => ({ ...prev, caseNotes: e.target.value }))}
+          placeholder="Enter formal forensic observations, search warrant references, or scope limitations..."
+          className="w-full px-3 py-2 rounded-lg bg-forensic-800 border border-forensic-700
+                     text-forensic-100 text-sm focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan resize-none"
+        />
+      </div>
+
+      {/* Sworn Integrity Declaration Checkbox */}
+      <div className="p-3 rounded-lg bg-accent-cyan/5 border border-accent-cyan/20">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={swornDeclaration}
+            onChange={(e) => setFormState((prev) => ({ ...prev, swornDeclaration: e.target.checked }))}
+            className="w-4 h-4 mt-0.5 rounded border-forensic-600 bg-forensic-800 text-accent-cyan focus:ring-accent-cyan"
+          />
+          <span className="text-xs text-forensic-300 leading-relaxed">
+            <b>Sworn Forensic Declaration:</b> I solemnly attest under penalty of perjury that this report
+            compiles deterministic evidence extracted without alteration in accordance with ISO/IEC 27037 standards.
+          </span>
+        </label>
+      </div>
+
+      {/* Primary Generation Action */}
       <button
         onClick={handleGenerate}
-        disabled={loading}
-        className="btn-primary w-full"
+        disabled={loading || !swornDeclaration}
+        className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-sm font-semibold tracking-wide disabled:opacity-50"
       >
         {loading ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Generating PDF...
+            <Loader2 className="h-4 w-4 animate-spin text-forensic-950" />
+            <span>Compiling In-Memory Court PDF...</span>
           </>
         ) : (
           <>
-            <FileText className="h-4 w-4" />
-            {reportType === 'full'
-              ? 'Generate Full Report'
-              : `Generate ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`}
+            <ShieldCheck className="h-4 w-4" />
+            <span>Generate & Stream Court PDF</span>
           </>
         )}
       </button>
 
-      {/* Success Message & Download Button */}
+      {/* Success Notification */}
       {lastReport && lastReport.status === 'completed' && (
-        <div className="mt-4 p-3 bg-accent-emerald/10 border border-accent-emerald/30 rounded-lg space-y-2">
-          <div className="flex items-center gap-2 text-accent-emerald">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Report Generated!</span>
+        <div className="p-3 bg-accent-emerald/10 border border-accent-emerald/30 rounded-lg space-y-1.5 animate-in">
+          <div className="flex items-center gap-2 text-accent-emerald font-semibold text-xs">
+            <CheckCircle className="h-4 w-4" />
+            <span>Court Report Generated & Streamed!</span>
           </div>
-          <p className="text-sm text-accent-emerald/80">
-            {lastReport.message || 'PDF report is ready for download.'}
+          <p className="text-[11px] text-forensic-300 font-mono break-all">
+            SHA-256: <span className="text-accent-cyan">{lastReport.sha256}</span>
           </p>
-          <button
-            onClick={handleDownload}
-            className="w-full mt-2 py-2 px-3 bg-accent-emerald hover:bg-emerald-600 text-forensic-950 font-semibold rounded-lg flex items-center justify-center gap-2 text-sm transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            Download PDF Report
-          </button>
+          <p className="text-[11px] text-forensic-400">
+            Downloaded: <span className="text-forensic-200">{lastReport.filename}</span> ({lastReport.totalPages} pages)
+          </p>
         </div>
       )}
 
-      {/* Error Message */}
+      {/* Error Notification */}
       {error && (
-        <div className="mt-4 p-3 bg-accent-rose/10 border border-accent-rose/30 rounded-lg">
-          <div className="flex items-center gap-2 text-accent-rose">
-            <AlertCircle className="h-5 w-5" />
-            <span className="font-medium">Error</span>
-          </div>
-          <p className="text-sm text-accent-rose/80 mt-1">{error}</p>
+        <div className="p-3 bg-accent-rose/10 border border-accent-rose/30 rounded-lg flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-accent-rose shrink-0 mt-0.5" />
+          <p className="text-xs text-accent-rose">{error}</p>
         </div>
       )}
     </div>

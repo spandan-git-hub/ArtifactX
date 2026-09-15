@@ -20,6 +20,8 @@ from backend.models.models import (
     MediaItem,
     DeletedMessage,
     CorrelationEdge,
+    ActivityLog,
+    GeneratedReport,
 )
 
 
@@ -400,3 +402,112 @@ class ReportRepository:
                     TelegramGroup.evidence_id.in_(evidence_ids)
                 ).count(),
             }
+
+    def get_custody_logs(self, case_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get chain of custody activity logs for report."""
+        logs = (
+            self.db.query(ActivityLog)
+            .filter(ActivityLog.case_id == case_id)
+            .order_by(ActivityLog.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "id": log.id,
+                "action": log.action,
+                "description": log.description,
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+            }
+            for log in logs
+        ]
+
+    def get_evidence_file_hashes(self, case_id: int, limit: int = 150) -> List[Dict[str, Any]]:
+        """Get file-level cryptographic hashes for evidence files."""
+        evidence_items = self.db.query(Evidence).filter(Evidence.case_id == case_id).all()
+        manifest = []
+
+        for ev in evidence_items:
+            # Root evidence container hash
+            meta = ev.metadata_ or {}
+            manifest.append({
+                "filename": ev.original_filename,
+                "type": ev.evidence_type or "Container",
+                "sha256": ev.sha256,
+                "md5": meta.get("md5", "—"),
+                "sha1": meta.get("sha1", "—"),
+                "size": meta.get("size_bytes", 0),
+                "mime": ev.content_type or "application/octet-stream",
+                "is_container": True,
+            })
+
+            # Extracted files
+            files = (
+                self.db.query(EvidenceFile)
+                .filter(EvidenceFile.evidence_id == ev.id)
+                .limit(limit)
+                .all()
+            )
+            for f in files:
+                f_meta = f.metadata_ or {}
+                manifest.append({
+                    "filename": f.relative_path,
+                    "type": "Extracted Artifact",
+                    "sha256": f.sha256,
+                    "md5": f_meta.get("md5", "—"),
+                    "sha1": f_meta.get("sha1", "—"),
+                    "size": f.file_size or 0,
+                    "mime": f.mime_type or "application/octet-stream",
+                    "is_container": False,
+                })
+
+        return manifest
+
+    def create_generated_report(
+        self,
+        report_id: str,
+        case_id: int,
+        report_type: str,
+        lead_analyst: str,
+        agency: str,
+        case_notes: str,
+        sha256: str,
+        total_pages: int,
+        size_bytes: int,
+        filename: str,
+    ) -> GeneratedReport:
+        """Create and persist a generated report history record."""
+        report = GeneratedReport(
+            report_id=report_id,
+            case_id=case_id,
+            report_type=report_type,
+            lead_analyst=lead_analyst,
+            agency=agency,
+            case_notes=case_notes,
+            sha256=sha256,
+            total_pages=total_pages,
+            size_bytes=size_bytes,
+            filename=filename,
+            generated_at=datetime.utcnow(),
+        )
+        self.db.add(report)
+        self.db.commit()
+        self.db.refresh(report)
+        return report
+
+    def get_report_history(self, case_id: int) -> List[GeneratedReport]:
+        """Fetch all generated report history records for a case."""
+        return (
+            self.db.query(GeneratedReport)
+            .filter(GeneratedReport.case_id == case_id)
+            .order_by(GeneratedReport.generated_at.desc())
+            .all()
+        )
+
+    def get_generated_report(self, case_id: int, report_id: str) -> Optional[GeneratedReport]:
+        """Fetch a specific generated report record."""
+        return (
+            self.db.query(GeneratedReport)
+            .filter(GeneratedReport.case_id == case_id, GeneratedReport.report_id == report_id)
+            .first()
+        )

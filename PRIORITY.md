@@ -189,12 +189,12 @@ Map cross-platform identity resolution and message correlations.
 Overhaul the PDF generator into a zero-workspace storage engine that streams PDFs directly to the browser while tracking generated report history in the database.
 
 ### Backend
-- [ ] **B26** Update `report_service.py` and `reports.py` to generate court PDFs into an in-memory `io.BytesIO()` buffer and return `StreamingResponse` for direct download — **zero PDF files written to project workspace directory**.
-- [ ] **B27** Create `GeneratedReport` model and `GET /api/cases/{id}/reports/history` endpoint to track generated report metadata (Report ID, Case ID, Report Type, Lead Analyst, Timestamp, Verification SHA-256 Hash of PDF bytes, Total Pages, Size Bytes) in the database.
-- [ ] **B28** Overhaul ReportLab PDF layout (Cover Page, Custody Log, Evidence Hashes, Timeline, Deletions, Correlated Entities, Sworn Analyst Sign-off Block). **Strictly exclude AI Assistant responses and sentiment scores**.
+- [x] **B26** Update `report_service.py` and `reports.py` to generate court PDFs into an in-memory `io.BytesIO()` buffer and return `StreamingResponse` for direct download — **zero PDF files written to project workspace directory**.
+- [x] **B27** Create `GeneratedReport` model and `GET /api/cases/{id}/reports/history` endpoint to track generated report metadata (Report ID, Case ID, Report Type, Lead Analyst, Timestamp, Verification SHA-256 Hash of PDF bytes, Total Pages, Size Bytes) in the database.
+- [x] **B28** Overhaul ReportLab PDF layout (Cover Page, Custody Log, Evidence Hashes, Timeline, Deletions, Correlated Entities, Sworn Analyst Sign-off Block). **Strictly exclude AI Assistant responses and sentiment scores**.
 
 ### Frontend
-- [ ] **F27** Overhaul `ReportsPage.jsx` (`/cases/:caseId/reports`):
+- [x] **F27** Overhaul `ReportsPage.jsx` (`/cases/:caseId/reports`):
   - Report configuration section toggles.
   - Lead Analyst name, agency, and case notes input fields.
   - Sworn integrity declaration checkbox.

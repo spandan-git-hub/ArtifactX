@@ -104,13 +104,18 @@ class FullReportData(BaseModel):
 # Report Generation Request/Response
 class ReportGenerateRequest(BaseModel):
     """Request to generate a report."""
-    case_id: int
+    case_id: Optional[int] = None
     report_type: ReportType = ReportType.FULL
     format: ReportFormat = ReportFormat.PDF
     include_evidence: bool = True
     include_timeline: bool = True
     include_deleted: bool = True
     include_correlations: bool = True
+    include_custody_log: bool = True
+    lead_analyst: Optional[str] = "Forensic Examiner"
+    agency: Optional[str] = "Digital Forensics Unit"
+    case_notes: Optional[str] = None
+    sworn_declaration: bool = True
 
 
 class ReportGenerateResponse(BaseModel):
@@ -121,7 +126,36 @@ class ReportGenerateResponse(BaseModel):
     status: ReportStatus
     message: str
     filename: Optional[str] = None
+    sha256: Optional[str] = None
+    total_pages: Optional[int] = 1
+    size_bytes: Optional[int] = 0
     created_at: datetime
+
+
+class GeneratedReportResponse(BaseModel):
+    """Metadata response for a generated court report."""
+    id: int
+    report_id: str
+    case_id: int
+    report_type: str
+    lead_analyst: Optional[str] = None
+    agency: Optional[str] = None
+    case_notes: Optional[str] = None
+    sha256: str
+    total_pages: int
+    size_bytes: int
+    filename: str
+    generated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReportHistoryResponse(BaseModel):
+    """Case report history response."""
+    case_id: int
+    total_reports: int
+    reports: List[GeneratedReportResponse]
 
 
 class ReportInfo(BaseModel):

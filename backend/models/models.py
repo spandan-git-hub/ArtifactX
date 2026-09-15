@@ -40,6 +40,7 @@ class Case(Base):
     media_items = relationship("MediaItem", back_populates="case", cascade="all, delete-orphan")
     activity_logs = relationship("ActivityLog", back_populates="case", cascade="all, delete-orphan")
     correlation_edges = relationship("CorrelationEdge", cascade="all, delete-orphan")
+    generated_reports = relationship("GeneratedReport", back_populates="case", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -296,3 +297,24 @@ class ErrorLog(Base):
     user_agent = Column(String(512))
     metadata_ = Column("metadata_", JSON, default=dict)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class GeneratedReport(Base):
+    """In-app report history tracker for generated court-ready reports."""
+
+    __tablename__ = "generated_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(String(64), unique=True, index=True, nullable=False)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    report_type = Column(String(50), nullable=False)
+    lead_analyst = Column(String(255))
+    agency = Column(String(255))
+    case_notes = Column(Text)
+    sha256 = Column(String(64), nullable=False, index=True)
+    total_pages = Column(Integer, default=1)
+    size_bytes = Column(Integer, default=0)
+    filename = Column(String(255), nullable=False)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    case = relationship("Case", back_populates="generated_reports")
