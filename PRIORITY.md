@@ -206,8 +206,8 @@ Overhaul the PDF generator into a zero-workspace storage engine that streams PDF
 
 ## Phase 14 — Workstation Validation & End-to-End Smoke Test
 
-- [ ] **T11** Verify zero broken buttons or non-functional routes across all sub-views.
-- [ ] **T12** Execute full evidence ingestion, hash verification, EXIF inspection, chat thread viewing, deletion badge checking, timeline filtering, correlation building, and streaming court-ready PDF generation (confirming zero `.pdf` files written to workspace) end-to-end.
+- [x] **T11** Verify zero broken buttons or non-functional routes across all sub-views.
+- [x] **T12** Execute full evidence ingestion, hash verification, EXIF inspection, chat thread viewing, deletion badge checking, timeline filtering, correlation building, and streaming court-ready PDF generation (confirming zero `.pdf` files written to workspace) end-to-end.
 
 ---
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { caseService } from '../services/caseService';
 import { Header } from '../components/layout';
+import ForensicWorkflowStepper from '../components/workspace/ForensicWorkflowStepper';
 import { Loader2, AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 
 const CaseWorkspacePage = ({ children }) => {
@@ -57,7 +58,7 @@ const CaseWorkspacePage = ({ children }) => {
     );
   }
 
-  const { case: caseData, hash_integrity_score } = workspace;
+  const { case: caseData, hash_integrity_score, analysis_stage } = workspace;
 
   return (
     <div className="min-h-screen bg-forensic-950">
@@ -92,6 +93,12 @@ const CaseWorkspacePage = ({ children }) => {
             {hash_integrity_score}% Integrity Verified
           </span>
         </div>
+
+        {/* Forensic Workflow Stepper */}
+        <ForensicWorkflowStepper
+          caseId={caseId}
+          currentStage={analysis_stage}
+        />
 
         {/* Child View */}
         <div>{children}</div>

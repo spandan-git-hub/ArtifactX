@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { caseService } from '../services/caseService';
+import CaseWorkspacePage from './CaseWorkspacePage';
 import { ReportPanel, ReportPdfPreview } from '../components/reports';
 import { useReports, useReportSummaries } from '../hooks/useReports';
 import { formatDistanceToNow } from 'date-fns';
@@ -110,7 +111,8 @@ const ReportsPage = () => {
   }
 
   return (
-    <div className="animate-in space-y-8">
+    <CaseWorkspacePage>
+      <div className="animate-in space-y-8">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-forensic-800">
         <div>
@@ -376,6 +378,7 @@ const ReportsPage = () => {
         )}
       </div>
     </div>
+    </CaseWorkspacePage>
   );
 };
 

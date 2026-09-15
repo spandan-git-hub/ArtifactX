@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import UPLOADS_DIR
 from backend.app.database import get_db
-from backend.models.models import Case, CorrelationEdge, AnalysisLog, ErrorLog
+from backend.models.models import (
+    Case, Evidence, EvidenceFile, AnalysisResult,
+    WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
+    TelegramMessage, TelegramContact, TelegramGroup,
+    TimelineEvent, DeletedMessage, MediaItem,
+    CorrelationEdge, ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
+)
 from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
 from backend.services.log_service import get_log_service
 from backend.utils.file_storage import delete_file
@@ -58,11 +64,6 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-
-    from backend.models.models import (
-        Evidence, EvidenceFile, WhatsAppMessage, TelegramMessage,
-        WhatsAppContact, TelegramContact, TimelineEvent, DeletedMessage, CorrelationEdge
-    )
 
     evidence_items = db.query(Evidence).filter(Evidence.case_id == case_id).all()
     evidence_summaries = []
@@ -227,14 +228,6 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
             except Exception:
                 pass
 
-        # Import models for bulk delete
-        from backend.models.models import (
-            Evidence, EvidenceFile, AnalysisResult,
-            WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
-            TelegramMessage, TelegramContact, TelegramGroup,
-            TimelineEvent, DeletedMessage, MediaItem,
-            CorrelationEdge, ActivityLog, ErrorLog, AnalysisLog
-        )
 
         # Bulk delete evidence-dependent tables
         if evidence_ids:
@@ -255,6 +248,7 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
         db.query(CorrelationEdge).filter(CorrelationEdge.case_id == case_id).delete(synchronize_session=False)
         db.query(ActivityLog).filter(ActivityLog.case_id == case_id).delete(synchronize_session=False)
         db.query(ErrorLog).filter(ErrorLog.case_id == case_id).delete(synchronize_session=False)
+        db.query(GeneratedReport).filter(GeneratedReport.case_id == case_id).delete(synchronize_session=False)
         db.query(Evidence).filter(Evidence.case_id == case_id).delete(synchronize_session=False)
 
         # Delete case object

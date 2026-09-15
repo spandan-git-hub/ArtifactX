@@ -2,19 +2,15 @@
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool
 
 from backend.app.config import settings
 
-# PostgreSQL configuration with connection pooling & keepalives for cloud Neon DB
+# Serverless PostgreSQL configuration (Neon cloud DB)
+# NullPool prevents stale pooled sockets when Neon serverless compute suspends/resumes
 engine_kwargs = {
-    "poolclass": QueuePool,
-    "pool_size": 5,
-    "max_overflow": 10,
-    "pool_pre_ping": True,  # Verify connections before use
-    "pool_recycle": 300,    # Recycle connections every 5 mins to prevent EOF/SSL drops
+    "poolclass": NullPool,
     "echo": settings.debug,
-    "use_native_hstore": False,
 }
 
 if settings.database_url.startswith("postgresql"):
@@ -40,16 +36,16 @@ def get_db():
     """Yield a database session for dependency injection with automatic connection retry."""
     db = SessionLocal()
     try:
-        db.execute(text("SELECT 1"))
+        yield db
     except Exception:
         try:
             db.rollback()
-            db.close()
         except Exception:
             pass
-        db = SessionLocal()
-
-    try:
-        yield db
+        raise
     finally:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         db.close()
