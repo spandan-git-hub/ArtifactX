@@ -6,9 +6,7 @@ Always read the relevant source-of-truth files before starting work:
 
 | File | Purpose |
 |------|---------|
-| `PRIORITY.md` | Phase-wise step-by-step implementation tracker — use this to know what to build next |
-| `FRONTEND.md` | Complete frontend implementation reference (routing, design, components, services, issues, UX standards) |
-| `BACKEND.md` | Complete backend implementation reference (schema, APIs, services, forensic engine, report generation) |
+| `EVERYTHING.md` | Authoritative project compendium: architecture, specifications, schema, APIs, workstation, court reports, and implementation status |
 | `SKILLS.md` | Installed skills, usage map, and ArtifactX design identity |
 
 Do not rely on conversation history. Always re-read the relevant file.
@@ -58,9 +56,8 @@ If a needed skill is missing:
 
 ## Development Rules
 
-* Follow `PRIORITY.md` for what to implement next.
-* Use `FRONTEND.md` and `BACKEND.md` as source of truth for all implementation details.
-* Do not invent features not listed in these files.
+* Use `EVERYTHING.md` as the definitive source of truth for all implementation details, architecture, APIs, and workflows.
+* Do not invent features not listed in `EVERYTHING.md`.
 * Do not remove existing features.
 * Do not change the technology stack.
 * Generate production-ready code.
