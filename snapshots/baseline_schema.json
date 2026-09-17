@@ -1,0 +1,1893 @@
+{
+  "activity_logs": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('activity_logs_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "action",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "activity_logs_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "activity_logs_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": []
+  },
+  "analysis_logs": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('analysis_logs_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "log_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "details",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "analysis_logs_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "analysis_logs_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": []
+  },
+  "analysis_results": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('analysis_results_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "analysis_type",
+        "type": "VARCHAR(50)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "results",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "started_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "completed_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "analysis_results_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "analysis_results_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_analysis_results_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "cases": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('cases_id_seq'::regclass)"
+      },
+      {
+        "name": "name",
+        "type": "VARCHAR(255)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "investigator",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "created_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "updated_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "cases_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [],
+    "indexes": [
+      {
+        "name": "ix_cases_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "correlation_edges": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('correlation_edges_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "source_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "target_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "source_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "target_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "relation_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata_",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "correlation_edges_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "correlation_edges_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": []
+  },
+  "deleted_messages": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('deleted_messages_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "source_app",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "chat_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "gap_start",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "gap_end",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "missing_count",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "confidence_score",
+        "type": "DOUBLE PRECISION",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "detection_method",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "detected_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "carve_source",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": "'SEQUENCE_GAP'::character varying"
+      },
+      {
+        "name": "recovered_text",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "byte_offset",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "raw_hex",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "frame_index",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "page_number",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "confidence_label",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "deleted_messages_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "deleted_messages_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "deleted_messages_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_deleted_messages_source_app",
+        "unique": false,
+        "column_names": [
+          "source_app"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "error_logs": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('error_logs_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "error_type",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "stack_trace",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "endpoint",
+        "type": "VARCHAR(512)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "method",
+        "type": "VARCHAR(10)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "client_ip",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "user_agent",
+        "type": "VARCHAR(512)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata_",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "error_logs_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "error_logs_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "error_logs_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_error_logs_timestamp",
+        "unique": false,
+        "column_names": [
+          "timestamp"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "evidence": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('evidence_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "original_filename",
+        "type": "VARCHAR(512)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "storage_path",
+        "type": "VARCHAR(1024)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "content_type",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata_",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "extracted_path",
+        "type": "VARCHAR(1024)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "uploaded_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "analyzed_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "evidence_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "evidence_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_evidence_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_evidence_sha256",
+        "unique": false,
+        "column_names": [
+          "sha256"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "evidence_files": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('evidence_files_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "relative_path",
+        "type": "VARCHAR(1024)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "file_size",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "mime_type",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata_",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_media",
+        "type": "BOOLEAN",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "evidence_files_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "evidence_files_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_evidence_files_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "generated_reports": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('generated_reports_id_seq'::regclass)"
+      },
+      {
+        "name": "report_id",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "report_type",
+        "type": "VARCHAR(50)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "lead_analyst",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "agency",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "case_notes",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "total_pages",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "size_bytes",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "filename",
+        "type": "VARCHAR(255)",
+        "nullable": false,
+        "default": null
+      },
+      {
+        "name": "generated_at",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "generated_reports_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "generated_reports_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_generated_reports_case_id",
+        "unique": false,
+        "column_names": [
+          "case_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_generated_reports_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_generated_reports_report_id",
+        "unique": true,
+        "column_names": [
+          "report_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_generated_reports_sha256",
+        "unique": false,
+        "column_names": [
+          "sha256"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "media_items": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('media_items_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "file_path",
+        "type": "VARCHAR(1024)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "mime_type",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "file_size",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "width",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "height",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "duration",
+        "type": "DOUBLE PRECISION",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "exif_data",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "is_orphan",
+        "type": "BOOLEAN",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "linked_message_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "media_items_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "media_items_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "media_items_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": []
+  },
+  "tg_contacts": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('tg_contacts_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "user_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "first_name",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "last_name",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "username",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "phone",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "tg_contacts_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "tg_contacts_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_tg_contacts_user_id",
+        "unique": false,
+        "column_names": [
+          "user_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "tg_groups": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('tg_groups_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "group_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "VARCHAR(512)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "username",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "tg_groups_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "tg_groups_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_tg_groups_group_id",
+        "unique": false,
+        "column_names": [
+          "group_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "tg_messages": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('tg_messages_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "dialog_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sender_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_path",
+        "type": "VARCHAR(1024)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "tg_messages_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "tg_messages_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_tg_messages_dialog_id",
+        "unique": false,
+        "column_names": [
+          "dialog_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_tg_messages_message_id",
+        "unique": false,
+        "column_names": [
+          "message_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_tg_messages_sender_id",
+        "unique": false,
+        "column_names": [
+          "sender_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_tg_messages_timestamp",
+        "unique": false,
+        "column_names": [
+          "timestamp"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "timeline_events": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('timeline_events_id_seq'::regclass)"
+      },
+      {
+        "name": "case_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "event_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "source_app",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "normalized_timestamp",
+        "type": "TIMESTAMP",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "entity_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "entity_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "metadata_",
+        "type": "JSON",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "timeline_events_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "timeline_events_case_id_fkey",
+        "constrained_columns": [
+          "case_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "cases",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      },
+      {
+        "name": "timeline_events_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_timeline_events_event_type",
+        "unique": false,
+        "column_names": [
+          "event_type"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_timeline_events_id",
+        "unique": false,
+        "column_names": [
+          "id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_timeline_events_normalized_timestamp",
+        "unique": false,
+        "column_names": [
+          "normalized_timestamp"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_timeline_events_source_app",
+        "unique": false,
+        "column_names": [
+          "source_app"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_timeline_events_timestamp",
+        "unique": false,
+        "column_names": [
+          "timestamp"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "wa_contacts": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('wa_contacts_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "display_name",
+        "type": "VARCHAR(512)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "phone_number",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "wa_contacts_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "wa_contacts_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_wa_contacts_jid",
+        "unique": false,
+        "column_names": [
+          "jid"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "wa_groups": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('wa_groups_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "group_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "subject",
+        "type": "VARCHAR(512)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "creator_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "creation_timestamp",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "wa_groups_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "wa_groups_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_wa_groups_group_jid",
+        "unique": false,
+        "column_names": [
+          "group_jid"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  },
+  "wa_messages": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "nextval('wa_messages_id_seq'::regclass)"
+      },
+      {
+        "name": "evidence_id",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message_id",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "key_remote_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "sender_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "participant_jid",
+        "type": "VARCHAR(255)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "timestamp",
+        "type": "BIGINT",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "media_path",
+        "type": "VARCHAR(1024)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "message_type",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(50)",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "primary_key": {
+      "constrained_columns": [
+        "id"
+      ],
+      "name": "wa_messages_pkey",
+      "comment": null,
+      "dialect_options": {
+        "postgresql_include": []
+      }
+    },
+    "foreign_keys": [
+      {
+        "name": "wa_messages_evidence_id_fkey",
+        "constrained_columns": [
+          "evidence_id"
+        ],
+        "referred_schema": null,
+        "referred_table": "evidence",
+        "referred_columns": [
+          "id"
+        ],
+        "options": {},
+        "comment": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_wa_messages_key_remote_jid",
+        "unique": false,
+        "column_names": [
+          "key_remote_jid"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_wa_messages_message_id",
+        "unique": false,
+        "column_names": [
+          "message_id"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      },
+      {
+        "name": "ix_wa_messages_timestamp",
+        "unique": false,
+        "column_names": [
+          "timestamp"
+        ],
+        "include_columns": [],
+        "dialect_options": {
+          "postgresql_include": []
+        }
+      }
+    ]
+  }
+}

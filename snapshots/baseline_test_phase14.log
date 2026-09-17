@@ -1,0 +1,68 @@
+=================================================================
+      ARTIFACTX PHASE 14 END-TO-END SMOKE TEST                   
+=================================================================
+[*] Initial workspace PDF count (excluding venv/node_modules): 0
+
+[Step 1] Verifying System Health...
+  -> Health: ok, Demo Mode: True
+
+[Step 2] Creating Demo Forensic Case...
+  -> Created Case ID: 57
+  -> WhatsApp Evidence ID: 104, Telegram Evidence ID: 105
+  -> Correlation Edges: 160
+
+[Step 3] Verifying Case Workspace State & Pipeline Stage...
+  -> Case Name: Phase 14 E2E Test Case
+  -> Hash Integrity Score: 100.0%
+  -> Analysis Stage: #3 - Analyze & Correlate
+  -> Summary: {'evidence_count': 2, 'whatsapp_messages': 50, 'telegram_messages': 50, 'total_messages': 100, 'total_contacts': 20, 'timeline_events': 100, 'deleted_messages': 4, 'correlation_edges': 160}
+
+[Step 4] Verifying Evidence and Multi-Hash Integrity Verification...
+  -> Found 2 evidence items
+  -> Evidence 105 (demo_telegram.db) Verification: status=VERIFIED_INTACT
+     Recorded SHA-256: 1111111111111111111111111111111111111111111111111111111111111111
+  -> Evidence 104 (demo_whatsapp.db) Verification: status=VERIFIED_INTACT
+     Recorded SHA-256: 0000000000000000000000000000000000000000000000000000000000000000
+
+[Step 5] Verifying Artifact Extraction & Inspector Endpoints...
+  -> EXIF response: total_images_inspected=0
+  -> SQLite inspect: status=success, table_count=3
+
+[Step 6] Verifying Chat Thread Viewer and Inline Deletion Indicators...
+  -> Retrieved 51 chat threads across WhatsApp and Telegram
+  -> Inspecting thread 'Chat dialog_29' (dialog_29) [App: telegram, Messages: 1]
+  -> Merged message stream items: 1
+  -> Inline deletion markers detected: 0
+
+[Step 7] Verifying Chronological Timeline & Density Histogram...
+  -> Histogram: Total Events=100, Buckets=0
+  -> App Breakdown: None
+  -> Retrieved 100 chronological timeline events
+
+[Step 8] Verifying Evidence Correlation Engine & Visualizer...
+  -> Correlated Entities: 10
+  -> Cross-App Correlated Message Pairs: 50
+
+[Step 9] Verifying Court-Ready PDF Streaming & Zero-Workspace Storage...
+  -> Streamed Court PDF Size: 15,134 bytes
+  -> Streamed PDF SHA-256: 8cfdf76b3305687b014e8b5900097b74ef9cec8824ecfa5611c0a6cab4739384
+  -> Post-generation workspace PDF count: 0
+  -> CONFIRMED: Zero PDF files were written to project workspace!
+
+[Step 10] Verifying In-App Report History Tracker...
+  -> Recorded Report History Items: 1
+  -> Report ID: 00193457-3bf8-4619-ae05-c62dc241f8c7
+  -> Filename: ArtifactX_CourtReport_Case57_FULL_20260917_155739.pdf
+  -> Total Pages: 5
+  -> DB Recorded SHA-256: 8cfdf76b3305687b014e8b5900097b74ef9cec8824ecfa5611c0a6cab4739384
+  -> CONFIRMED: Cryptographic SHA-256 byte signature matches DB history record!
+
+[Step 11] Verifying Re-Download Endpoint from Report History...
+  -> CONFIRMED: Re-download stream verified intact!
+
+=================================================================
+     ALL PHASE 14 SMOKE TESTS PASSED SUCCESSFULLY! (11/11)      
+=================================================================
+
+[Cleanup] Deleting test case 57...
+  -> Case 57 deleted successfully.

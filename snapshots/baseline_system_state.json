@@ -1,0 +1,7 @@
+{
+  "phase": "Phase A - Baseline Preservation",
+  "git_head": "9cdc0e0b258a14c4e6938f4209000b9bd11b084e",
+  "git_branch": "main",
+  "git_status": "D CLAUDE.md\n D EVERYTHING.md\n D SKILLS.md\n?? backend/scripts/capture_baseline.py\n?? markdown/\n?? snapshots/",
+  "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]"
+}

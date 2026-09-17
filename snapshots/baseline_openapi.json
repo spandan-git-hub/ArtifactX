@@ -1,0 +1,7377 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ArtifactX",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/cases": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Get Cases",
+        "operationId": "get_cases_api_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseRead"
+                  },
+                  "type": "array",
+                  "title": "Response Get Cases Api Cases Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Create Case",
+        "operationId": "create_case_api_cases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/workspace": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Get Case Workspace",
+        "operationId": "get_case_workspace_api_cases__case_id__workspace_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseWorkspaceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Get Case",
+        "operationId": "get_case_api_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Update Case",
+        "operationId": "update_case_api_cases__case_id__put",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cases"
+        ],
+        "summary": "Delete Case",
+        "operationId": "delete_case_api_cases__case_id__delete",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/chats": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Get Case Chats",
+        "description": "Get all WhatsApp and Telegram chat threads for a case.",
+        "operationId": "get_case_chats_api_cases__case_id__chats_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Case Chats Api Cases  Case Id  Chats Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/chats/{jid_raw}/messages": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Get Chat Messages",
+        "description": "Get message stream and deletion indicators for a specific chat JID or dialog_id.",
+        "operationId": "get_chat_messages_api_cases__case_id__chats__jid_raw__messages_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "jid_raw",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jid Raw"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Chat Messages Api Cases  Case Id  Chats  Jid Raw  Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/upload": {
+      "post": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Upload Evidence",
+        "description": "Upload evidence file (ZIP or regular) for a case.",
+        "operationId": "upload_evidence_api_evidence_upload_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_evidence_api_evidence_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "List Evidences",
+        "description": "List evidences for a specific case.",
+        "operationId": "list_evidences_api_evidence__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceRead"
+                  },
+                  "title": "Response List Evidences Api Evidence  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "List Evidences",
+        "description": "List evidences for a specific case.",
+        "operationId": "list_evidences_api_evidence_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceRead"
+                  },
+                  "title": "Response List Evidences Api Evidence Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Get Evidence",
+        "operationId": "get_evidence_api_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Delete Evidence",
+        "description": "Delete evidence and its associated files.",
+        "operationId": "delete_evidence_api_evidence__evidence_id__delete",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}/files": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "List Evidence Files",
+        "description": "List files contained within the evidence (if ZIP).",
+        "operationId": "list_evidence_files_api_evidence__evidence_id__files_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}/files/{file_id}": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Get Evidence File",
+        "description": "Download a specific file from the evidence inventory.",
+        "operationId": "get_evidence_file_api_evidence__evidence_id__files__file_id__get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}/verify-hashes": {
+      "post": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Verify Evidence Hashes",
+        "description": "Verify on-disk evidence files against recorded cryptographic hashes (SHA-256, MD5, SHA-1).",
+        "operationId": "verify_evidence_hashes_api_evidence__evidence_id__verify_hashes_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}/exif": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Get Evidence Exif",
+        "description": "B21: Extract EXIF metadata (camera, specs, GPS, resolution) for evidence image files.",
+        "operationId": "get_evidence_exif_api_evidence__evidence_id__exif_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}/sqlite-inspect": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Inspect Sqlite Database",
+        "description": "B22: Raw SQLite table inspector endpoint allowing direct inspection of msgstore.db, cache4.db, etc.",
+        "operationId": "inspect_sqlite_database_api_evidence__evidence_id__sqlite_inspect_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "table_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Table Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/evidence/{evidence_id}/analyze/whatsapp": {
+      "post": {
+        "tags": [
+          "whatsapp"
+        ],
+        "summary": "Analyze Whatsapp",
+        "description": "Trigger WhatsApp analysis on evidence.",
+        "operationId": "analyze_whatsapp_api_whatsapp_evidence__evidence_id__analyze_whatsapp_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/evidence/{evidence_id}/wa-messages": {
+      "get": {
+        "tags": [
+          "whatsapp"
+        ],
+        "summary": "Get Wa Messages",
+        "description": "Get extracted WhatsApp messages for evidence.",
+        "operationId": "get_wa_messages_api_whatsapp_evidence__evidence_id__wa_messages_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageRead"
+                  },
+                  "title": "Response Get Wa Messages Api Whatsapp Evidence  Evidence Id  Wa Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/evidence/{evidence_id}/wa-contacts": {
+      "get": {
+        "tags": [
+          "whatsapp"
+        ],
+        "summary": "Get Wa Contacts",
+        "description": "Get extracted WhatsApp contacts for evidence.",
+        "operationId": "get_wa_contacts_api_whatsapp_evidence__evidence_id__wa_contacts_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactRead"
+                  },
+                  "title": "Response Get Wa Contacts Api Whatsapp Evidence  Evidence Id  Wa Contacts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/evidence/{evidence_id}/wa-groups": {
+      "get": {
+        "tags": [
+          "whatsapp"
+        ],
+        "summary": "Get Wa Groups",
+        "description": "Get extracted WhatsApp groups for evidence.",
+        "operationId": "get_wa_groups_api_whatsapp_evidence__evidence_id__wa_groups_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GroupRead"
+                  },
+                  "title": "Response Get Wa Groups Api Whatsapp Evidence  Evidence Id  Wa Groups Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/evidence/{evidence_id}/wa-media": {
+      "get": {
+        "tags": [
+          "whatsapp"
+        ],
+        "summary": "Get Wa Media",
+        "description": "Get media references from WhatsApp messages for evidence.",
+        "operationId": "get_wa_media_api_whatsapp_evidence__evidence_id__wa_media_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/evidence/{evidence_id}/analyze/telegram": {
+      "post": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Analyze Telegram",
+        "description": "Trigger Telegram analysis on evidence.",
+        "operationId": "analyze_telegram_api_telegram_evidence__evidence_id__analyze_telegram_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/evidence/{evidence_id}/tg-messages": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Get Tg Messages",
+        "description": "Get extracted Telegram messages for evidence.",
+        "operationId": "get_tg_messages_api_telegram_evidence__evidence_id__tg_messages_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TelegramMessageRead"
+                  },
+                  "title": "Response Get Tg Messages Api Telegram Evidence  Evidence Id  Tg Messages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/evidence/{evidence_id}/tg-contacts": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Get Tg Contacts",
+        "description": "Get extracted Telegram contacts for evidence.",
+        "operationId": "get_tg_contacts_api_telegram_evidence__evidence_id__tg_contacts_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TelegramContactRead"
+                  },
+                  "title": "Response Get Tg Contacts Api Telegram Evidence  Evidence Id  Tg Contacts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/evidence/{evidence_id}/tg-groups": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Get Tg Groups",
+        "description": "Get extracted Telegram groups for evidence.",
+        "operationId": "get_tg_groups_api_telegram_evidence__evidence_id__tg_groups_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TelegramGroupRead"
+                  },
+                  "title": "Response Get Tg Groups Api Telegram Evidence  Evidence Id  Tg Groups Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/evidence/{evidence_id}/tg-media": {
+      "get": {
+        "tags": [
+          "telegram"
+        ],
+        "summary": "Get Tg Media",
+        "description": "Get media references from Telegram messages for evidence.",
+        "operationId": "get_tg_media_api_telegram_evidence__evidence_id__tg_media_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/timeline/build": {
+      "post": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Build Timeline",
+        "description": "Build timeline for a case from WhatsApp, Telegram, deleted gaps, and evidence files.",
+        "operationId": "build_timeline_api_cases__case_id__timeline_build_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/timeline": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline",
+        "description": "Get or filter timeline events for a case.",
+        "operationId": "get_timeline_api_cases__case_id__timeline_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEventRead"
+                  },
+                  "title": "Response Get Timeline Api Cases  Case Id  Timeline Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/timeline/filter": {
+      "post": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Filter Timeline",
+        "description": "Filter timeline events for a case.",
+        "operationId": "filter_timeline_api_cases__case_id__timeline_filter_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimelineEventFilter"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEventRead"
+                  },
+                  "title": "Response Filter Timeline Api Cases  Case Id  Timeline Filter Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/cases/{case_id}/histogram": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline Histogram",
+        "description": "Get time-density histogram for timeline visualization.",
+        "operationId": "get_timeline_histogram_api_timeline_cases__case_id__histogram_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "day",
+              "title": "Interval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/timeline/histogram": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline Histogram",
+        "description": "Get time-density histogram for timeline visualization.",
+        "operationId": "get_timeline_histogram_api_cases__case_id__timeline_histogram_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "day",
+              "title": "Interval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/cases/{case_id}/timeline/build": {
+      "post": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Build Timeline",
+        "description": "Build timeline for a case from WhatsApp, Telegram, deleted gaps, and evidence files.",
+        "operationId": "build_timeline_api_timeline_cases__case_id__timeline_build_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/cases/{case_id}/timeline": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline",
+        "description": "Get or filter timeline events for a case.",
+        "operationId": "get_timeline_api_timeline_cases__case_id__timeline_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEventRead"
+                  },
+                  "title": "Response Get Timeline Api Timeline Cases  Case Id  Timeline Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/cases/{case_id}/timeline/filter": {
+      "post": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Filter Timeline",
+        "description": "Filter timeline events for a case.",
+        "operationId": "filter_timeline_api_timeline_cases__case_id__timeline_filter_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimelineEventFilter"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEventRead"
+                  },
+                  "title": "Response Filter Timeline Api Timeline Cases  Case Id  Timeline Filter Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/timeline/cases/{case_id}/histogram": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline Histogram",
+        "description": "Get time-density histogram for timeline visualization.",
+        "operationId": "get_timeline_histogram_api_timeline_timeline_cases__case_id__histogram_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "day",
+              "title": "Interval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/cases/{case_id}/timeline/histogram": {
+      "get": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Get Timeline Histogram",
+        "description": "Get time-density histogram for timeline visualization.",
+        "operationId": "get_timeline_histogram_api_timeline_cases__case_id__timeline_histogram_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "source_app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "day",
+              "title": "Interval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deleted/cases/{case_id}/deleted/detect": {
+      "post": {
+        "tags": [
+          "deleted"
+        ],
+        "summary": "Detect Deletions",
+        "description": "Detect deleted messages for a case from WhatsApp and Telegram messages.",
+        "operationId": "detect_deletions_api_deleted_cases__case_id__deleted_detect_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deleted/cases/{case_id}/deleted": {
+      "get": {
+        "tags": [
+          "deleted"
+        ],
+        "summary": "Get Deleted Messages",
+        "description": "Get deleted messages for a case.",
+        "operationId": "get_deleted_messages_api_deleted_cases__case_id__deleted_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeletedMessageRead"
+                  },
+                  "title": "Response Get Deleted Messages Api Deleted Cases  Case Id  Deleted Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/evidence/{evidence_id}/analyze/media": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Analyze Media",
+        "description": "Trigger media analysis on evidence.",
+        "operationId": "analyze_media_api_media_evidence__evidence_id__analyze_media_post",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/evidence/{evidence_id}/media": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get Media Items",
+        "description": "Get media items for evidence.",
+        "operationId": "get_media_items_api_media_evidence__evidence_id__media_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/cases/{case_id}/media/orphan": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get Orphan Media",
+        "description": "Get orphan media items for a case.",
+        "operationId": "get_orphan_media_api_media_cases__case_id__media_orphan_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/evidence/{evidence_id}/files/orphan": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get Orphan Files",
+        "description": "Get orphan files (extracted files without media items) for evidence.",
+        "operationId": "get_orphan_files_api_media_evidence__evidence_id__files_orphan_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlate": {
+      "post": {
+        "tags": [
+          "correlation"
+        ],
+        "summary": "Correlate Case",
+        "description": "Trigger correlation for a case.",
+        "operationId": "correlate_case_api_cases__case_id__correlate_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlation": {
+      "get": {
+        "tags": [
+          "correlation"
+        ],
+        "summary": "Get Case Correlation",
+        "description": "Get correlation edges for a case.",
+        "operationId": "get_case_correlation_api_cases__case_id__correlation_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Case Correlation Api Cases  Case Id  Correlation Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlation/entities": {
+      "get": {
+        "tags": [
+          "correlation"
+        ],
+        "summary": "Get Entity Resolutions",
+        "description": "Get resolved cross-app entity contact mappings for a case.",
+        "operationId": "get_entity_resolutions_api_cases__case_id__correlation_entities_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Entity Resolutions Api Cases  Case Id  Correlation Entities Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlation/matrix": {
+      "get": {
+        "tags": [
+          "correlation"
+        ],
+        "summary": "Get Message Matrix",
+        "description": "Get cross-app message correlation matrix for a case within a time window threshold.",
+        "operationId": "get_message_matrix_api_cases__case_id__correlation_matrix_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "window_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 300,
+              "title": "Window Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Message Matrix Api Cases  Case Id  Correlation Matrix Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlation/status": {
+      "get": {
+        "tags": [
+          "correlation"
+        ],
+        "summary": "Get Correlation Status",
+        "description": "Get accurate platform evidence presence status (has_whatsapp, has_telegram, evidence_count) for a case.",
+        "operationId": "get_correlation_status_api_cases__case_id__correlation_status_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Correlation Status Api Cases  Case Id  Correlation Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Global Search",
+        "description": "Global search across messages, contacts, and media.\n\n- Searches message bodies, contact names/numbers, media paths\n- Filters by app (WhatsApp/Telegram/All)\n- Returns categorized results",
+        "operationId": "global_search_api_search_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Case ID to search within",
+              "title": "Case Id"
+            },
+            "description": "Case ID to search within"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Search query",
+              "title": "Query"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AppType",
+              "description": "Filter by app",
+              "default": "all"
+            },
+            "description": "Filter by app"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max results per category",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max results per category"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/messages": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search Messages",
+        "description": "Search messages with filters.\n\n- Full-text search on message body\n- Date range filter (date_from, date_to)\n- App filter (whatsapp/telegram/all)\n- Pagination support",
+        "operationId": "search_messages_api_search_messages_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Case ID to search within",
+              "title": "Case Id"
+            },
+            "description": "Case ID to search within"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query",
+              "title": "Query"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date",
+              "title": "Date From"
+            },
+            "description": "Start date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date",
+              "title": "Date To"
+            },
+            "description": "End date"
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AppType",
+              "description": "Filter by app",
+              "default": "all"
+            },
+            "description": "Filter by app"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Results per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Results per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/contacts": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search Contacts",
+        "description": "Search contacts with filters.\n\n- Full-text search on name, phone, username, JID\n- App filter (whatsapp/telegram/all)\n- Pagination support",
+        "operationId": "search_contacts_api_search_contacts_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Case ID to search within",
+              "title": "Case Id"
+            },
+            "description": "Case ID to search within"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query",
+              "title": "Query"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AppType",
+              "description": "Filter by app",
+              "default": "all"
+            },
+            "description": "Filter by app"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Results per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Results per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/media": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search Media",
+        "description": "Search media with filters.\n\n- Search on file path/name\n- Date range filter\n- App filter (whatsapp/telegram/all)\n- Media type filter (image/video/audio/document)\n- Pagination support",
+        "operationId": "search_media_api_search_media_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Case ID to search within",
+              "title": "Case Id"
+            },
+            "description": "Case ID to search within"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query",
+              "title": "Query"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date",
+              "title": "Date From"
+            },
+            "description": "Start date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date",
+              "title": "Date To"
+            },
+            "description": "End date"
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AppType",
+              "description": "Filter by app",
+              "default": "all"
+            },
+            "description": "Filter by app"
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MediaType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by media type",
+              "title": "Media Type"
+            },
+            "description": "Filter by media type"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Results per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Results per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/summary": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Get Search Summary",
+        "description": "Get search summary statistics for a case.\n\nReturns counts of messages, contacts, and media,\nalong with date ranges and available apps.",
+        "operationId": "get_search_summary_api_search_summary_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Case ID",
+              "title": "Case Id"
+            },
+            "description": "Case ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/stats": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Case Stats",
+        "description": "Get comprehensive statistics for a case.\n\nReturns:\n- Total messages across all apps\n- Total contacts\n- Total media files\n- Total deleted messages\n- Total groups\n- Per-app stats (WhatsApp, Telegram)",
+        "operationId": "get_case_stats_api_cases__case_id__stats_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/correlation-stats": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Correlation Stats",
+        "description": "Get correlation statistics for a case.\n\nReturns:\n- Total correlation edges\n- Message-contact links\n- Message-media links\n- Cross-app links",
+        "operationId": "get_correlation_stats_api_cases__case_id__correlation_stats_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/timeline-stats": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Timeline Stats",
+        "description": "Get timeline event statistics for a case.\n\nReturns:\n- Total events\n- Events by type\n- Events by app\n- Date range",
+        "operationId": "get_timeline_stats_api_cases__case_id__timeline_stats_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/overview": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Case Overview",
+        "description": "Get comprehensive case overview for dashboard.\n\nReturns all dashboard data including:\n- Case information\n- Statistics (messages, contacts, media, etc.)\n- Correlation statistics\n- Timeline statistics\n- Recent events\n- Available apps and date range",
+        "operationId": "get_case_overview_api_cases__case_id__overview_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Generate Court Report",
+        "description": "Generate a court-ready PDF report for a case into memory.\nStreams PDF directly to browser (zero workspace disk storage).\nTracks generated report metadata in database.",
+        "operationId": "generate_court_report_api_cases__case_id__reports_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to stream PDF bytes directly or return metadata",
+              "default": true,
+              "title": "Stream"
+            },
+            "description": "Whether to stream PDF bytes directly or return metadata"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportGenerateRequest",
+                "default": {
+                  "report_type": "full",
+                  "format": "pdf",
+                  "include_evidence": true,
+                  "include_timeline": true,
+                  "include_deleted": true,
+                  "include_correlations": true,
+                  "include_custody_log": true,
+                  "lead_analyst": "Forensic Examiner",
+                  "agency": "Digital Forensics Unit",
+                  "sworn_declaration": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports/history": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report History",
+        "description": "Get in-app report history for a case, tracking generated report IDs,\nanalysts, timestamps, total pages, file sizes, and SHA-256 signatures.",
+        "operationId": "get_report_history_api_cases__case_id__reports_history_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports/{report_id}/download": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Download Historical Report",
+        "description": "Download a past generated report by its report ID.\nRetrieves from temporary cache or reconstructs deterministically in memory.",
+        "operationId": "download_historical_report_api_cases__case_id__reports__report_id__download_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports/summary": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Evidence Summary",
+        "description": "Get evidence summary without generating a PDF.",
+        "operationId": "get_evidence_summary_api_cases__case_id__reports_summary_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports/timeline": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Timeline Summary",
+        "description": "Get timeline summary without generating a PDF.",
+        "operationId": "get_timeline_summary_api_cases__case_id__reports_timeline_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/reports/deleted": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Deleted Summary",
+        "description": "Get deleted messages summary without generating a PDF.",
+        "operationId": "get_deleted_summary_api_cases__case_id__reports_deleted_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedMessageSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/download/{case_id}/{filename}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Download Report Legacy",
+        "description": "Legacy download endpoint supporting direct streaming from temp cache or regeneration.\nZero files written to workspace.",
+        "operationId": "download_report_legacy_api_reports_download__case_id___filename__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs/analysis": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Get Analysis Logs",
+        "description": "Get analysis logs with optional filters.",
+        "operationId": "get_analysis_logs_api_logs_analysis_get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by evidence ID",
+              "title": "Evidence Id"
+            },
+            "description": "Filter by evidence ID"
+          },
+          {
+            "name": "log_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by log type",
+              "title": "Log Type"
+            },
+            "description": "Filter by log type"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter from date",
+              "title": "Start Date"
+            },
+            "description": "Filter from date"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to date",
+              "title": "End Date"
+            },
+            "description": "Filter to date"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Max results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Max results"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Offset for pagination",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisLogEntry"
+                  },
+                  "title": "Response Get Analysis Logs Api Logs Analysis Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs/errors": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Get Error Logs",
+        "description": "Get error logs with optional filters.",
+        "operationId": "get_error_logs_api_logs_errors_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by case ID",
+              "title": "Case Id"
+            },
+            "description": "Filter by case ID"
+          },
+          {
+            "name": "evidence_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by evidence ID",
+              "title": "Evidence Id"
+            },
+            "description": "Filter by evidence ID"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter from date",
+              "title": "Start Date"
+            },
+            "description": "Filter from date"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to date",
+              "title": "End Date"
+            },
+            "description": "Filter to date"
+          },
+          {
+            "name": "error_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by error type",
+              "title": "Error Type"
+            },
+            "description": "Filter by error type"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Max results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Max results"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Offset for pagination",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErrorLogEntry"
+                  },
+                  "title": "Response Get Error Logs Api Logs Errors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs/activity": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Get Activity Logs",
+        "description": "Get activity logs with optional filters.",
+        "operationId": "get_activity_logs_api_logs_activity_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by case ID",
+              "title": "Case Id"
+            },
+            "description": "Filter by case ID"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by action type",
+              "title": "Action"
+            },
+            "description": "Filter by action type"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter from date",
+              "title": "Start Date"
+            },
+            "description": "Filter from date"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to date",
+              "title": "End Date"
+            },
+            "description": "Filter to date"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Max results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Max results"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Offset for pagination",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityLogEntry"
+                  },
+                  "title": "Response Get Activity Logs Api Logs Activity Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs/summary/{case_id}": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Get Log Summary",
+        "description": "Get a summary of all logs for a case.",
+        "operationId": "get_log_summary_api_logs_summary__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/create-demo-case": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Create Demo Case",
+        "description": "Create a demo case with mock forensic data for testing.\nReturns the case ID and statistics.",
+        "operationId": "create_demo_case_api_demo_create_demo_case_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Demo Case Api Demo Create Demo Case Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/demo-case/{case_id}": {
+      "delete": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Delete Demo Case",
+        "description": "Delete a demo case and all associated data.",
+        "operationId": "delete_demo_case_api_demo_demo_case__case_id__delete",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Demo Case Api Demo Demo Case  Case Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/assistant/query": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Query Assistant",
+        "description": "Process investigator natural language questions over case messages and forensic metadata.\nNOTE: Strictly excluded from legal court reports.",
+        "operationId": "query_assistant_api_cases__case_id__assistant_query_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopilotQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Query Assistant Api Cases  Case Id  Assistant Query Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}/assistant/sentiment": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Analyze Sentiment",
+        "description": "Execute chat sentiment classification, intention marker detection, and suspicion confidence scoring.\nNOTE: Strictly excluded from legal court reports.",
+        "operationId": "analyze_sentiment_api_cases__case_id__assistant_sentiment_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SentimentAnalysisRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Analyze Sentiment Api Cases  Case Id  Assistant Sentiment Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityLogEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "timestamp"
+        ],
+        "title": "ActivityLogEntry",
+        "description": "Activity log entry schema."
+      },
+      "AnalysisLogEntry": {
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "log_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Type"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "AnalysisLogEntry",
+        "description": "Analysis log entry schema."
+      },
+      "AnalysisStageInfo": {
+        "properties": {
+          "stage_number": {
+            "type": "integer",
+            "title": "Stage Number"
+          },
+          "stage_name": {
+            "type": "string",
+            "title": "Stage Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage_number",
+          "stage_name",
+          "description"
+        ],
+        "title": "AnalysisStageInfo"
+      },
+      "AppStats": {
+        "properties": {
+          "app": {
+            "type": "string",
+            "title": "App"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          },
+          "contact_count": {
+            "type": "integer",
+            "title": "Contact Count"
+          },
+          "group_count": {
+            "type": "integer",
+            "title": "Group Count"
+          },
+          "media_count": {
+            "type": "integer",
+            "title": "Media Count"
+          },
+          "first_activity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Activity"
+          },
+          "last_activity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app",
+          "message_count",
+          "contact_count",
+          "group_count",
+          "media_count"
+        ],
+        "title": "AppStats",
+        "description": "Statistics for a specific app (WhatsApp/Telegram)."
+      },
+      "AppType": {
+        "type": "string",
+        "enum": [
+          "whatsapp",
+          "telegram",
+          "all"
+        ],
+        "title": "AppType",
+        "description": "Source application type."
+      },
+      "Body_upload_evidence_api_evidence_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_evidence_api_evidence_upload_post"
+      },
+      "CaseCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "investigator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investigator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CaseCreate"
+      },
+      "CaseOverview": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "case_name": {
+            "type": "string",
+            "title": "Case Name"
+          },
+          "case_status": {
+            "type": "string",
+            "title": "Case Status"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CaseStats"
+          },
+          "correlation_stats": {
+            "$ref": "#/components/schemas/CorrelationStats"
+          },
+          "timeline_stats": {
+            "$ref": "#/components/schemas/TimelineStats"
+          },
+          "recent_events": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineMiniEvent"
+            },
+            "type": "array",
+            "title": "Recent Events"
+          },
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Apps"
+          },
+          "date_range_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range Start"
+          },
+          "date_range_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "case_name",
+          "case_status",
+          "stats",
+          "correlation_stats",
+          "timeline_stats"
+        ],
+        "title": "CaseOverview",
+        "description": "Comprehensive case overview for dashboard."
+      },
+      "CaseRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "investigator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investigator"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CaseRead"
+      },
+      "CaseStats": {
+        "properties": {
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages"
+          },
+          "total_contacts": {
+            "type": "integer",
+            "title": "Total Contacts"
+          },
+          "total_media": {
+            "type": "integer",
+            "title": "Total Media"
+          },
+          "total_deleted": {
+            "type": "integer",
+            "title": "Total Deleted"
+          },
+          "total_groups": {
+            "type": "integer",
+            "title": "Total Groups"
+          },
+          "whatsapp": {
+            "$ref": "#/components/schemas/AppStats"
+          },
+          "telegram": {
+            "$ref": "#/components/schemas/AppStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_messages",
+          "total_contacts",
+          "total_media",
+          "total_deleted",
+          "total_groups",
+          "whatsapp",
+          "telegram"
+        ],
+        "title": "CaseStats",
+        "description": "Case statistics."
+      },
+      "CaseUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "investigator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investigator"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "title": "CaseUpdate"
+      },
+      "CaseWorkspaceRead": {
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/CaseRead"
+          },
+          "active_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceWorkspaceSummary"
+            },
+            "type": "array",
+            "title": "Active Evidence"
+          },
+          "hash_integrity_score": {
+            "type": "number",
+            "title": "Hash Integrity Score"
+          },
+          "analysis_stage": {
+            "$ref": "#/components/schemas/AnalysisStageInfo"
+          },
+          "summary_counts": {
+            "$ref": "#/components/schemas/WorkspaceCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case",
+          "active_evidence",
+          "hash_integrity_score",
+          "analysis_stage",
+          "summary_counts"
+        ],
+        "title": "CaseWorkspaceRead"
+      },
+      "ContactRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jid"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "ContactRead"
+      },
+      "ContactSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ContactSearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "ContactSearchResponse",
+        "description": "Paginated contact search response."
+      },
+      "ContactSearchResult": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "app": {
+            "type": "string",
+            "title": "App"
+          },
+          "jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jid"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "evidence_id",
+          "app"
+        ],
+        "title": "ContactSearchResult",
+        "description": "Single contact search result."
+      },
+      "CopilotQueryRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Investigator natural language question or keyword search"
+          },
+          "jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jid",
+            "description": "Filter search to a specific chat JID or dialog ID"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "Max finding records to return",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "CopilotQueryRequest"
+      },
+      "CorrelationStats": {
+        "properties": {
+          "total_edges": {
+            "type": "integer",
+            "title": "Total Edges"
+          },
+          "message_contact_links": {
+            "type": "integer",
+            "title": "Message Contact Links"
+          },
+          "message_media_links": {
+            "type": "integer",
+            "title": "Message Media Links"
+          },
+          "cross_app_links": {
+            "type": "integer",
+            "title": "Cross App Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_edges",
+          "message_contact_links",
+          "message_media_links",
+          "cross_app_links"
+        ],
+        "title": "CorrelationStats",
+        "description": "Correlation statistics."
+      },
+      "DeletedMessageRead": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "source_app": {
+            "type": "string",
+            "title": "Source App"
+          },
+          "chat_jid": {
+            "type": "string",
+            "title": "Chat Jid"
+          },
+          "gap_start": {
+            "type": "integer",
+            "title": "Gap Start"
+          },
+          "gap_end": {
+            "type": "integer",
+            "title": "Gap End"
+          },
+          "missing_count": {
+            "type": "integer",
+            "title": "Missing Count"
+          },
+          "confidence_score": {
+            "type": "number",
+            "title": "Confidence Score"
+          },
+          "detection_method": {
+            "type": "string",
+            "title": "Detection Method"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "evidence_id",
+          "source_app",
+          "chat_jid",
+          "gap_start",
+          "gap_end",
+          "missing_count",
+          "confidence_score",
+          "detection_method",
+          "id",
+          "detected_at"
+        ],
+        "title": "DeletedMessageRead"
+      },
+      "DeletedMessageSummary": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "total_deletions": {
+            "type": "integer",
+            "title": "Total Deletions"
+          },
+          "whatsapp_deletions": {
+            "type": "integer",
+            "title": "Whatsapp Deletions"
+          },
+          "telegram_deletions": {
+            "type": "integer",
+            "title": "Telegram Deletions"
+          },
+          "high_confidence_count": {
+            "type": "integer",
+            "title": "High Confidence Count"
+          },
+          "medium_confidence_count": {
+            "type": "integer",
+            "title": "Medium Confidence Count"
+          },
+          "low_confidence_count": {
+            "type": "integer",
+            "title": "Low Confidence Count"
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "total_deletions",
+          "whatsapp_deletions",
+          "telegram_deletions",
+          "high_confidence_count",
+          "medium_confidence_count",
+          "low_confidence_count"
+        ],
+        "title": "DeletedMessageSummary",
+        "description": "Summary of deleted messages."
+      },
+      "DemoData": {
+        "properties": {
+          "case_name": {
+            "type": "string",
+            "title": "Case Name"
+          },
+          "has_whatsapp": {
+            "type": "boolean",
+            "title": "Has Whatsapp",
+            "default": true
+          },
+          "has_telegram": {
+            "type": "boolean",
+            "title": "Has Telegram",
+            "default": true
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count",
+            "default": 100
+          },
+          "contact_count": {
+            "type": "integer",
+            "title": "Contact Count",
+            "default": 15
+          }
+        },
+        "type": "object",
+        "title": "DemoData",
+        "description": "Demo data structure."
+      },
+      "ErrorLogEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "stack_trace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stack Trace"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "client_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Ip"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "metadata_": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "message",
+          "timestamp"
+        ],
+        "title": "ErrorLogEntry",
+        "description": "Error log entry schema."
+      },
+      "EvidenceRead": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "evidence_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Type"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "extracted_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Path"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Uploaded At"
+          },
+          "analyzed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyzed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "id",
+          "original_filename",
+          "storage_path",
+          "sha256",
+          "uploaded_at"
+        ],
+        "title": "EvidenceRead"
+      },
+      "EvidenceSummary": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "case_name": {
+            "type": "string",
+            "title": "Case Name"
+          },
+          "total_evidence_files": {
+            "type": "integer",
+            "title": "Total Evidence Files"
+          },
+          "total_extracted_files": {
+            "type": "integer",
+            "title": "Total Extracted Files"
+          },
+          "evidence_breakdown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Evidence Breakdown"
+          },
+          "media_summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Media Summary"
+          },
+          "apps_found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Apps Found"
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "case_name",
+          "total_evidence_files",
+          "total_extracted_files"
+        ],
+        "title": "EvidenceSummary",
+        "description": "Summary of evidence for a case."
+      },
+      "EvidenceWorkspaceSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "evidence_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Type"
+          },
+          "file_count": {
+            "type": "integer",
+            "title": "File Count",
+            "default": 0
+          },
+          "uploaded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded At"
+          },
+          "analyzed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyzed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "original_filename",
+          "sha256"
+        ],
+        "title": "EvidenceWorkspaceSummary"
+      },
+      "GeneratedReportResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "report_id": {
+            "type": "string",
+            "title": "Report Id"
+          },
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "report_type": {
+            "type": "string",
+            "title": "Report Type"
+          },
+          "lead_analyst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Analyst"
+          },
+          "agency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agency"
+          },
+          "case_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Notes"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "report_id",
+          "case_id",
+          "report_type",
+          "sha256",
+          "total_pages",
+          "size_bytes",
+          "filename",
+          "generated_at"
+        ],
+        "title": "GeneratedReportResponse",
+        "description": "Metadata response for a generated court report."
+      },
+      "GlobalSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageSearchResult"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactSearchResult"
+            },
+            "type": "array",
+            "title": "Contacts"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/MediaSearchResult"
+            },
+            "type": "array",
+            "title": "Media"
+          },
+          "total_results": {
+            "type": "integer",
+            "title": "Total Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "total_results"
+        ],
+        "title": "GlobalSearchResponse",
+        "description": "Global search response with categorized results."
+      },
+      "GroupRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "group_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Jid"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "creator_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Jid"
+          },
+          "creation_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creation Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "GroupRead"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LogSummary": {
+        "properties": {
+          "total_activities": {
+            "type": "integer",
+            "title": "Total Activities",
+            "default": 0
+          },
+          "total_analysis": {
+            "type": "integer",
+            "title": "Total Analysis",
+            "default": 0
+          },
+          "total_errors": {
+            "type": "integer",
+            "title": "Total Errors",
+            "default": 0
+          },
+          "recent_errors": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorLogEntry"
+            },
+            "type": "array",
+            "title": "Recent Errors",
+            "default": []
+          },
+          "recent_activities": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityLogEntry"
+            },
+            "type": "array",
+            "title": "Recent Activities",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "LogSummary",
+        "description": "Summary of logs for a case."
+      },
+      "MediaSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/MediaSearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "MediaSearchResponse",
+        "description": "Paginated media search response."
+      },
+      "MediaSearchResult": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "mime_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime Type"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          },
+          "is_orphan": {
+            "type": "boolean",
+            "title": "Is Orphan",
+            "default": false
+          },
+          "linked_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "evidence_id",
+          "file_path",
+          "sha256"
+        ],
+        "title": "MediaSearchResult",
+        "description": "Single media search result."
+      },
+      "MediaType": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "audio",
+          "document",
+          "all"
+        ],
+        "title": "MediaType",
+        "description": "Media type filter."
+      },
+      "MessageRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "key_remote_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Remote Jid"
+          },
+          "sender_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Jid"
+          },
+          "participant_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participant Jid"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "media_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Path"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "MessageRead"
+      },
+      "MessageSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/MessageSearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "MessageSearchResponse",
+        "description": "Paginated message search response."
+      },
+      "MessageSearchResult": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "app": {
+            "type": "string",
+            "title": "App"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "chat_jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Jid"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "media_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "evidence_id",
+          "app",
+          "timestamp"
+        ],
+        "title": "MessageSearchResult",
+        "description": "Single message search result."
+      },
+      "ReportFormat": {
+        "type": "string",
+        "enum": [
+          "pdf",
+          "json"
+        ],
+        "title": "ReportFormat",
+        "description": "Report output formats."
+      },
+      "ReportGenerateRequest": {
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "report_type": {
+            "$ref": "#/components/schemas/ReportType",
+            "default": "full"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ReportFormat",
+            "default": "pdf"
+          },
+          "include_evidence": {
+            "type": "boolean",
+            "title": "Include Evidence",
+            "default": true
+          },
+          "include_timeline": {
+            "type": "boolean",
+            "title": "Include Timeline",
+            "default": true
+          },
+          "include_deleted": {
+            "type": "boolean",
+            "title": "Include Deleted",
+            "default": true
+          },
+          "include_correlations": {
+            "type": "boolean",
+            "title": "Include Correlations",
+            "default": true
+          },
+          "include_custody_log": {
+            "type": "boolean",
+            "title": "Include Custody Log",
+            "default": true
+          },
+          "lead_analyst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Analyst",
+            "default": "Forensic Examiner"
+          },
+          "agency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agency",
+            "default": "Digital Forensics Unit"
+          },
+          "case_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Notes"
+          },
+          "sworn_declaration": {
+            "type": "boolean",
+            "title": "Sworn Declaration",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ReportGenerateRequest",
+        "description": "Request to generate a report."
+      },
+      "ReportHistoryResponse": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "total_reports": {
+            "type": "integer",
+            "title": "Total Reports"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/GeneratedReportResponse"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "total_reports",
+          "reports"
+        ],
+        "title": "ReportHistoryResponse",
+        "description": "Case report history response."
+      },
+      "ReportType": {
+        "type": "string",
+        "enum": [
+          "full",
+          "evidence",
+          "timeline",
+          "deleted",
+          "summary"
+        ],
+        "title": "ReportType",
+        "description": "Types of reports."
+      },
+      "SearchSummary": {
+        "properties": {
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages"
+          },
+          "total_contacts": {
+            "type": "integer",
+            "title": "Total Contacts"
+          },
+          "total_media": {
+            "type": "integer",
+            "title": "Total Media"
+          },
+          "date_range_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range Start"
+          },
+          "date_range_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range End"
+          },
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Apps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_messages",
+          "total_contacts",
+          "total_media"
+        ],
+        "title": "SearchSummary",
+        "description": "Summary statistics for search results."
+      },
+      "SentimentAnalysisRequest": {
+        "properties": {
+          "jid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jid",
+            "description": "Optional target chat thread JID to analyze"
+          },
+          "message_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Ids",
+            "description": "Optional explicit list of message IDs to analyze"
+          }
+        },
+        "type": "object",
+        "title": "SentimentAnalysisRequest"
+      },
+      "TelegramContactRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "TelegramContactRead"
+      },
+      "TelegramGroupRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "TelegramGroupRead"
+      },
+      "TelegramMessageRead": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "dialog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dialog Id"
+          },
+          "sender_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Id"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "media_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Path"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "id"
+        ],
+        "title": "TelegramMessageRead"
+      },
+      "TimelineEventFilter": {
+        "properties": {
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "source_app": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source App"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search"
+          }
+        },
+        "type": "object",
+        "title": "TimelineEventFilter"
+      },
+      "TimelineEventRead": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "source_app": {
+            "type": "string",
+            "title": "Source App"
+          },
+          "timestamp": {
+            "type": "integer",
+            "title": "Timestamp"
+          },
+          "normalized_timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Normalized Timestamp"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "metadata_": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "evidence_id",
+          "event_type",
+          "source_app",
+          "timestamp",
+          "normalized_timestamp",
+          "id"
+        ],
+        "title": "TimelineEventRead"
+      },
+      "TimelineMiniEvent": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "source_app": {
+            "type": "string",
+            "title": "Source App"
+          },
+          "normalized_timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Normalized Timestamp"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "source_app",
+          "normalized_timestamp"
+        ],
+        "title": "TimelineMiniEvent",
+        "description": "Mini timeline event for dashboard preview."
+      },
+      "TimelineStats": {
+        "properties": {
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "events_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Events By Type"
+          },
+          "events_by_app": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Events By App"
+          },
+          "date_range_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range Start"
+          },
+          "date_range_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_events",
+          "events_by_type",
+          "events_by_app"
+        ],
+        "title": "TimelineStats",
+        "description": "Timeline statistics."
+      },
+      "TimelineSummary": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "events_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Events By Type"
+          },
+          "events_by_app": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Events By App"
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Range"
+          },
+          "app_breakdown": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "App Breakdown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "total_events"
+        ],
+        "title": "TimelineSummary",
+        "description": "Summary of timeline events."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkspaceCounts": {
+        "properties": {
+          "evidence_count": {
+            "type": "integer",
+            "title": "Evidence Count",
+            "default": 0
+          },
+          "whatsapp_messages": {
+            "type": "integer",
+            "title": "Whatsapp Messages",
+            "default": 0
+          },
+          "telegram_messages": {
+            "type": "integer",
+            "title": "Telegram Messages",
+            "default": 0
+          },
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages",
+            "default": 0
+          },
+          "total_contacts": {
+            "type": "integer",
+            "title": "Total Contacts",
+            "default": 0
+          },
+          "timeline_events": {
+            "type": "integer",
+            "title": "Timeline Events",
+            "default": 0
+          },
+          "deleted_messages": {
+            "type": "integer",
+            "title": "Deleted Messages",
+            "default": 0
+          },
+          "correlation_edges": {
+            "type": "integer",
+            "title": "Correlation Edges",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "WorkspaceCounts"
+      }
+    }
+  }
+}
