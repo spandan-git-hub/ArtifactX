@@ -56,27 +56,27 @@
 
 # D. R2 — Physical Recovery
 
-- [ ] WAL header parser
-- [ ] WAL frame parser
-- [ ] WAL page reconstruction
-- [ ] Freelist header parser
-- [ ] Freelist trunk traversal
-- [ ] Freelist leaf-page scanner
-- [ ] B-tree page parser
-- [ ] Cell/freeblock/slack scanner
-- [ ] SQLite varint decoder
-- [ ] SQLite serial-type decoder
-- [ ] SQLite record decoder
-- [ ] WhatsApp payload candidate decoder
-- [ ] Telegram payload candidate decoder
-- [ ] Recovery provenance schema
-- [ ] Recovery API
-- [ ] Recovery UI
-- [ ] Synthetic deletion fixtures
-- [ ] Malformed SQLite fixtures
-- [ ] False-positive tests
-- [ ] Source immutability test
-- [ ] R2 acceptance gate passed
+- [x] WAL header parser
+- [x] WAL frame parser
+- [x] WAL page reconstruction
+- [x] Freelist header parser
+- [x] Freelist trunk traversal
+- [x] Freelist leaf-page scanner
+- [x] B-tree page parser
+- [x] Cell/freeblock/slack scanner
+- [x] SQLite varint decoder
+- [x] SQLite serial-type decoder
+- [x] SQLite record decoder
+- [x] WhatsApp payload candidate decoder
+- [x] Telegram payload candidate decoder
+- [x] Recovery provenance schema
+- [x] Recovery API
+- [x] Recovery UI
+- [x] Synthetic deletion fixtures
+- [x] Malformed SQLite fixtures
+- [x] False-positive tests
+- [x] Source immutability test
+- [x] R2 acceptance gate passed
 
 # E. R3 — Decryption
 
@@ -225,21 +225,21 @@
 
 ## Current project state
 
-**Last completed phase:** Phase C — Zero-Local-Storage Hardening
+**Last completed phase:** Phase D — R2 Physical Recovery
 
-**Current active phase:** Phase D — R2 Physical Recovery
+**Current active phase:** Phase E — R3 Decryption
 
-**Current active task:** Review and prepare Phase D (Physical Recovery: WAL/Freelist/Slack parsers, record carving)
+**Current active task:** Review Phase E requirements and establish implementation plan for Cryptographic Decryption (WhatsApp Crypt12/14/15, Telegram SQLCipher)
 
 **Blocking issue:** None
 
-**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_zero_storage_e2e.py`
+**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_r2_recovery_e2e.py`
 
-**Last verified commit/change:** Phase C Zero-Local-Storage Hardening verified complete (10/10 zero-storage tests passed, 11/11 Phase 14 regression passed, vite build clean, 0 files in uploads/ or reports/)
+**Last verified commit/change:** Phase D R2 Physical Recovery verified complete (6/6 R2 tests passed, 11/11 Phase 14 regression passed, 10/10 zero-storage passed, vite build clean with 0 errors)
 
-**Next action:** Review Phase D requirements and establish implementation plan for Physical Recovery
+**Next action:** Await user instruction before proceeding to Phase E
 
-**Date/time updated:** 2026-09-17 23:55:00 UTC+05:30
+**Date/time updated:** 2026-09-18 00:32:00 UTC+05:30
 
 ## Change log
 
@@ -248,5 +248,6 @@
 | 2026-09-17 | Phase A | Captured DB schema (18 tables), OpenAPI contract (70 routes, 2 assistant endpoints), full Phase 14 regression run (11/11 passed, 0 workspace PDFs), system metadata, and frontend build verification (vite build 0 errors). | `test_phase14_e2e.py` (11/11), `npm run build` | Verified complete | Baseline frozen in `snapshots/` prior to R1 |
 | 2026-09-17 | Phase B | Surgically removed assistant router & service, frontend assistant drawer/hook/service, copilot UI buttons, sentiment/suspicion overlays, and inspector cards. Verified 0 active AI references. | OpenAPI route check (68 clean routes), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Judicial admissibility enforced; AI entirely excised |
 | 2026-09-17 | Phase C | Hardened zero-local-storage pipeline: added BYTEA columns to evidence, evidence_files, and generated_reports; in-memory stream hashing; in-memory ZIP extraction; deserialized in-memory SQLite parser (open_sqlite); in-memory EXIF/media inspection; eliminated tempfile caching for court PDFs. | `test_zero_storage_e2e.py` (10/10 passed), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Zero-local-disk target fully satisfied; uploads/ and reports/ remain strictly empty |
+| 2026-09-18 | Phase D | Implemented SQLite physical carving: WAL header & frame parser, freelist trunk/leaf scanner, B-tree cell slack space carver, varint/serial-type/record decoders, WhatsApp & Telegram payload decoders, RecoveredFinding & RecoveryRun models, 4 REST endpoints (`/api/cases/{case_id}/recovery/...`), RecoveryPage workstation UI with hex/ASCII inspector & provenance. | `test_r2_recovery_e2e.py` (6/6 passed), `test_phase14_e2e.py` (11/11 passed), `test_zero_storage_e2e.py` (10/10 passed), `npm run build` (0 errors) | Verified complete | Physical carving verified without evidence mutation; zero-disk invariant preserved |
 
 

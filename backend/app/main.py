@@ -15,7 +15,7 @@ from backend.app.config import settings
 from backend.app.database import Base, engine
 from backend.utils.logging_config import configure_logging
 from backend.middleware import ErrorLoggingMiddleware
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo, chats
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo, chats, recovery
 
 
 @asynccontextmanager
@@ -76,6 +76,7 @@ app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
+app.include_router(recovery.router, prefix="/api", tags=["recovery"])
 
 
 

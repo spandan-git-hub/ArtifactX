@@ -18,4 +18,7 @@ from .models import (
     AnalysisLog,
     ActivityLog,
     ErrorLog,
+    GeneratedReport,
+    RecoveryRun,
+    RecoveredFinding,
 )

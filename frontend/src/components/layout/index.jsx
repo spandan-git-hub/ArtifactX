@@ -14,6 +14,7 @@ import {
   Database,
   Clock,
   GitFork,
+  ArchiveRestore,
 } from 'lucide-react';
 
 const Sidebar = ({ collapsed, onToggle }) => {
@@ -28,6 +29,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       { path: '/cases', icon: FolderKanban, label: 'All Cases' },
       { path: `/cases/${activeCaseId}/evidence`, icon: Database, label: 'Evidence & Artifacts' },
       { path: `/cases/${activeCaseId}/chat`, icon: MessageSquare, label: 'Chat Viewer' },
+      { path: `/cases/${activeCaseId}/recovery`, icon: ArchiveRestore, label: 'Physical Recovery' },
       { path: `/cases/${activeCaseId}/timeline`, icon: Clock, label: 'Timeline' },
       { path: `/cases/${activeCaseId}/correlation`, icon: GitFork, label: 'Correlation' },
       { path: `/cases/${activeCaseId}/dashboard`, icon: LayoutDashboard, label: 'Dashboard' },

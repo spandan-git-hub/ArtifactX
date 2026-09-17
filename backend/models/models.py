@@ -42,6 +42,8 @@ class Case(Base):
     activity_logs = relationship("ActivityLog", back_populates="case", cascade="all, delete-orphan")
     correlation_edges = relationship("CorrelationEdge", cascade="all, delete-orphan")
     generated_reports = relationship("GeneratedReport", back_populates="case", cascade="all, delete-orphan")
+    recovered_findings = relationship("RecoveredFinding", back_populates="case", cascade="all, delete-orphan")
+    recovery_runs = relationship("RecoveryRun", back_populates="case", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -322,3 +324,54 @@ class GeneratedReport(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
 
     case = relationship("Case", back_populates="generated_reports")
+
+
+class RecoveryRun(Base):
+    """Audit record for a physical deleted message recovery run."""
+
+    __tablename__ = "recovery_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    status = Column(String(50), default="QUEUED", index=True)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    findings_count = Column(Integer, default=0)
+    wal_pages_analyzed = Column(Integer, default=0)
+    freelist_pages_analyzed = Column(Integer, default=0)
+    slack_spans_analyzed = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+
+    case = relationship("Case", back_populates="recovery_runs")
+    findings = relationship("RecoveredFinding", back_populates="recovery_run", cascade="all, delete-orphan")
+
+
+class RecoveredFinding(Base):
+    """Physically carved deleted message or candidate record."""
+
+    __tablename__ = "recovered_findings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    run_id = Column(Integer, ForeignKey("recovery_runs.id"), nullable=True, index=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    source_file_id = Column(Integer, ForeignKey("evidence_files.id"), nullable=True)
+    source_app = Column(String(50), default="unknown", index=True)
+    method = Column(String(50), nullable=False, index=True)  # wal, freelist, slack, record_reconstruction
+    page_number = Column(Integer, default=0)
+    byte_offset = Column(BigInteger, default=0)
+    raw_payload_hash = Column(String(64), nullable=False, index=True)
+    raw_payload_preview = Column(Text, nullable=True)
+    message_id = Column(String(255), nullable=True)
+    chat_id = Column(String(255), nullable=True, index=True)
+    sender_id = Column(String(255), nullable=True)
+    body = Column(Text, nullable=True)
+    timestamp = Column(BigInteger, nullable=True, index=True)
+    media_reference = Column(String(1024), nullable=True)
+    validation_status = Column(String(50), default="CANDIDATE", index=True)  # RECOVERED, PARTIALLY_RECONSTRUCTED, CANDIDATE, UNVALIDATED
+    limitations = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    case = relationship("Case", back_populates="recovered_findings")
+    recovery_run = relationship("RecoveryRun", back_populates="findings")
