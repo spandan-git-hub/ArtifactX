@@ -44,6 +44,8 @@ class Case(Base):
     generated_reports = relationship("GeneratedReport", back_populates="case", cascade="all, delete-orphan")
     recovered_findings = relationship("RecoveredFinding", back_populates="case", cascade="all, delete-orphan")
     recovery_runs = relationship("RecoveryRun", back_populates="case", cascade="all, delete-orphan")
+    derived_artifacts = relationship("DerivedArtifact", back_populates="case", cascade="all, delete-orphan")
+    decryption_operations = relationship("DecryptionOperation", back_populates="case", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -77,6 +79,8 @@ class Evidence(Base):
     deleted_messages = relationship("DeletedMessage", cascade="all, delete-orphan")
     media_items = relationship("MediaItem", cascade="all, delete-orphan")
     analysis_logs = relationship("AnalysisLog", cascade="all, delete-orphan")
+    derived_artifacts = relationship("DerivedArtifact", back_populates="evidence", cascade="all, delete-orphan")
+    decryption_operations = relationship("DecryptionOperation", back_populates="evidence", cascade="all, delete-orphan")
 
 
 class EvidenceFile(Base):
@@ -375,3 +379,56 @@ class RecoveredFinding(Base):
 
     case = relationship("Case", back_populates="recovered_findings")
     recovery_run = relationship("RecoveryRun", back_populates="findings")
+
+
+class DerivedArtifact(Base):
+    """
+    Decrypted database, decrypted media exhibit, or reconstructed artifact
+    stored directly in PostgreSQL BYTEA with parent exhibit provenance (zero disk storage).
+    """
+
+    __tablename__ = "derived_artifacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    parent_evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    parent_file_id = Column(Integer, ForeignKey("evidence_files.id"), nullable=True, index=True)
+    original_filename = Column(String(512), nullable=False)
+    artifact_type = Column(String(50), nullable=False, index=True)  # decrypted_sqlite, decrypted_media, recovered_secret_chat
+    sha256 = Column(String(64), nullable=False, index=True)
+    size_bytes = Column(Integer, default=0)
+    mime_type = Column(String(255), nullable=True)
+    content_bytes = Column(LargeBinary, nullable=True)
+    provenance = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    case = relationship("Case", back_populates="derived_artifacts")
+    evidence = relationship("Evidence", back_populates="derived_artifacts")
+
+
+class DecryptionOperation(Base):
+    """
+    Audit record for cryptographic decryption operations and derivation provenance.
+    Never persists keys or passcodes.
+    """
+
+    __tablename__ = "decryption_operations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    file_id = Column(Integer, ForeignKey("evidence_files.id"), nullable=True, index=True)
+    format = Column(String(50), nullable=False, index=True)  # crypt12, crypt14, crypt15, sqlcipher, enc, mtproto
+    status = Column(String(50), default="QUEUED", index=True)  # QUEUED, RUNNING, SUCCEEDED, FAILED
+    input_sha256 = Column(String(64), nullable=False, index=True)
+    output_sha256 = Column(String(64), nullable=True, index=True)
+    derived_artifact_id = Column(Integer, ForeignKey("derived_artifacts.id"), nullable=True, index=True)
+    parameters = Column(JSON, default=dict)  # Sanitized, non-sensitive parameters
+    validation = Column(JSON, default=dict)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    case = relationship("Case", back_populates="decryption_operations")
+    evidence = relationship("Evidence", back_populates="decryption_operations")
+    derived_artifact = relationship("DerivedArtifact")

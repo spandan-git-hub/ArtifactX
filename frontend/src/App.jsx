@@ -11,6 +11,7 @@ import ChatViewerPage from './pages/ChatViewerPage';
 import TimelinePage from './pages/TimelinePage';
 import CorrelationPage from './pages/CorrelationPage';
 import RecoveryPage from './pages/RecoveryPage';
+import DecryptionPage from './pages/DecryptionPage';
 import CaseForm from './components/cases/CaseForm';
 import { Layout } from './components/layout';
 import DemoModal from './components/demo/DemoModal';
@@ -72,6 +73,7 @@ function App() {
         <Route path="/cases/:caseId/evidence" element={<EvidencePage />} />
         <Route path="/cases/:caseId/chat" element={<ChatViewerPage />} />
         <Route path="/cases/:caseId/recovery" element={<RecoveryPage />} />
+        <Route path="/cases/:caseId/decryption" element={<DecryptionPage />} />
         <Route path="/cases/:caseId/timeline" element={<TimelinePage />} />
         <Route path="/cases/:caseId/correlation" element={<CorrelationPage />} />
         <Route path="/cases/:caseId/search" element={<SearchPage />} />

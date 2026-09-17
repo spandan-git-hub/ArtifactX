@@ -80,23 +80,23 @@
 
 # E. R3 — Decryption
 
-- [ ] Encryption format detector
-- [ ] WhatsApp key parser
-- [ ] Crypt12 implementation validated against fixtures
-- [ ] Crypt14 implementation validated against fixtures
-- [ ] Crypt15 implementation validated against fixtures
-- [ ] WhatsApp media decryptor validated
-- [ ] Telegram SQLCipher detector
-- [ ] Authorized passcode workflow
-- [ ] SQLCipher parameter profiles validated
-- [ ] Telegram secret-chat implementation validated
-- [ ] Decryption operation provenance
-- [ ] Derived-artifact storage
-- [ ] Key/passcode redaction tests
-- [ ] Wrong-key tests
-- [ ] Corruption/authentication tests
-- [ ] Zero-disk plaintext test
-- [ ] R3 acceptance gate passed
+- [x] Encryption format detector
+- [x] WhatsApp key parser
+- [x] Crypt12 implementation validated against fixtures
+- [x] Crypt14 implementation validated against fixtures
+- [x] Crypt15 implementation validated against fixtures
+- [x] WhatsApp media decryptor validated
+- [x] Telegram SQLCipher detector
+- [x] Authorized passcode workflow
+- [x] SQLCipher parameter profiles validated
+- [x] Telegram secret-chat implementation validated
+- [x] Decryption operation provenance
+- [x] Derived-artifact storage
+- [x] Key/passcode redaction tests
+- [x] Wrong-key tests
+- [x] Corruption/authentication tests
+- [x] Zero-disk plaintext test
+- [x] R3 acceptance gate passed
 
 # F. R4 — Deep Correlation
 
@@ -225,21 +225,21 @@
 
 ## Current project state
 
-**Last completed phase:** Phase D — R2 Physical Recovery
+**Last completed phase:** Phase E — R3 Decryption
 
-**Current active phase:** Phase E — R3 Decryption
+**Current active phase:** Phase F — R4 Deep Correlation
 
-**Current active task:** Review Phase E requirements and establish implementation plan for Cryptographic Decryption (WhatsApp Crypt12/14/15, Telegram SQLCipher)
+**Current active task:** Review Phase F requirements and prepare implementation plan for Entity Resolution & Deep Correlation
 
 **Blocking issue:** None
 
-**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_r2_recovery_e2e.py`
+**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_r3_decryption_e2e.py`
 
-**Last verified commit/change:** Phase D R2 Physical Recovery verified complete (6/6 R2 tests passed, 11/11 Phase 14 regression passed, 10/10 zero-storage passed, vite build clean with 0 errors)
+**Last verified commit/change:** Phase E R3 Decryption verified complete (10/10 R3 tests passed, 6/6 R2 tests passed, 10/10 zero-storage passed, 11/11 Phase 14 regression passed, vite build clean with 0 errors)
 
-**Next action:** Await user instruction before proceeding to Phase E
+**Next action:** Await user instruction before proceeding to Phase F
 
-**Date/time updated:** 2026-09-18 00:32:00 UTC+05:30
+**Date/time updated:** 2026-09-18 01:12:00 UTC+05:30
 
 ## Change log
 
@@ -249,5 +249,6 @@
 | 2026-09-17 | Phase B | Surgically removed assistant router & service, frontend assistant drawer/hook/service, copilot UI buttons, sentiment/suspicion overlays, and inspector cards. Verified 0 active AI references. | OpenAPI route check (68 clean routes), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Judicial admissibility enforced; AI entirely excised |
 | 2026-09-17 | Phase C | Hardened zero-local-storage pipeline: added BYTEA columns to evidence, evidence_files, and generated_reports; in-memory stream hashing; in-memory ZIP extraction; deserialized in-memory SQLite parser (open_sqlite); in-memory EXIF/media inspection; eliminated tempfile caching for court PDFs. | `test_zero_storage_e2e.py` (10/10 passed), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Zero-local-disk target fully satisfied; uploads/ and reports/ remain strictly empty |
 | 2026-09-18 | Phase D | Implemented SQLite physical carving: WAL header & frame parser, freelist trunk/leaf scanner, B-tree cell slack space carver, varint/serial-type/record decoders, WhatsApp & Telegram payload decoders, RecoveredFinding & RecoveryRun models, 4 REST endpoints (`/api/cases/{case_id}/recovery/...`), RecoveryPage workstation UI with hex/ASCII inspector & provenance. | `test_r2_recovery_e2e.py` (6/6 passed), `test_phase14_e2e.py` (11/11 passed), `test_zero_storage_e2e.py` (10/10 passed), `npm run build` (0 errors) | Verified complete | Physical carving verified without evidence mutation; zero-disk invariant preserved |
+| 2026-09-18 | Phase E | Implemented R3 Cryptographic Decryption Subsystem: format/entropy detector, WhatsApp 158-byte key parser & passkey sanitizer, Crypt12 (AES-GCM), Crypt14 (PBKDF2-HMAC-SHA256 + GCM), Crypt15 (64-hex PBKDF2-HMAC-SHA512), WhatsApp media HKDF (RFC 5869) + AES-CBC + HMAC, Telegram SQLCipher v3/v4 pure-Python page decryptor & PIN tester, Telegram MTProto Secret Chat AES-IGE, DerivedArtifact & DecryptionOperation models, 5 REST endpoints, DecryptionPage workstation UI. | `test_r3_decryption_e2e.py` (10/10), `test_r2_recovery_e2e.py` (6/6), `test_zero_storage_e2e.py` (10/10), `test_phase14_e2e.py` (11/11), `npm run build` (0 errors) | Verified complete | Zero secret leakage enforced; derived exhibits persisted directly to PostgreSQL BYTEA |
 
 

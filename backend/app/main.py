@@ -15,7 +15,7 @@ from backend.app.config import settings
 from backend.app.database import Base, engine
 from backend.utils.logging_config import configure_logging
 from backend.middleware import ErrorLoggingMiddleware
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo, chats, recovery
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, demo, chats, recovery, decryption
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE evidence ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
                 conn.execute(text("ALTER TABLE evidence_files ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
                 conn.execute(text("ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS pdf_data BYTEA;"))
+                conn.execute(text("ALTER TABLE derived_artifacts ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
             break
         except Exception as e:
             if attempt == max_retries - 1:
@@ -77,6 +78,7 @@ app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(recovery.router, prefix="/api", tags=["recovery"])
+app.include_router(decryption.router, prefix="/api", tags=["decryption"])
 
 
 
