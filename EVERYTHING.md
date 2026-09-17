@@ -5,7 +5,7 @@
 > **Target Audience:** Human Developers, Forensic Investigators, Systems Architects, and AI Agents  
 > **Document Structure:**
 > - **Part I: Current As-Built Implementation (Phases 0–15)** — Exhaustive documentation of the working code, database models, 15 API routers, frontend workstation, court PDF engine, and test records.
-> - **Part II: Strategic Reorientation, Missing Gaps & Future Roadmap** — Crucial architectural realizations, planned excision of AI sentiment, evolution to physical deleted message carving, deep cross-platform correlation, and the comprehensive forensic analysis framework.
+> - **Part II: Strategic Reorientation, Missing Gaps & Future Roadmap** — Crucial architectural realizations, planned excision of AI sentiment, evolution to physical deleted message carving, database & media decryption (WhatsApp Crypt / Telegram SQLCipher), deep cross-platform correlation, and the comprehensive forensic analysis framework.
 
 ---
 
@@ -50,8 +50,9 @@
 17. [Planned Excision: Decommissioning AI Sentiment & Copilot](#17-planned-excision-decommissioning-ai-sentiment--copilot)
 18. [Future Flagship Pillar 1: True Deleted Message Recovery Engine (Physical Carving)](#18-future-flagship-pillar-1-true-deleted-message-recovery-engine-physical-carving)
 19. [Future Flagship Pillar 2: Deep Cross-Platform Correlation Engine](#19-future-flagship-pillar-2-deep-cross-platform-correlation-engine)
-20. [Filling The Void: Comprehensive Digital Forensics Analysis Framework](#20-filling-the-void-comprehensive-digital-forensics-analysis-framework)
-21. [Strategic Engineering Roadmap (Phases R1–R4)](#21-strategic-engineering-roadmap-phases-r1r4)
+20. [Future Flagship Pillar 3: Database & Media Decryption Subsystem (WhatsApp Crypt12/14/15 & Telegram SQLCipher)](#20-future-flagship-pillar-3-database--media-decryption-subsystem-whatsapp-crypt121415--telegram-sqlcipher)
+21. [Filling The Void: Comprehensive Digital Forensics Analysis Framework](#21-filling-the-void-comprehensive-digital-forensics-analysis-framework)
+22. [Strategic Engineering Roadmap (Phases R1–R5)](#22-strategic-engineering-roadmap-phases-r1r5)
 
 ---
 
@@ -116,6 +117,10 @@ ArtifactX is governed by strict digital forensics and judicial rules:
 4. **The Legal Boundary: Strict AI Assistant Isolation:**
    - While AI-driven natural language queries and sentiment scores assist the human investigator during triage, modern judicial courts reject non-deterministic or subjective AI inferences.
    - Therefore, **AI Copilot outputs, sentiment tones, and suspicion scores are strictly excluded from generated court-ready PDF reports**. Court reports present only verifiable, deterministic facts.
+5. **Zero Local File Saves Mandate (All Data Stored on Database Itself):**
+   - **Absolute Prohibition on Local File Saves:** Under no circumstances should evidence archives, media files, extracted SQLite databases, or generated reports be written or saved to the local host filesystem.
+   - **All Artifacts Stored in the Database:** All ingested evidence packages, extracted file payloads, binary exhibits, media items, and report records must be stored directly within the cloud PostgreSQL database (using binary `BYTEA` columns or database-backed large objects) or processed ephemerally in-memory via `io.BytesIO`.
+   - **Zero Local Disk Residue:** Local staging directories (`uploads/`, `reports/`) must remain strictly empty, ensuring zero data remanence, zero local disk leakage, and full judicial auditability.
 
 ---
 
@@ -148,18 +153,16 @@ flowchart TB
         Parsers --> Detectors --> Engines
     end
 
-    subgraph Persistence["🗄️ PERSISTENCE & CLOUD STORAGE"]
+    subgraph Persistence["🗄️ PERSISTENCE & IN-MEMORY ENGINE (ZERO LOCAL DISK)"]
         direction TB
-        PG[("Neon Serverless Cloud PostgreSQL\n17 Relational Tables\nNullPool + SSL Require")]
-        RawDisk[("Uploads Directory\nuploads/\nRaw Archives & SQLite DBs")]
-        StreamBuf[("In-Memory Buffer\nio.BytesIO\nZero Workspace PDF Engine")]
+        PG[("Neon Serverless Cloud PostgreSQL\n17 Relational Tables + BYTEA Evidence Storage\nNullPool + SSL Require")]
+        StreamBuf[("In-Memory Buffer\nio.BytesIO\nEphemeral Streaming & Zero Local Disk Engine")]
     end
 
     Hooks -- "Axios HTTP (Port 8080)" --> MW
     Services --> ForensicEngine
     Services --> PG
-    Services -- "Read Evidence" --> RawDisk
-    Services -- "Stream PDF" --> StreamBuf
+    Services -- "In-Memory Stream" --> StreamBuf
     StreamBuf -- "Direct Binary Stream" --> UI
 ```
 
@@ -632,8 +635,8 @@ d:\ArtifactX\
 │   │   ├── pages/                          # Workstation view pages (11 pages)
 │   │   └── services/                       # Axios API service wrappers
 │
-├── reports/                                # Zero-workspace storage (Kept empty)
-└── uploads/                                # Ingested evidence packages & active DBs
+├── reports/                                # Zero-workspace storage (Compiled in-memory; strictly empty)
+└── uploads/                                # Zero-local-storage (Cleared completely; strictly empty; all files stored on database)
 ```
 
 ---
@@ -769,7 +772,7 @@ This repository is published publicly **strictly for portfolio evaluation and ac
 
 ## 16. Strategic Critical Realization: What The Developer Must Know
 
-An objective evaluation of the current application reveals three fundamental truths:
+An objective evaluation of the current application reveals six fundamental architectural realizations:
 
 1. **The Word "Analysis" Is Unfulfilled:**  
    Currently, the workstation is predominantly an **Evidence Viewer and Inspector** (parsing tables, rendering message bubbles, listing contacts, and displaying file manifests). It does not yet perform true **forensic analysis**—it lacks behavioral chronobiology, network centrality, criminal hierarchy modeling, automated financial/crypto artifact harvesting, and spatial velocity anomaly detection.
@@ -779,6 +782,10 @@ An objective evaluation of the current application reveals three fundamental tru
    Currently, the system flags sequence gaps (e.g. noticing message ID 105 is missing between 104 and 106). That is detection. **Forensic recovery means parsing SQLite Write-Ahead Logs (`-wal`), freelist pages, and cell slack space to carve the actual deleted message text, timestamp, and sender identity.**
 4. **AI Sentiment & Copilots Are a Detriment to Forensics:**  
    Keyword-based sentiment analysis ("Aggressive", "Deceptive") and conversational AI copilots are legally inadmissible, subjective, and violate the *Daubert* standard for expert testimony. They introduce legal liability and must be excised.
+5. **Chat Application Encryption Obscures Key Evidence:**  
+   Currently, the extraction parsers assume raw, unencrypted SQLite databases. However, in real-world forensic seizures, WhatsApp databases are encrypted (`msgstore.db.crypt12`, `crypt14`, `crypt15`) and media is stored as `.enc` ciphertext, while Telegram databases (`cache4.db`) are encrypted with SQLCipher when an in-app passcode lock is active. Attempting to query these files with standard SQLite results in unreadable binary garbage or `file is not a database` errors, hiding all chats and contacts. ArtifactX must incorporate a dedicated Decryption Subsystem.
+6. **Zero Local File Saves Mandate (All Data Must Be Stored in the Database Itself):**  
+   Local filesystem caching in `uploads/` has been purged, and local file storage is permanently forbidden. Moving forward, **no evidence files, extracted artifacts, or media caches may be saved to local disk**. Storing evidence on local server disks violates chain of custody, causes unauthenticated evidence spillage, and risks disk bloat. All evidentiary artifacts must be stored directly within the cloud PostgreSQL database (persisted as binary `BYTEA` / BLOB entities with cryptographic checksums) or processed ephemerally in-memory (`io.BytesIO`). Local folders (`uploads/`, `reports/`) must remain strictly empty at all times.
 
 ---
 
@@ -899,7 +906,144 @@ The current prototype's phone number string matching must be replaced with an in
 
 ---
 
-## 20. Filling The Void: Comprehensive Digital Forensics Analysis Framework
+## 20. Future Flagship Pillar 3: Database & Media Decryption Subsystem (WhatsApp Crypt12/14/15 & Telegram SQLCipher)
+
+> **The Encryption Problem in Live Mobile Seizures:**  
+> In modern digital forensics, seized mobile evidence rarely presents unencrypted SQLite databases. WhatsApp backups are encrypted as `msgstore.db.crypt12`, `crypt14`, or `crypt15`, and extracted media files are stored as `.enc` ciphertexts. Telegram encrypts `cache4.db` using SQLCipher when an app passcode is configured. Attempting to query these files directly causes standard SQLite parsers to fail with `file is not a database` or unreadable binary garbage, rendering all chats, contacts, and evidence invisible. ArtifactX must integrate an automated Decryption Subsystem.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DATABASE & MEDIA FORENSIC DECRYPTION SUBSYSTEM              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+          ┌───────────────────────────┴───────────────────────────┐
+          ▼                                                       ▼
+┌───────────────────────────────────┐   ┌───────────────────────────────────┐
+│     WHATSAPP DECRYPTION ENGINE    │   │    TELEGRAM SQLCIPHER & MTPROTO   │
+├───────────────────────────────────┤   ├───────────────────────────────────┤
+│ • Ingests /files/key (158 bytes)  │   │ • Detects non-ASCII header entropy│
+│ • Crypt12/14: AES-GCM + IV decode │   │ • SQLCipher AES-256-CBC derivation│
+│ • Crypt15: 64-hex passkey PBKDF2  │   │ • Key derivation: PBKDF2 iter     │
+│ • HKDF media key derivation (RFC) │   │ • Decrypts local cache4.db to SQL │
+│ • Decrypts .enc media to jpg/mp4  │   │ • MTProto enc_chats secret keys   │
+└───────────────────────────────────┘   └───────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    VERIFIED PLAINTEXT SQLITE ARTIFACTS                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Plaintext msgstore.db & cache4.db handed to forensic/ extraction parsers  │
+│ • Decrypted images, voice notes, and documents linked to chat messages      │
+│ • Cryptographic SHA-256 logged with tool provenance & key derivation audit  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. WhatsApp Crypt12 / Crypt14 / Crypt15 Database Decryption
+1. **Key File Acquisition & Structure:**
+   - On physical or rooted Android acquisitions, the key file is located at:
+     ```
+     /data/data/com.whatsapp/files/key
+     ```
+   - Structure of the 158-byte binary key file:
+     - **Bytes 0–2:** Magic header identifying key version (`0x00 0x01 0x02` or equivalent).
+     - **Bytes 30–61 (32 bytes):** AES-256 symmetric cipher key.
+     - **Bytes 110–125 (16 bytes):** Default initialization vector (IV).
+2. **Crypt12 Decryption Workflow:**
+   - **Header:** 67-byte header containing file signature, salt, and authentication tag.
+   - **Initialization Vector (IV):** Extracted from header bytes 51 through 66 (16 bytes).
+   - **Cipher:** AES-256 in Galois/Counter Mode (GCM) with authentication tag validation.
+   - **Payload:** Ciphertext starting at offset 67 is decrypted using the 32-byte key from `/files/key` and the extracted IV.
+3. **Crypt14 Decryption Workflow:**
+   - Modernized header structure with updated key derivation. Uses PBKDF2-HMAC-SHA256 with dynamic salt extracted from the database header to derive the AES-256-GCM session key before payload stream decryption.
+4. **Crypt15 (End-to-End Encrypted Cloud & Local Backups):**
+   - Crypt15 does not use the static `/files/key` file; it uses a **64-character hexadecimal passkey** configured by the user or an encrypted HSM vault key.
+   - **Key Derivation:**
+     $$\text{AES\_Key} = \text{PBKDF2-HMAC-SHA512}(\text{PasskeyHex}, \text{Salt}, \text{Iterations}=100000, \text{KeyLen}=32)$$
+   - The engine validates the derived key against the database authentication tag and decrypts the database body to standard SQLite.
+5. **Decryption Execution & Pipeline Handoff:**
+   - The decrypted database is saved as a verified local working file (e.g. `msgstore_decrypted.db`).
+   - Its SHA-256 hash is computed and recorded in `evidence_files` as a derived exhibit linked to the parent `.crypt` container.
+   - The plaintext SQLite file is immediately handed off to [`forensic/whatsapp/extractor.py`](file:///d:/ArtifactX/forensic/whatsapp/extractor.py), unlocking all messages, contacts, and group chats without code changes to the core extractor.
+
+### 2. WhatsApp `.enc` Media Decryption Engine (HKDF RFC 5869)
+Suspects often send critical photos, videos, voice recordings, and documents that WhatsApp stores as encrypted ciphertext (`.enc` files) in:
+```
+/sdcard/WhatsApp/Media/WhatsApp Images/
+/sdcard/WhatsApp/Media/WhatsApp Audio/
+/sdcard/WhatsApp/Media/WhatsApp Video/
+/sdcard/WhatsApp/Media/WhatsApp Documents/
+```
+Even if `msgstore.db` is decrypted, clicking on media or extracting EXIF metadata will fail unless these `.enc` files are decrypted:
+1. **Media Key Extraction:**
+   - Inside the decrypted `msgstore.db` (in tables `message_media`, `messages`, or inside carved Protobuf structures), each media attachment row contains a raw 32-byte binary field: `media_key`.
+2. **HKDF Key Expansion (RFC 5869):**
+   - The engine derives media-specific cipher keys, IV, and HMAC keys using HKDF with SHA-256:
+     $$\text{PRK} = \text{HKDF-Extract}(\text{salt}=\text{0}^{32}, \text{IKM}=\text{media\_key})$$
+   - Depending on the media type, an application-specific info string is applied:
+     - Images: `"WhatsApp Image Keys"`
+     - Audio / Voice Notes: `"WhatsApp Audio Keys"`
+     - Video: `"WhatsApp Video Keys"`
+     - Documents: `"WhatsApp Document Keys"`
+   - Expansion produces 112 bytes of derived key material:
+     $$\text{Keys} = \text{HKDF-Expand}(\text{PRK}, \text{info}, L=112)$$
+     - **Bytes 0–15:** 16-byte AES Initialization Vector (IV)
+     - **Bytes 16–47 (32 bytes):** AES-256 Cipher Key
+     - **Bytes 48–79 (32 bytes):** HMAC-SHA256 Authentication Key
+     - **Bytes 80–111 (32 bytes):** Reference / Validation Key
+3. **Decryption & Validation:**
+   - The engine reads the raw `.enc` file, verifies the trailing 10-byte MAC against the derived HMAC key, decrypts the ciphertext using AES-256-CBC with PKCS#7 unpadding, and restores the original `.jpg`, `.mp4`, `.opus`, or `.pdf` file.
+   - The restored media files are placed in the case media cache and indexed by [`forensic/media/`](file:///d:/ArtifactX/forensic/media/), enabling full image viewing in `ChatViewerPage.jsx` and EXIF/GPS extraction in `ExifDrawer.jsx`.
+
+### 3. Telegram SQLCipher & MTProto Secret Chat Decryption
+1. **Encrypted SQLite Detection (Entropy & Magic Header Check):**
+   - Standard SQLite databases always commence with the 16-byte magic ASCII header:
+     ```
+     53 51 4c 69 74 65 20 66 6f 72 6d 61 74 20 33 00  ("SQLite format 3\0")
+     ```
+   - If the first 16 bytes contain high-entropy, non-ASCII pseudorandom bytes, the engine flags the database as **SQLCipher-Encrypted**.
+2. **Telegram Passcode Unlocking & SQLCipher Decryption:**
+   - When a user enables Telegram's in-app Passcode Lock, `cache4.db` is encrypted using SQLCipher:
+     - 256-bit AES in CBC mode.
+     - 4,096-byte page size (default).
+     - PBKDF2 key derivation (64,000 or 256,000 iterations using HMAC-SHA256 or HMAC-SHA512).
+   - ArtifactX provides:
+     - **Passcode Input:** An investigator prompt / API parameter to submit the known device or app PIN.
+     - **Dictionary / PIN Brute-Force Module:** Automated derivation for common 4-digit and 6-digit numeric PINs ($10^4$ to $10^6$ space), unlocking the database within seconds.
+     - Decryption syntax:
+       ```python
+       import sqlcipher3
+       conn = sqlcipher3.connect("cache4.db")
+       conn.execute(f"PRAGMA key = '{passcode}';")
+       conn.execute("PRAGMA cipher_page_size = 4096;")
+       conn.execute("PRAGMA kdf_iter = 64000;")
+       # Export plaintext SQLite:
+       conn.execute("ATTACH DATABASE 'cache4_decrypted.db' AS plaintext KEY '';")
+       conn.execute("SELECT sqlcipher_export('plaintext');")
+       conn.execute("DETACH DATABASE plaintext;")
+       ```
+3. **Telegram MTProto Secret Chat Key Reconstruction (`enc_chats`):**
+   - Secret Chats in Telegram use end-to-end MTProto encryption and are not stored in Telegram's cloud.
+   - On the local device, `cache4.db` stores secret chat metadata in table `enc_chats`:
+     - `auth_key`: 256-byte Diffie-Hellman shared key.
+     - `key_hash`: 64-bit key fingerprint.
+     - `in_seq_no`, `out_seq_no`: Message sequence counters.
+   - Encrypted message bodies in `messages_v2` or `messages` for secret chats contain serialized MTProto binary payloads.
+   - The MTProto decryption module reconstructs the AES-256-IGE (Infinite Garble Extension) cipher keys:
+     $$\text{msg\_key} = \text{SHA-256}(\text{auth\_key}_{88..120} + \text{ciphertext})_{0..16}$$
+     $$\text{aes\_key}, \text{aes\_iv} = \text{KDF}(\text{auth\_key}, \text{msg\_key}, \text{client\_mode})$$
+   - Decrypts the IGE ciphertext, unpacks the serialized TL (Type Language) object, and recovers the plaintext secret chat message.
+
+### 4. Judicial Audit Trail & Chain of Custody
+1. **Non-Destructive Derivation:** Original `.crypt12/14/15`, `.enc`, and encrypted `cache4.db` files are preserved unmodified in `uploads/` with immutable primary SHA-256 digests.
+2. **Derivation Provenance Logging:** When a decrypted SQLite file is produced, an entry is written to `activity_logs`:
+   - Parent file ID and hash.
+   - Decryption method used (`CRYPT14_AES_GCM`, `SQLCIPHER_PASSCODE_PIN`, `HKDF_MEDIA_AES_CBC`).
+   - SHA-256 hash of the resulting decrypted database.
+   - Timestamp and examiner identity.
+
+---
+
+## 21. Filling The Void: Comprehensive Digital Forensics Analysis Framework
 
 > **The Meaning of "Analysis":**  
 > A true digital forensics suite must not stop at extracting data. It must provide **behavioral intelligence, social network analysis, financial artifact harvesting, and anti-forensic anomaly detection**.
@@ -988,7 +1132,7 @@ A deterministic forensic extraction engine scanning message bodies, file names, 
 
 ---
 
-## 21. Strategic Engineering Roadmap (Phases R1–R4)
+## 22. Strategic Engineering Roadmap (Phases R1–R5)
 
 To bridge the gap between the current working prototype and the true forensic vision, the next development cycles should be executed according to this phased roadmap:
 
@@ -997,10 +1141,11 @@ To bridge the gap between the current working prototype and the true forensic vi
 │                   ARTIFACTX STRATEGIC ROADMAP PHASING                       │
 └─────────────────────────────────────────────────────────────────────────────┘
   │
-  ├──► PHASE R1: AI Excision & Codebase Purge
+  ├──► PHASE R1: AI Excision & Zero-Local-Storage Hardening
   │    ├── Delete backend/api/assistant.py and backend/services/assistant_service.py
   │    ├── Delete ForensicAssistantDrawer.jsx, useAiAssistant.js, assistantService.js
-  │    └── Remove AI buttons from CaseWorkspacePage and ChatViewerPage
+  │    ├── Remove AI buttons from CaseWorkspacePage and ChatViewerPage
+  │    └── Enforce Zero Local Storage: Store all evidence in database (BYTEA/BLOB) & in-memory streams; zero disk saves
   │
   ├──► PHASE R2: True Deleted Message Recovery Engine (Physical Carving)
   │    ├── Implement SQLite WAL (-wal) frame parser for uncheckpointed rows
@@ -1008,13 +1153,19 @@ To bridge the gap between the current working prototype and the true forensic vi
   │    ├── Implement B-Tree cell slack space text extractor
   │    └── Implement schema-adaptive Protobuf payload reconstructor
   │
-  ├──► PHASE R3: Deep Cross-Platform Correlation Engine
+  ├──► PHASE R3: Database & Media Decryption Subsystem
+  │    ├── Implement WhatsApp Crypt12/14/15 decrypter (/files/key & 64-hex passkey)
+  │    ├── Implement WhatsApp .enc media decryptor (HKDF RFC 5869 key derivation)
+  │    ├── Implement Telegram SQLCipher header entropy detector & PIN unlocker
+  │    └── Implement MTProto AES-IGE secret chat (enc_chats) reconstructor
+  │
+  ├──► PHASE R4: Deep Cross-Platform Correlation Engine
   │    ├── Implement Multi-Entity Identity Resolution Graph (Person entity)
   │    ├── Implement Platform Handover / Surveillance Evasion Detector
   │    ├── Implement Perceptual Media Hasher (pHash/dHash, Hamming distance <= 4)
   │    └── Implement Cross-App Shared Artifact Stitching (Crypto/Bank/Code-words)
   │
-  └──► PHASE R4: Digital Forensic Analysis Suite
+  └──► PHASE R5: Digital Forensic Analysis Suite
        ├── Module A: 24x7 Circadian Heatmaps & Latency Dominance Analyzer
        ├── Module B: Social Network Centrality (Degree, Betweenness, Modularity)
        ├── Module C: Crypto Wallet, IBAN, Credit Card, and Darknet Carvers

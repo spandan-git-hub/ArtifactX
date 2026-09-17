@@ -79,7 +79,7 @@ If a needed skill is missing:
 
 * **Evidence Integrity & Hashing:** Calculate and display cryptographic hashes (SHA-256, MD5, SHA-1) on ingestion and verification. Maintain a chain-of-custody log for all operations.
 * **No Synthetic Artifacts:** Never fabricate forensic findings. Parse evidence only from uploaded evidence files via `forensic/` module. Demo mode data must be clearly tagged as demo data.
-* **Court-Ready Reports & Zero Workspace Storage:** Generated PDF court reports **MUST NOT** be saved inside the project workspace directory. Reports must be generated in-memory (`io.BytesIO`) and streamed directly to the browser for download (`StreamingResponse`), or cached in system temp storage (`tempfile.gettempdir()`). Report metadata (Case ID, Report Type, Generation Timestamp, Lead Analyst, Verification SHA-256 Hash of PDF bytes) must be tracked in the app database (`generated_reports` / `activity_logs`).
+* **Zero Local File Saves (Store All Data in Database):** Under no circumstances should evidence files, archives, extracted databases, or media be saved to the local host filesystem. All files, exhibits, media bytes, and forensic records must be stored directly in the database (PostgreSQL `BYTEA` / BLOB) or processed ephemerally in-memory via `io.BytesIO`. Local directories (such as `uploads/` and `reports/`) must remain strictly empty.
 * **AI Forensic Assistant Isolation (Legal Boundary):** The AI Assistant (copilot chat, chat sentiment analysis, intention checking, suspicion scoring) is strictly an internal investigative helper for the human investigator. **AI insights MUST BE EXCLUDED from official court-ready PDF reports** to ensure judicial admissibility and prevent courts from rejecting evidence.
 
 ---
