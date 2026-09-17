@@ -25,20 +25,20 @@
 
 # B. R1 — AI Excision
 
-- [ ] Remove `backend/api/assistant.py`
-- [ ] Remove `backend/services/assistant_service.py`
-- [ ] Remove `ForensicAssistantDrawer.jsx`
-- [ ] Remove `useAiAssistant.js`
-- [ ] Remove `assistantService.js`
-- [ ] Remove assistant router include
-- [ ] Remove assistant UI triggers
-- [ ] Remove assistant frontend route/state references
-- [ ] Remove assistant-only dependencies
-- [ ] Repository-wide assistant reference audit complete
-- [ ] No sentiment/suspicion code remains active
-- [ ] Court report contains no AI-derived fields
-- [ ] R1 backend tests pass
-- [ ] R1 frontend build passes
+- [x] Remove `backend/api/assistant.py`
+- [x] Remove `backend/services/assistant_service.py`
+- [x] Remove `ForensicAssistantDrawer.jsx`
+- [x] Remove `useAiAssistant.js`
+- [x] Remove `assistantService.js`
+- [x] Remove assistant router include
+- [x] Remove assistant UI triggers
+- [x] Remove assistant frontend route/state references
+- [x] Remove assistant-only dependencies
+- [x] Repository-wide assistant reference audit complete
+- [x] No sentiment/suspicion code remains active
+- [x] Court report contains no AI-derived fields
+- [x] R1 backend tests pass
+- [x] R1 frontend build passes
 
 # C. Zero-Local-Storage Hardening
 
@@ -225,25 +225,26 @@
 
 ## Current project state
 
-**Last completed phase:** Phase A — Baseline Preservation
+**Last completed phase:** Phase B — R1 AI Excision
 
-**Current active phase:** Phase B — R1 AI Excision
+**Current active phase:** Phase C — Zero-Local-Storage Hardening
 
-**Current active task:** Plan and prepare Phase B (AI Excision: assistant router, service, UI drawer, hook)
+**Current active task:** Review and prepare Phase C (Zero-Local-Storage Hardening: streaming ingestion, PostgreSQL evidence BLOBs, memory-only SQLite/media parsing)
 
 **Blocking issue:** None
 
 **Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_phase14_e2e.py`
 
-**Last verified commit/change:** Baseline snapshots captured in `snapshots/` (`baseline_schema.json`, `baseline_schema.sql`, `baseline_openapi.json`, `baseline_test_phase14.log`, `baseline_system_state.json`)
+**Last verified commit/change:** Phase B AI Excision completed and verified (assistant router/service excised, drawer/hook excised, 68/68 OpenAPI paths clean, 11/11 E2E tests pass, vite build clean)
 
-**Next action:** Review Phase B implementation plan and execute surgical AI excision
+**Next action:** Review Phase C requirements and establish implementation plan for Zero-Local-Storage Hardening
 
-**Date/time updated:** 2026-09-17 21:50:00 UTC+05:30
+**Date/time updated:** 2026-09-17 23:25:00 UTC+05:30
 
 ## Change log
 
 | Date | Phase | Change | Tests | Status | Notes |
 |---|---|---|---|---|---|
 | 2026-09-17 | Phase A | Captured DB schema (18 tables), OpenAPI contract (70 routes, 2 assistant endpoints), full Phase 14 regression run (11/11 passed, 0 workspace PDFs), system metadata, and frontend build verification (vite build 0 errors). | `test_phase14_e2e.py` (11/11), `npm run build` | Verified complete | Baseline frozen in `snapshots/` prior to R1 |
+| 2026-09-17 | Phase B | Surgically removed assistant router & service, frontend assistant drawer/hook/service, copilot UI buttons, sentiment/suspicion overlays, and inspector cards. Verified 0 active AI references. | OpenAPI route check (68 clean routes), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Judicial admissibility enforced; AI entirely excised |
 

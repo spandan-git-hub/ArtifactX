@@ -3,8 +3,6 @@ import { useParams } from 'react-router-dom';
 import CaseWorkspacePage from './CaseWorkspacePage';
 import chatService from '../services/chatService';
 import ExifMetadataDrawer from '../components/evidence/ExifMetadataDrawer';
-import ForensicAssistantDrawer from '../components/assistant/ForensicAssistantDrawer';
-import useAiAssistant from '../hooks/useAiAssistant';
 import {
   MessageSquare,
   Search,
@@ -26,24 +24,7 @@ import {
   ChevronRight,
   Code,
   Info,
-  Sparkles,
-  Bot,
-  Activity,
-  Flame,
-  ShieldAlert,
-  DollarSign,
-  Trash2,
-  Lock,
 } from 'lucide-react';
-
-const TONE_BADGES = {
-  Aggressive: { label: 'Aggressive', bg: 'bg-accent-rose/15 text-accent-rose border-accent-rose/30' },
-  Suspicious: { label: 'Suspicious', bg: 'bg-amber-400/15 text-amber-400 border-amber-400/30' },
-  Deceptive: { label: 'Deceptive', bg: 'bg-purple-400/15 text-purple-400 border-purple-400/30' },
-  Urgent: { label: 'Urgent', bg: 'bg-orange-400/15 text-orange-400 border-orange-400/30' },
-  Evasive: { label: 'Evasive', bg: 'bg-yellow-400/15 text-yellow-400 border-yellow-400/30' },
-  Neutral: { label: 'Neutral', bg: 'bg-forensic-800 text-forensic-400 border-forensic-700' },
-};
 
 const ChatViewerPage = () => {
   const { caseId } = useParams();
@@ -58,14 +39,6 @@ const ChatViewerPage = () => {
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'whatsapp', 'telegram'
   const [selectedJid, setSelectedJid] = useState(null);
 
-  // Phase 15: AI Assistant & Sentiment Overlay State
-  const [showSentimentOverlay, setShowSentimentOverlay] = useState(false);
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const {
-    sentimentData,
-    loadingSentiment,
-    loadSentiment,
-  } = useAiAssistant(caseId);
 
   // Active message stream
   const [activeThreadInfo, setActiveThreadInfo] = useState(null);
@@ -162,24 +135,6 @@ const ChatViewerPage = () => {
     }
   }, [messageStream]);
 
-  // Load sentiment data when overlay is toggled on or thread changes
-  useEffect(() => {
-    if (showSentimentOverlay && caseId && selectedJid) {
-      loadSentiment(selectedJid);
-    }
-  }, [showSentimentOverlay, caseId, selectedJid, loadSentiment]);
-
-  const handleSelectCitation = (finding) => {
-    if (finding.chat_jid && finding.chat_jid !== selectedJid) {
-      setSelectedJid(finding.chat_jid);
-    }
-    const found = messageStream.find(
-      (m) => m.id === finding.id || m.message_id === finding.message_id
-    );
-    if (found) {
-      setSelectedMessage(found);
-    }
-  };
 
   // Filter threads
   const filteredThreads = threads.filter((thread) => {
@@ -230,7 +185,7 @@ const ChatViewerPage = () => {
   };
 
   return (
-    <CaseWorkspacePage activeTab="chat" onOpenCopilot={() => setIsAssistantOpen(true)}>
+    <CaseWorkspacePage activeTab="chat">
       <div className="h-[calc(100vh-180px)] flex flex-col lg:flex-row gap-4 bg-forensic-950 text-forensic-100 animate-in">
         {/* ======================================================== */}
         {/* LEFT PANE: Thread List Sidebar */}
@@ -406,38 +361,7 @@ const ChatViewerPage = () => {
                   </span>
                 )}
 
-                {/* Phase 15: Sentiment Overlay Toggle */}
-                <button
-                  onClick={() => {
-                    const next = !showSentimentOverlay;
-                    setShowSentimentOverlay(next);
-                    if (next && selectedJid) loadSentiment(selectedJid);
-                  }}
-                  className={`py-1 px-2.5 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
-                    showSentimentOverlay
-                      ? 'bg-accent-cyan/20 border-accent-cyan text-accent-cyan shadow-sm'
-                      : 'bg-forensic-900 border-forensic-700 text-forensic-400 hover:text-forensic-200'
-                  }`}
-                  title="Toggle emotional tone badges and suspicion indicators on chat messages"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Sentiment Overlay</span>
-                  <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${
-                    showSentimentOverlay ? 'bg-accent-cyan text-forensic-950' : 'bg-forensic-800 text-forensic-500'
-                  }`}>
-                    {showSentimentOverlay ? 'ON' : 'OFF'}
-                  </span>
-                </button>
 
-                {/* Phase 15: AI Forensic Copilot Trigger */}
-                <button
-                  onClick={() => setIsAssistantOpen(true)}
-                  className="btn-primary py-1 px-2.5 text-xs inline-flex items-center gap-1.5 shadow-sm"
-                  title="Open AI Forensic Assistant Copilot"
-                >
-                  <Bot className="w-3.5 h-3.5" />
-                  <span>AI Copilot</span>
-                </button>
               </div>
             </div>
           ) : (
@@ -537,56 +461,7 @@ const ChatViewerPage = () => {
                         </p>
                       )}
 
-                      {/* Phase 15: Chat Sentiment & Intention Overlay */}
-                      {showSentimentOverlay && sentimentData?.messages?.[item.id] && (() => {
-                        const s = sentimentData.messages[item.id];
-                        const badgeStyle = TONE_BADGES[s.tone] || TONE_BADGES.Neutral;
-                        return (
-                          <div className="mt-1.5 pt-1.5 border-t border-forensic-800/80 space-y-1.5 animate-in fade-in">
-                            <div className="flex items-center justify-between gap-2 flex-wrap text-[10px]">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`px-2 py-0.5 rounded font-mono font-medium border ${badgeStyle.bg}`}>
-                                  {s.tone}
-                                </span>
-                                {s.suspicion_score > 0 && (
-                                  <span className={`px-1.5 py-0.5 rounded font-mono font-semibold ${
-                                    s.suspicion_score >= 70
-                                      ? 'text-accent-rose bg-accent-rose/15 border border-accent-rose/30'
-                                      : s.suspicion_score >= 40
-                                      ? 'text-amber-400 bg-amber-400/15 border border-amber-400/30'
-                                      : 'text-forensic-400 bg-forensic-800/40 border border-forensic-700/40'
-                                  }`}>
-                                    Suspicion: {s.suspicion_score}%
-                                  </span>
-                                )}
-                              </div>
 
-                              {s.confidence_level && (
-                                <span className="text-forensic-500 font-mono text-[9px]">
-                                  Confidence: {s.confidence_level}
-                                </span>
-                              )}
-                            </div>
-
-                            {s.intentions?.length > 0 && (
-                              <div className="flex flex-wrap gap-1 pt-0.5">
-                                {s.intentions.map((intent) => (
-                                  <span
-                                    key={intent}
-                                    className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-forensic-950 text-accent-cyan border border-accent-cyan/20 flex items-center gap-1"
-                                  >
-                                    {intent === 'financial_demand' && <DollarSign className="w-2.5 h-2.5 text-emerald-400" />}
-                                    {intent === 'coercion' && <Flame className="w-2.5 h-2.5 text-accent-rose" />}
-                                    {intent === 'deletion_awareness' && <Trash2 className="w-2.5 h-2.5 text-amber-400" />}
-                                    {intent === 'covert_communication' && <Lock className="w-2.5 h-2.5 text-purple-400" />}
-                                    {intent.replace('_', ' ')}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
 
                       {/* Attachment Preview Box */}
                       {isMedia && item.media_info && (
@@ -673,97 +548,7 @@ const ChatViewerPage = () => {
                   </p>
                 </div>
 
-                {/* Phase 15: AI Sentiment & Intent Analysis Card */}
-                <div className="card bg-forensic-950/80 border-accent-cyan/20 p-3 space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-forensic-800 pb-2">
-                    <span className="text-xs font-semibold text-forensic-100 flex items-center gap-1.5 font-mono">
-                      <Sparkles className="w-3.5 h-3.5 text-accent-cyan" />
-                      AI Sentiment & Intent
-                    </span>
-                    <span className="badge badge-cyan text-[9px] uppercase font-mono">Investigative</span>
-                  </div>
 
-                  {/* Legal Court Exclusion Disclaimer */}
-                  <div className="p-1.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
-                    <span className="leading-tight">Internal Aid Only — Excluded from Court Reports</span>
-                  </div>
-
-                  {sentimentData?.messages?.[selectedMessage.id] ? (() => {
-                    const s = sentimentData.messages[selectedMessage.id];
-                    const badgeStyle = TONE_BADGES[s.tone] || TONE_BADGES.Neutral;
-                    return (
-                      <div className="space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-forensic-400 text-[11px]">Emotional Tone:</span>
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium border ${badgeStyle.bg}`}>
-                            {s.tone}
-                          </span>
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between text-[11px] mb-1">
-                            <span className="text-forensic-400">Suspicion Score:</span>
-                            <span className={`font-mono font-bold ${
-                              s.suspicion_score >= 70 ? 'text-accent-rose' : s.suspicion_score >= 40 ? 'text-amber-400' : 'text-accent-cyan'
-                            }`}>
-                              {s.suspicion_score}% ({s.confidence_level} Confidence)
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-forensic-900 rounded-full overflow-hidden border border-forensic-800">
-                            <div
-                              className={`h-full transition-all duration-300 ${
-                                s.suspicion_score >= 70 ? 'bg-accent-rose' : s.suspicion_score >= 40 ? 'bg-amber-400' : 'bg-accent-cyan'
-                              }`}
-                              style={{ width: `${s.suspicion_score}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {s.intentions?.length > 0 && (
-                          <div>
-                            <span className="text-forensic-400 text-[11px] block mb-1">Detected Intentions:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {s.intentions.map((intent) => (
-                                <span key={intent} className="badge badge-gray text-[10px] uppercase font-mono">
-                                  {intent.replace('_', ' ')}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {s.highlights?.length > 0 && (
-                          <div>
-                            <span className="text-forensic-400 text-[11px] block mb-1">Lexical Triggers:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {s.highlights.map((h, i) => (
-                                <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-forensic-900 border border-forensic-800 text-forensic-300">
-                                  "{h}"
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })() : (
-                    <div className="text-center py-2">
-                      <button
-                        onClick={() => loadSentiment(selectedJid, [selectedMessage.id])}
-                        disabled={loadingSentiment}
-                        className="btn-secondary py-1 px-2.5 text-[11px] inline-flex items-center gap-1.5"
-                      >
-                        {loadingSentiment ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5 text-accent-cyan" />
-                        )}
-                        Analyze This Message
-                      </button>
-                    </div>
-                  )}
-                </div>
 
                 {/* Message Attributes */}
                 <div className="card bg-forensic-950/60 border-forensic-800 p-3 space-y-3">
@@ -867,15 +652,6 @@ const ChatViewerPage = () => {
         fileName={exifDrawerState.fileName}
       />
 
-      {/* Phase 15: Forensic AI Assistant & Copilot Drawer */}
-      <ForensicAssistantDrawer
-        isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
-        caseId={caseId}
-        activeJid={selectedJid}
-        activeThreadName={activeThreadInfo?.name}
-        onSelectCitation={handleSelectCitation}
-      />
     </CaseWorkspacePage>
   );
 };

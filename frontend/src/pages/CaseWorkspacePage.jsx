@@ -3,17 +3,15 @@ import { useParams, Link } from 'react-router-dom';
 import { caseService } from '../services/caseService';
 import { Header } from '../components/layout';
 import ForensicWorkflowStepper from '../components/workspace/ForensicWorkflowStepper';
-import ForensicAssistantDrawer from '../components/assistant/ForensicAssistantDrawer';
-import { Loader2, AlertCircle, ArrowLeft, ShieldCheck, Bot } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 
-const CaseWorkspacePage = ({ children, onOpenCopilot }) => {
+const CaseWorkspacePage = ({ children }) => {
   const params = useParams();
   const caseId = params.id || params.caseId;
 
   const [workspace, setWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [internalCopilotOpen, setInternalCopilotOpen] = useState(false);
 
   useEffect(() => {
     const fetchWorkspace = async () => {
@@ -91,21 +89,6 @@ const CaseWorkspacePage = ({ children, onOpenCopilot }) => {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => {
-                if (onOpenCopilot) {
-                  onOpenCopilot();
-                } else {
-                  setInternalCopilotOpen(true);
-                }
-              }}
-              className="btn-secondary text-xs py-1 px-2.5 inline-flex items-center gap-1.5 font-mono shadow-sm"
-              title="Open AI Forensic Assistant Copilot"
-            >
-              <Bot className="w-3.5 h-3.5 text-accent-cyan" />
-              <span>AI Copilot</span>
-            </button>
-
             <span className="text-xs font-mono text-accent-emerald bg-accent-emerald/10 px-2.5 py-1 rounded border border-accent-emerald/20 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4" />
               {hash_integrity_score}% Integrity Verified
@@ -121,15 +104,6 @@ const CaseWorkspacePage = ({ children, onOpenCopilot }) => {
 
         {/* Child View */}
         <div>{children}</div>
-
-        {/* Global Case Workspace AI Copilot Drawer */}
-        {!onOpenCopilot && (
-          <ForensicAssistantDrawer
-            isOpen={internalCopilotOpen}
-            onClose={() => setInternalCopilotOpen(false)}
-            caseId={caseId}
-          />
-        )}
       </div>
     </div>
   );
