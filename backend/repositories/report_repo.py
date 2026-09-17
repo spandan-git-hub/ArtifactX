@@ -475,8 +475,9 @@ class ReportRepository:
         total_pages: int,
         size_bytes: int,
         filename: str,
+        pdf_data: Optional[bytes] = None,
     ) -> GeneratedReport:
-        """Create and persist a generated report history record."""
+        """Create and persist a generated report history record with binary PDF data."""
         report = GeneratedReport(
             report_id=report_id,
             case_id=case_id,
@@ -488,6 +489,7 @@ class ReportRepository:
             total_pages=total_pages,
             size_bytes=size_bytes,
             filename=filename,
+            pdf_data=pdf_data,
             generated_at=datetime.utcnow(),
         )
         self.db.add(report)

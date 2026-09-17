@@ -5,8 +5,14 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 
-def extract_media_references(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
+from typing import List, Dict, Any, Union, BinaryIO
+
+from forensic.common.sqlite import open_sqlite
+
+
+def extract_media_references(db_source: Union[Path, str, bytes, BinaryIO], evidence_id: int) -> List[Dict[str, Any]]:
     """Extract media references from Telegram messages.
+    Accepts memory bytes, stream, or filesystem path.
     Returns a list of dictionaries with media reference info.
     Each dict contains:
         - evidence_id
@@ -15,10 +21,12 @@ def extract_media_references(db_path: Path, evidence_id: int) -> List[Dict[str, 
         - media_type (mime type or type)
         - message_type (derived: image, video, audio, document)
     """
-    if not db_path.exists():
-        return []
+    if isinstance(db_source, (str, Path)):
+        p = Path(db_source)
+        if not p.exists() or not p.is_file():
+            return []
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = open_sqlite(db_source)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         # Try to get messages that have media

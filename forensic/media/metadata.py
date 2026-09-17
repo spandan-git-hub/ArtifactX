@@ -1,7 +1,8 @@
 """Metadata extraction for media files."""
 
+import io
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, BinaryIO
 
 try:
     from PIL import Image
@@ -26,17 +27,17 @@ def _convert_to_degrees(value) -> float:
     return 0.0
 
 
-def extract_image_metadata(file_path: Path) -> Dict[str, Any]:
+def extract_image_metadata(source: Union[Path, str, bytes, BinaryIO]) -> Dict[str, Any]:
     """
-    Extract metadata from image files including EXIF data, camera details, and GPS.
+    Extract metadata from image files or in-memory byte buffers including EXIF data, camera details, and GPS.
 
     Args:
-        file_path: Path to the image file
+        source: Path, string, bytes, or BinaryIO of the image to analyze
 
     Returns:
         Dictionary containing width, height, camera details, GPS, and sanitized exif_data
     """
-    if not PIL_AVAILABLE or not file_path.exists():
+    if not PIL_AVAILABLE:
         return {
             "width": None,
             "height": None,
@@ -45,8 +46,24 @@ def extract_image_metadata(file_path: Path) -> Dict[str, Any]:
             "gps": {"has_gps": False},
         }
 
+    if isinstance(source, (str, Path)):
+        p = Path(source)
+        if not p.exists() or not p.is_file():
+            return {
+                "width": None,
+                "height": None,
+                "exif_data": {},
+                "camera": {},
+                "gps": {"has_gps": False},
+            }
+        file_to_open = p
+    elif isinstance(source, bytes):
+        file_to_open = io.BytesIO(source)
+    else:
+        file_to_open = source
+
     try:
-        with Image.open(file_path) as img:
+        with Image.open(file_to_open) as img:
             width, height = img.size
             raw_exif = {}
             sanitized_exif = {}

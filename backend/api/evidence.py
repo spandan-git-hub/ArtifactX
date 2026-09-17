@@ -29,6 +29,7 @@ from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
 from backend.services.log_service import get_log_service
 from forensic.media.metadata import extract_image_metadata
+from forensic.common.sqlite import open_sqlite
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -145,9 +146,10 @@ def _safe_zip_member_path(filename: str) -> Path:
     return member_path
 
 
-def _extract_zip(zip_data: bytes, extract_dir: Path) -> List[dict]:
-    """Extract ZIP archive to directory, return list of file info.
-    Each dict contains: relative_path, size, sha256, md5, sha1.
+def _extract_zip_in_memory(zip_data: bytes) -> List[dict]:
+    """Extract ZIP archive in memory, returning list of member file info.
+    Guarantees zero files written to host filesystem.
+    Each dict contains: relative_path, size, sha256, md5, sha1, mime_type, content_bytes.
     """
     extracted_info = []
     try:
@@ -164,36 +166,27 @@ def _extract_zip(zip_data: bytes, extract_dir: Path) -> List[dict]:
                     continue
 
                 relative_path = _safe_zip_member_path(info.filename)
-                target_path = extract_dir / relative_path
-                try:
-                    target_path.resolve().relative_to(extract_dir.resolve())
-                except ValueError:
+                rel_str = str(relative_path).replace("\\", "/")
+                if rel_str.startswith("../") or "/../" in rel_str or rel_str.startswith("/"):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Unsafe ZIP member path: {info.filename}",
                     )
 
-                logger.info(
-                    "Extracting ZIP member filename=%s size=%s target=%s",
-                    info.filename,
-                    info.file_size,
-                    target_path,
-                )
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                with zf.open(info) as source, open(target_path, "wb") as target:
-                    while chunk := source.read(8192):
-                        target.write(chunk)
+                with zf.open(info) as source:
+                    member_bytes = source.read()
 
-                file_hashes = compute_multi_hashes(target_path)
-                mime_type, _ = mimetypes.guess_type(str(target_path))
+                file_hashes = compute_multi_hashes_bytes(member_bytes)
+                mime_type, _ = mimetypes.guess_type(rel_str)
                 extracted_info.append(
                     {
-                        "relative_path": str(relative_path),
-                        "size": info.file_size,
+                        "relative_path": rel_str,
+                        "size": len(member_bytes),
                         "sha256": file_hashes["sha256"],
                         "md5": file_hashes["md5"],
                         "sha1": file_hashes["sha1"],
                         "mime_type": mime_type,
+                        "content_bytes": member_bytes,
                     }
                 )
     except zipfile.BadZipFile as exc:
@@ -268,25 +261,11 @@ def upload_evidence(
                 detail=f"Case {case_id} not found",
             )
 
-        logger.info("Validating upload directory path=%s", UPLOADS_DIR)
-        try:
-            UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            logger.error("Upload directory is not writable path=%s\n%s", UPLOADS_DIR, traceback.format_exc())
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Upload storage is not available",
-            ) from exc
-        if not UPLOADS_DIR.is_dir():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Upload storage path is not a directory",
-            )
 
         logger.info("Validating supported upload filename=%s content_type=%s", safe_name, file.content_type)
         _validate_supported_upload(safe_name, file.content_type)
 
-        logger.info("Reading uploaded file filename=%s", safe_name)
+        logger.info("Reading uploaded file stream into memory filename=%s", safe_name)
         file_data = file.file.read()
         file_size = len(file_data)
         logger.info("Uploaded file read complete filename=%s size=%s", safe_name, file_size)
@@ -306,27 +285,17 @@ def upload_evidence(
         is_zip = _is_zip_file(safe_name, file.content_type)
         evidence_type = "zip" if is_zip else "file"
         stored_name = f"{uuid.uuid4().hex}_{safe_name}"
-        storage_path = UPLOADS_DIR / stored_name
+        storage_path = f"db://evidence/{stored_name}"
 
+        extracted_files = []
         if is_zip:
-            extract_dir_name = f"extract_{uuid.uuid4().hex}"
-            extract_dir = UPLOADS_DIR / extract_dir_name
-            logger.info("Creating ZIP extraction directory path=%s", extract_dir)
-            extract_dir.mkdir(parents=True, exist_ok=True)
-
-            logger.info("Extracting ZIP filename=%s extract_dir=%s", safe_name, extract_dir)
-            extracted_files = _extract_zip(file_data, extract_dir)
+            logger.info("Extracting ZIP in memory filename=%s", safe_name)
+            extracted_files = _extract_zip_in_memory(file_data)
             logger.info(
-                "ZIP extraction complete filename=%s extract_dir=%s extracted_count=%s",
+                "In-memory ZIP extraction complete filename=%s extracted_count=%s",
                 safe_name,
-                extract_dir,
                 len(extracted_files),
             )
-
-        logger.info("Saving uploaded file storage_path=%s", storage_path)
-        with open(storage_path, "xb") as target:
-            target.write(file_data)
-        logger.info("Uploaded file saved storage_path=%s", storage_path)
 
         evidence_metadata = {
             "original_content_type": file.content_type,
@@ -336,33 +305,35 @@ def upload_evidence(
             "stored_filename": stored_name,
             "md5": md5,
             "sha1": sha1,
+            "storage_mode": "postgres_bytea",
         }
 
         logger.info("Creating Evidence row case_id=%s filename=%s sha256=%s", case_id, safe_name, sha256)
         evidence = Evidence(
             case_id=case_id,
             original_filename=safe_name,
-            storage_path=str(storage_path),
+            storage_path=storage_path,
             sha256=sha256,
             content_type=file.content_type,
             evidence_type=evidence_type,
             metadata_=evidence_metadata,
-            extracted_path=str(extract_dir) if extract_dir else None,
+            content_bytes=file_data,
+            extracted_path=f"db://evidence/{stored_name}/extracted" if is_zip else None,
         )
         db.add(evidence)
         db.flush()
         logger.info("Evidence row flushed evidence_id=%s", evidence.id)
 
-        if is_zip and extract_dir:
+        if is_zip:
             for file_info in extracted_files:
-                abs_path = extract_dir / file_info["relative_path"]
                 mime_type = file_info.get("mime_type")
                 file_metadata = {
                     "size": file_info["size"],
                     "mime_type": mime_type,
-                    "extracted_path": str(abs_path),
                     "md5": file_info.get("md5"),
                     "sha1": file_info.get("sha1"),
+                    "parent_sha256": sha256,
+                    "storage_mode": "postgres_bytea",
                 }
                 media_type = _media_type_from_mime(mime_type)
                 logger.info(
@@ -379,11 +350,12 @@ def upload_evidence(
                     file_size=file_info["size"],
                     mime_type=mime_type,
                     metadata_=file_metadata,
+                    content_bytes=file_info["content_bytes"],
                     is_media=media_type is not None,
                     media_type=media_type,
                 )
                 db.add(evidence_file)
-
+            db.flush()
         logger.info("Creating ActivityLog row case_id=%s evidence_id=%s", case_id, evidence.id)
         db.add(ActivityLog(
             case_id=case_id,
@@ -730,6 +702,12 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
                 "md5": expected_md5 or "d41d8cd98f00b204e9800998ecf8427e",
                 "sha1": expected_sha1 or "da39a3ee5e6b4b0d3255bfef95601890afd80709",
             }
+        elif evidence.content_bytes:
+            actual_hashes = compute_multi_hashes_bytes(evidence.content_bytes)
+            sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
+            md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
+            sha1_match = True if not expected_sha1 else actual_hashes["sha1"].lower() == expected_sha1.lower()
+            main_file_match = sha256_match and md5_match and sha1_match
         elif main_file_path.exists() and main_file_path.is_file():
             actual_hashes = compute_multi_hashes(main_file_path)
             sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
@@ -753,7 +731,13 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
 
             f_match = False
             act_hashes = {}
-            if evidence.extracted_path:
+            if f.content_bytes:
+                act_hashes = compute_multi_hashes_bytes(f.content_bytes)
+                s_match = act_hashes["sha256"].lower() == exp_sha256.lower()
+                m_match = True if not exp_md5 else act_hashes["md5"].lower() == exp_md5.lower()
+                sh_match = True if not exp_sha1 else act_hashes["sha1"].lower() == exp_sha1.lower()
+                f_match = s_match and m_match and sh_match
+            elif evidence.extracted_path:
                 ext_base = Path(evidence.extracted_path)
                 if not ext_base.is_absolute():
                     ext_base = UPLOADS_DIR / evidence.extracted_path
@@ -936,11 +920,14 @@ def get_evidence_exif(
         if not file_row:
             raise HTTPException(status_code=404, detail="Requested file not found in evidence")
 
-        target_path = Path(evidence.extracted_path or evidence.storage_path) / file_row.relative_path
-        if not target_path.exists() and evidence.storage_path:
-            target_path = Path(evidence.storage_path)
+        target_source = file_row.content_bytes
+        if target_source is None:
+            target_path = Path(evidence.extracted_path or evidence.storage_path) / file_row.relative_path
+            if not target_path.exists() and evidence.storage_path:
+                target_path = Path(evidence.storage_path)
+            target_source = target_path
 
-        meta = extract_image_metadata(target_path)
+        meta = extract_image_metadata(target_source)
         results.append({
             "file_id": file_row.id,
             "relative_path": file_row.relative_path,
@@ -958,27 +945,33 @@ def get_evidence_exif(
 
         if image_files:
             for f in image_files:
-                base_dir = Path(evidence.extracted_path) if evidence.extracted_path else Path(evidence.storage_path).parent
-                target_path = base_dir / f.relative_path
-                if target_path.exists():
-                    meta = extract_image_metadata(target_path)
-                    results.append({
-                        "file_id": f.id,
-                        "relative_path": f.relative_path,
-                        "mime_type": f.mime_type,
-                        "file_size": f.file_size,
-                        "metadata": meta,
-                    })
+                target_source = f.content_bytes
+                if target_source is None:
+                    base_dir = Path(evidence.extracted_path) if evidence.extracted_path else Path(evidence.storage_path).parent
+                    target_source = base_dir / f.relative_path
+
+                meta = extract_image_metadata(target_source)
+                results.append({
+                    "file_id": f.id,
+                    "relative_path": f.relative_path,
+                    "mime_type": f.mime_type,
+                    "file_size": f.file_size,
+                    "metadata": meta,
+                })
         else:
             # Check main evidence storage path if it's an image
-            p = Path(evidence.storage_path)
-            if p.exists() and (evidence.content_type or "").startswith("image/"):
-                meta = extract_image_metadata(p)
+            target_source = evidence.content_bytes
+            if target_source is None and evidence.storage_path:
+                p = Path(evidence.storage_path)
+                if p.exists():
+                    target_source = p
+            if target_source is not None and (evidence.content_type or "").startswith("image/"):
+                meta = extract_image_metadata(target_source)
                 results.append({
                     "file_id": None,
                     "relative_path": evidence.original_filename,
                     "mime_type": evidence.content_type,
-                    "file_size": p.stat().st_size,
+                    "file_size": len(target_source) if isinstance(target_source, bytes) else target_source.stat().st_size,
                     "metadata": meta,
                 })
 
@@ -1017,7 +1010,7 @@ def inspect_sqlite_database(
         for f in db_files
     ]
 
-    target_file_path = None
+    db_source = None
     target_rel_path = evidence.original_filename
     selected_file_id = None
 
@@ -1030,22 +1023,28 @@ def inspect_sqlite_database(
             raise HTTPException(status_code=404, detail="Database file not found in evidence")
         selected_file_id = file_row.id
         target_rel_path = file_row.relative_path
-        if evidence.extracted_path:
-            target_file_path = Path(evidence.extracted_path) / file_row.relative_path
-        else:
-            target_file_path = Path(evidence.storage_path)
+        db_source = file_row.content_bytes
+        if not db_source:
+            if evidence.extracted_path and not str(evidence.extracted_path).startswith("db://"):
+                db_source = Path(evidence.extracted_path) / file_row.relative_path
+            elif evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
+                db_source = Path(evidence.storage_path)
     elif db_files:
         # Default to first database file found
         first_db = db_files[0]
         selected_file_id = first_db.id
         target_rel_path = first_db.relative_path
-        if evidence.extracted_path:
-            target_file_path = Path(evidence.extracted_path) / first_db.relative_path
-        else:
-            target_file_path = Path(evidence.storage_path)
+        db_source = first_db.content_bytes
+        if not db_source:
+            if evidence.extracted_path and not str(evidence.extracted_path).startswith("db://"):
+                db_source = Path(evidence.extracted_path) / first_db.relative_path
+            elif evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
+                db_source = Path(evidence.storage_path)
     else:
         # Check main storage file
-        target_file_path = Path(evidence.storage_path)
+        db_source = evidence.content_bytes
+        if not db_source and evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
+            db_source = Path(evidence.storage_path)
 
     if evidence.evidence_type == "demo":
         demo_tables = [
@@ -1087,16 +1086,15 @@ def inspect_sqlite_database(
             "rows": sample_rows
         }
 
-    if not target_file_path or not target_file_path.exists():
+    if not db_source or (isinstance(db_source, (str, Path)) and not Path(db_source).exists()):
         raise HTTPException(
             status_code=404,
-            detail=f"SQLite database file not found on disk: {target_rel_path}"
+            detail=f"SQLite database file not found: {target_rel_path}"
         )
 
     # 2. Inspect SQLite Database
     try:
-        uri_path = f"file:{target_file_path.resolve()}?mode=ro"
-        conn = sqlite3.connect(uri_path, uri=True)
+        conn = open_sqlite(db_source)
         cursor = conn.cursor()
 
         # List tables & schemas
@@ -1172,6 +1170,7 @@ def inspect_sqlite_database(
             "file_id": selected_file_id,
             "database_name": target_rel_path,
             "available_databases": available_databases,
+            "table_count": len(tables_meta),
             "tables": tables_meta,
             "selected_table": active_table,
             "columns": columns_meta,

@@ -2,7 +2,9 @@
 
 import sqlite3
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union, BinaryIO
+
+from forensic.common.sqlite import open_sqlite
 
 
 def _tables(cursor: sqlite3.Cursor) -> set[str]:
@@ -64,14 +66,17 @@ def _message_query(table: str, cols: set[str]) -> str:
     """
 
 
-def extract_messages(db_path: Path, evidence_id: int) -> List[Dict[str, Any]]:
+def extract_messages(db_source: Union[Path, str, bytes, BinaryIO], evidence_id: int) -> List[Dict[str, Any]]:
     """Extract WhatsApp messages from the database.
+    Accepts memory bytes, stream, or filesystem path.
     Returns a list of dictionaries matching WhatsAppMessage model.
     """
-    if not db_path.exists():
-        return []
+    if isinstance(db_source, (str, Path)):
+        p = Path(db_source)
+        if not p.exists() or not p.is_file():
+            return []
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = open_sqlite(db_source)
         conn.row_factory = sqlite3.Row  # to access columns by name
         cursor = conn.cursor()
         table_names = _tables(cursor)

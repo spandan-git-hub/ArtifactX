@@ -26,6 +26,11 @@ async def lifespan(app: FastAPI):
     for attempt in range(max_retries):
         try:
             Base.metadata.create_all(bind=engine)
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE evidence ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
+                conn.execute(text("ALTER TABLE evidence_files ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
+                conn.execute(text("ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS pdf_data BYTEA;"))
             break
         except Exception as e:
             if attempt == max_retries - 1:

@@ -42,17 +42,17 @@
 
 # C. Zero-Local-Storage Hardening
 
-- [ ] Upload stream hashes without persistent local staging
-- [ ] Evidence binary stored in PostgreSQL
-- [ ] ZIP members stored in PostgreSQL
-- [ ] SQLite parser accepts memory/stream input
-- [ ] Media parser accepts memory/stream input
-- [ ] Derived artifacts have parent hashes
-- [ ] Report generation uses `BytesIO`
-- [ ] `uploads/` remains empty
-- [ ] `reports/` remains empty
-- [ ] Zero-disk integration test passes
-- [ ] No sensitive material appears in logs
+- [x] Upload stream hashes without persistent local staging
+- [x] Evidence binary stored in PostgreSQL
+- [x] ZIP members stored in PostgreSQL
+- [x] SQLite parser accepts memory/stream input
+- [x] Media parser accepts memory/stream input
+- [x] Derived artifacts have parent hashes
+- [x] Report generation uses `BytesIO`
+- [x] `uploads/` remains empty
+- [x] `reports/` remains empty
+- [x] Zero-disk integration test passes
+- [x] No sensitive material appears in logs
 
 # D. R2 — Physical Recovery
 
@@ -225,21 +225,21 @@
 
 ## Current project state
 
-**Last completed phase:** Phase B — R1 AI Excision
+**Last completed phase:** Phase C — Zero-Local-Storage Hardening
 
-**Current active phase:** Phase C — Zero-Local-Storage Hardening
+**Current active phase:** Phase D — R2 Physical Recovery
 
-**Current active task:** Review and prepare Phase C (Zero-Local-Storage Hardening: streaming ingestion, PostgreSQL evidence BLOBs, memory-only SQLite/media parsing)
+**Current active task:** Review and prepare Phase D (Physical Recovery: WAL/Freelist/Slack parsers, record carving)
 
 **Blocking issue:** None
 
-**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_phase14_e2e.py`
+**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_zero_storage_e2e.py`
 
-**Last verified commit/change:** Phase B AI Excision completed and verified (assistant router/service excised, drawer/hook excised, 68/68 OpenAPI paths clean, 11/11 E2E tests pass, vite build clean)
+**Last verified commit/change:** Phase C Zero-Local-Storage Hardening verified complete (10/10 zero-storage tests passed, 11/11 Phase 14 regression passed, vite build clean, 0 files in uploads/ or reports/)
 
-**Next action:** Review Phase C requirements and establish implementation plan for Zero-Local-Storage Hardening
+**Next action:** Review Phase D requirements and establish implementation plan for Physical Recovery
 
-**Date/time updated:** 2026-09-17 23:25:00 UTC+05:30
+**Date/time updated:** 2026-09-17 23:55:00 UTC+05:30
 
 ## Change log
 
@@ -247,4 +247,6 @@
 |---|---|---|---|---|---|
 | 2026-09-17 | Phase A | Captured DB schema (18 tables), OpenAPI contract (70 routes, 2 assistant endpoints), full Phase 14 regression run (11/11 passed, 0 workspace PDFs), system metadata, and frontend build verification (vite build 0 errors). | `test_phase14_e2e.py` (11/11), `npm run build` | Verified complete | Baseline frozen in `snapshots/` prior to R1 |
 | 2026-09-17 | Phase B | Surgically removed assistant router & service, frontend assistant drawer/hook/service, copilot UI buttons, sentiment/suspicion overlays, and inspector cards. Verified 0 active AI references. | OpenAPI route check (68 clean routes), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Judicial admissibility enforced; AI entirely excised |
+| 2026-09-17 | Phase C | Hardened zero-local-storage pipeline: added BYTEA columns to evidence, evidence_files, and generated_reports; in-memory stream hashing; in-memory ZIP extraction; deserialized in-memory SQLite parser (open_sqlite); in-memory EXIF/media inspection; eliminated tempfile caching for court PDFs. | `test_zero_storage_e2e.py` (10/10 passed), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Zero-local-disk target fully satisfied; uploads/ and reports/ remain strictly empty |
+
 

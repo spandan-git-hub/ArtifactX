@@ -2,27 +2,31 @@
 
 import mimetypes
 from pathlib import Path
-from typing import Literal, Optional
+from typing import BinaryIO, Literal, Optional, Union
 
 # Initialize mimetypes
 mimetypes.init()
 
 
-def detect_media_type(file_path: Path) -> Optional[Literal["image", "video", "audio", "document", "other"]]:
+def detect_media_type(
+    file_source: Union[Path, str, bytes, BinaryIO],
+    filename: Optional[str] = None,
+) -> Optional[Literal["image", "video", "audio", "document", "other"]]:
     """
-    Detect the media type of a file based on its MIME type and extension.
-
-    Args:
-        file_path: Path to the file to analyze
-
-    Returns:
-        One of: "image", "video", "audio", "document", "other", or None if file doesn't exist
+    Detect the media type of a file or in-memory buffer based on its MIME type,
+    extension, or magic header bytes.
     """
-    if not file_path.exists() or not file_path.is_file():
-        return None
+    name_to_check = filename or ""
+    if isinstance(file_source, (str, Path)):
+        name_to_check = str(file_source)
+    elif isinstance(file_source, bytes):
+        if file_source.startswith(b"\xff\xd8\xff") or file_source.startswith(b"\x89PNG") or file_source.startswith(b"GIF8") or file_source.startswith(b"RIFF") and b"WEBP" in file_source[:16]:
+            return "image"
+        if file_source.startswith(b"%PDF-"):
+            return "document"
 
     # Get MIME type
-    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type, _ = mimetypes.guess_type(name_to_check)
 
     if mime_type:
         if mime_type.startswith("image/"):

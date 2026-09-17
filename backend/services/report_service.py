@@ -160,7 +160,7 @@ class ReportService:
         # Estimate / track page count from PDF binary marker
         total_pages = max(1, pdf_bytes.count(b"/Type /Page") - pdf_bytes.count(b"/Type /Pages"))
 
-        # Persist report history in database
+        # Persist report history and PDF binary in database (Zero Local Disk)
         self.repo.create_generated_report(
             report_id=report_id,
             case_id=case_id,
@@ -172,6 +172,7 @@ class ReportService:
             total_pages=total_pages,
             size_bytes=size_bytes,
             filename=filename,
+            pdf_data=pdf_bytes,
         )
 
         # Log to chain-of-custody audit log
@@ -187,14 +188,6 @@ class ReportService:
         )
         self.db.commit()
 
-        # Cache in system temp storage (outside project workspace) for instant re-download
-        temp_cache_path = os.path.join(tempfile.gettempdir(), f"artifactx_{report_id}.pdf")
-        try:
-            with open(temp_cache_path, "wb") as f:
-                f.write(pdf_bytes)
-        except Exception:
-            pass  # Fallback to in-memory regeneration if temp file write fails
-
         return {
             "pdf_bytes": pdf_bytes,
             "report_id": report_id,
@@ -208,24 +201,20 @@ class ReportService:
         }
 
     def get_cached_or_regenerate_report(self, case_id: int, report_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve cached PDF bytes from system temp or regenerate if needed."""
-        # 1. Check system temp cache
-        temp_cache_path = os.path.join(tempfile.gettempdir(), f"artifactx_{report_id}.pdf")
-        if os.path.exists(temp_cache_path):
-            with open(temp_cache_path, "rb") as f:
-                bytes_data = f.read()
-            report = self.repo.get_generated_report(case_id, report_id)
-            return {
-                "pdf_bytes": bytes_data,
-                "filename": report.filename if report else f"report_{report_id}.pdf",
-                "sha256": report.sha256 if report else hashlib.sha256(bytes_data).hexdigest(),
-            }
-
-        # 2. Re-generate using stored report metadata
+        """Retrieve stored PDF bytes from PostgreSQL or regenerate deterministically in memory."""
         report = self.repo.get_generated_report(case_id, report_id)
         if not report:
             return None
 
+        # 1. Direct retrieval from database BYTEA storage (Zero disk usage)
+        if report.pdf_data:
+            return {
+                "pdf_bytes": report.pdf_data,
+                "filename": report.filename,
+                "sha256": report.sha256,
+            }
+
+        # 2. In-memory regeneration using stored report metadata
         result = self.generate_report_bytes(
             case_id=case_id,
             report_type=report.report_type,

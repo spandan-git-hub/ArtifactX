@@ -2,16 +2,22 @@
 
 import sqlite3
 from pathlib import Path
+from typing import BinaryIO, Union
+
+from forensic.common.sqlite import open_sqlite
 
 
-def is_whatsapp_database(file_path: Path) -> bool:
-    """Check if the given file is a WhatsApp SQLite database.
+def is_whatsapp_database(db_source: Union[Path, str, bytes, BinaryIO]) -> bool:
+    """Check if the given source is a WhatsApp SQLite database.
+    Accepts memory bytes, streams, or filesystem paths.
     Looks for known tables: sqlite_master tables.
     """
-    if not file_path.exists() or not file_path.is_file():
-        return False
+    if isinstance(db_source, (str, Path)):
+        p = Path(db_source)
+        if not p.exists() or not p.is_file():
+            return False
     try:
-        conn = sqlite3.connect(str(file_path))
+        conn = open_sqlite(db_source)
         cursor = conn.cursor()
         # Get list of tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -31,5 +37,5 @@ def is_whatsapp_database(file_path: Path) -> bool:
         if len(tables.intersection(modern_tables)) >= 2:
             return True
         return False
-    except sqlite3.Error:
+    except Exception:
         return False

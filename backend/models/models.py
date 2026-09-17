@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     JSON,
+    LargeBinary,
     String,
     Text,
 )
@@ -57,6 +58,7 @@ class Evidence(Base):
     evidence_type = Column(String(50))
     metadata_ = Column("metadata_", JSON, default=dict)
     extracted_path = Column(String(1024))
+    content_bytes = Column(LargeBinary, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime)
 
@@ -87,6 +89,7 @@ class EvidenceFile(Base):
     file_size = Column(Integer)
     mime_type = Column(String(255))
     metadata_ = Column("metadata_", JSON, default=dict)
+    content_bytes = Column(LargeBinary, nullable=True)
     is_media = Column(Boolean, default=False)
     media_type = Column(String(50))
 
@@ -315,6 +318,7 @@ class GeneratedReport(Base):
     total_pages = Column(Integer, default=1)
     size_bytes = Column(Integer, default=0)
     filename = Column(String(255), nullable=False)
+    pdf_data = Column(LargeBinary, nullable=True)
     generated_at = Column(DateTime, default=datetime.utcnow)
 
     case = relationship("Case", back_populates="generated_reports")

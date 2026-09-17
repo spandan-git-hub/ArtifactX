@@ -197,15 +197,18 @@ async def download_report_legacy(
     service: ReportService = Depends(get_report_service),
 ):
     """
-    Legacy download endpoint supporting direct streaming from temp cache or regeneration.
-    Zero files written to workspace.
+    Download endpoint supporting direct streaming from PostgreSQL BYTEA or in-memory regeneration.
+    Zero files written or read from disk.
     """
-    temp_path = os.path.join(tempfile.gettempdir(), filename)
-    if os.path.exists(temp_path):
-        with open(temp_path, "rb") as f:
-            pdf_bytes = f.read()
+    from backend.models.models import GeneratedReport
+    report = db.query(GeneratedReport).filter(
+        GeneratedReport.case_id == case_id,
+        GeneratedReport.filename == filename
+    ).first()
+
+    if report and report.pdf_data:
         return StreamingResponse(
-            BytesIO(pdf_bytes),
+            BytesIO(report.pdf_data),
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
