@@ -46,6 +46,8 @@ class Case(Base):
     recovery_runs = relationship("RecoveryRun", back_populates="case", cascade="all, delete-orphan")
     derived_artifacts = relationship("DerivedArtifact", back_populates="case", cascade="all, delete-orphan")
     decryption_operations = relationship("DecryptionOperation", back_populates="case", cascade="all, delete-orphan")
+    person_entities = relationship("PersonEntity", back_populates="case", cascade="all, delete-orphan")
+    correlation_findings = relationship("CorrelationFinding", back_populates="case", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -432,3 +434,54 @@ class DecryptionOperation(Base):
     case = relationship("Case", back_populates="decryption_operations")
     evidence = relationship("Evidence", back_populates="decryption_operations")
     derived_artifact = relationship("DerivedArtifact")
+
+
+class PersonEntity(Base):
+    """
+    Resolved Person hypothesis cluster grouping corroborated accounts,
+    phone numbers, and handles with provenance and explicit limitations.
+    """
+
+    __tablename__ = "person_entities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    entity_uuid = Column(String(64), unique=True, index=True, nullable=False)
+    label = Column(String(255), nullable=False)
+    entity_type = Column(String(50), default="PERSON", index=True)
+    confidence_score = Column(Float, default=1.0)
+    resolution_method = Column(String(100), nullable=False)
+    attributes = Column(JSON, default=dict)
+    evidence_links = Column(JSON, default=list)
+    limitations = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+    is_ambiguous = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    case = relationship("Case", back_populates="person_entities")
+
+
+class CorrelationFinding(Base):
+    """
+    Stores specialized deep correlation findings:
+    - Platform handover candidates
+    - Perceptual media hash matches
+    - Shared financial/crypto/logistical artifacts
+    - Spatiotemporal rendezvous candidates
+    """
+
+    __tablename__ = "correlation_findings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    finding_uuid = Column(String(64), unique=True, index=True, nullable=False)
+    finding_type = Column(String(50), nullable=False, index=True)  # handover, media_match, shared_artifact, rendezvous
+    sub_type = Column(String(50), nullable=True, index=True)       # e.g., BITCOIN, EVM, IBAN, dHash, EXIF_GPS
+    confidence_score = Column(Float, default=1.0)
+    details = Column(JSON, default=dict)
+    evidence_ids = Column(JSON, default=list)
+    limitations = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    case = relationship("Case", back_populates="correlation_findings")

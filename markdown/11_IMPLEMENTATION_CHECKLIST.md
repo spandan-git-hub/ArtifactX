@@ -100,24 +100,24 @@
 
 # F. R4 — Deep Correlation
 
-- [ ] Person entity model
-- [ ] Account/entity attribute model
-- [ ] Identity-resolution engine
-- [ ] Evidence-backed edge model
-- [ ] Platform handover detector
-- [ ] Configurable handover threshold
-- [ ] pHash implementation
-- [ ] dHash implementation
-- [ ] Media distance tests
-- [ ] Crypto artifact extraction
-- [ ] Banking artifact extraction
-- [ ] Code-word/artifact extraction
-- [ ] GPS rendezvous detector
-- [ ] Graph API
-- [ ] Graph UI
-- [ ] Edge drill-down to evidence
-- [ ] Ambiguous-match labeling
-- [ ] R4 acceptance gate passed
+- [x] Person entity model
+- [x] Account/entity attribute model
+- [x] Identity-resolution engine
+- [x] Evidence-backed edge model
+- [x] Platform handover detector
+- [x] Configurable handover threshold
+- [x] pHash implementation
+- [x] dHash implementation
+- [x] Media distance tests
+- [x] Crypto artifact extraction
+- [x] Banking artifact extraction
+- [x] Code-word/artifact extraction
+- [x] GPS rendezvous detector
+- [x] Graph API
+- [x] Graph UI
+- [x] Edge drill-down to evidence
+- [x] Ambiguous-match labeling
+- [x] R4 acceptance gate passed
 
 # G. R5 — Analysis Suite
 
@@ -225,21 +225,21 @@
 
 ## Current project state
 
-**Last completed phase:** Phase E — R3 Decryption
+**Last completed phase:** Phase F — R4 Deep Correlation
 
-**Current active phase:** Phase F — R4 Deep Correlation
+**Current active phase:** Phase G — R5 Analysis Suite
 
-**Current active task:** Review Phase F requirements and prepare implementation plan for Entity Resolution & Deep Correlation
+**Current active task:** Review Phase G requirements (await user instruction before starting Phase G)
 
 **Blocking issue:** None
 
-**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_r3_decryption_e2e.py`
+**Last successful test command:** `$env:PYTHONPATH="d:\ArtifactX"; python backend\scripts\test_r4_correlation_e2e.py`
 
-**Last verified commit/change:** Phase E R3 Decryption verified complete (10/10 R3 tests passed, 6/6 R2 tests passed, 10/10 zero-storage passed, 11/11 Phase 14 regression passed, vite build clean with 0 errors)
+**Last verified commit/change:** Phase F R4 Deep Correlation verified complete (9/9 R4 tests passed, 10/10 R3 tests passed, 6/6 R2 tests passed, 10/10 zero-storage passed, 11/11 Phase 14 regression passed, vite build clean with 0 errors)
 
-**Next action:** Await user instruction before proceeding to Phase F
+**Next action:** Await user instruction before proceeding to Phase G
 
-**Date/time updated:** 2026-09-18 01:12:00 UTC+05:30
+**Date/time updated:** 2026-09-18 09:28:00 UTC+05:30
 
 ## Change log
 
@@ -250,5 +250,7 @@
 | 2026-09-17 | Phase C | Hardened zero-local-storage pipeline: added BYTEA columns to evidence, evidence_files, and generated_reports; in-memory stream hashing; in-memory ZIP extraction; deserialized in-memory SQLite parser (open_sqlite); in-memory EXIF/media inspection; eliminated tempfile caching for court PDFs. | `test_zero_storage_e2e.py` (10/10 passed), `test_phase14_e2e.py` (11/11 passed), `vite build` (0 errors) | Verified complete | Zero-local-disk target fully satisfied; uploads/ and reports/ remain strictly empty |
 | 2026-09-18 | Phase D | Implemented SQLite physical carving: WAL header & frame parser, freelist trunk/leaf scanner, B-tree cell slack space carver, varint/serial-type/record decoders, WhatsApp & Telegram payload decoders, RecoveredFinding & RecoveryRun models, 4 REST endpoints (`/api/cases/{case_id}/recovery/...`), RecoveryPage workstation UI with hex/ASCII inspector & provenance. | `test_r2_recovery_e2e.py` (6/6 passed), `test_phase14_e2e.py` (11/11 passed), `test_zero_storage_e2e.py` (10/10 passed), `npm run build` (0 errors) | Verified complete | Physical carving verified without evidence mutation; zero-disk invariant preserved |
 | 2026-09-18 | Phase E | Implemented R3 Cryptographic Decryption Subsystem: format/entropy detector, WhatsApp 158-byte key parser & passkey sanitizer, Crypt12 (AES-GCM), Crypt14 (PBKDF2-HMAC-SHA256 + GCM), Crypt15 (64-hex PBKDF2-HMAC-SHA512), WhatsApp media HKDF (RFC 5869) + AES-CBC + HMAC, Telegram SQLCipher v3/v4 pure-Python page decryptor & PIN tester, Telegram MTProto Secret Chat AES-IGE, DerivedArtifact & DecryptionOperation models, 5 REST endpoints, DecryptionPage workstation UI. | `test_r3_decryption_e2e.py` (10/10), `test_r2_recovery_e2e.py` (6/6), `test_zero_storage_e2e.py` (10/10), `test_phase14_e2e.py` (11/11), `npm run build` (0 errors) | Verified complete | Zero secret leakage enforced; derived exhibits persisted directly to PostgreSQL BYTEA |
+| 2026-09-18 | Phase F | Implemented R4 Deep Cross-Platform Correlation Engine: Multi-entity resolution (`forensic.correlation.entities`), evidence-backed edges with judicial admissibility labeling, platform handover detector (`forensic.correlation.handover`) with neutral `PLATFORM_HANDOVER_CANDIDATE` classification, perceptual media hashing (pure-Python 64-bit dHash and 2D-DCT pHash in `forensic.correlation.media_hash`), deterministic artifact extraction and validation (Bitcoin Base58/Bech32, EVM 0x+40, Tron, Monero, IBAN ISO 7064 mod-97, Credit Cards Luhn mod-10, SWIFT/BIC, UPI, flight numbers, codewords in `forensic.correlation.artifacts`), spatiotemporal rendezvous detection (`forensic.correlation.rendezvous`), `PersonEntity` & `CorrelationFinding` DB models, 6 REST endpoints (`/correlation/...`), multi-view CorrelationPage workstation UI with evidence drill-down drawer and parameters tuning modal. | `test_r4_correlation_e2e.py` (9/9), `test_r3_decryption_e2e.py` (10/10), `test_r2_recovery_e2e.py` (6/6), `test_zero_storage_e2e.py` (10/10), `test_phase14_e2e.py` (11/11), `npm run build` (0 errors) | Verified complete | Judicial admissibility strictly enforced; zero-local-disk invariant preserved |
+
 
 
