@@ -62,7 +62,7 @@ class CorrelationService:
             wa_messages = self.whatsapp_repo.get_messages_by_evidence_id(db, evidence.id)
             tg_messages = self.telegram_repo.get_messages_by_evidence_id(db, evidence.id)
 
-            if evidence.evidence_type != "demo" and not wa_messages and not tg_messages:
+            if not wa_messages and not tg_messages:
                 wa_service.analyze_evidence_sync(evidence.id, db)
                 tg_service.analyze_evidence_sync(evidence.id, db)
 
@@ -132,46 +132,6 @@ class CorrelationService:
                     is_orphan=media.is_orphan,
                     linked_message_id=media.linked_message_id,
                 ))
-
-        # Demo auto-alignment if applicable
-        if any(e.evidence_type == "demo" for e in evidences):
-            from datetime import datetime, timezone, timedelta
-            import random
-            from backend.models.models import WhatsAppMessage as ORMWhatsAppMessage, TelegramMessage as ORMTelegramMessage
-            from backend.api.demo import REALISTIC_EXCHANGES
-
-            base_time = datetime.now(timezone.utc) - timedelta(days=3)
-            demo_ev_ids = [e.id for e in evidences if e.evidence_type == "demo"]
-            wa_db_msgs = db.query(ORMWhatsAppMessage).filter(ORMWhatsAppMessage.evidence_id.in_(demo_ev_ids)).order_by(ORMWhatsAppMessage.id).all()
-            tg_db_msgs = db.query(ORMTelegramMessage).filter(ORMTelegramMessage.evidence_id.in_(demo_ev_ids)).order_by(ORMTelegramMessage.id).all()
-
-            if wa_db_msgs and tg_db_msgs:
-                min_count = min(len(wa_db_msgs), len(tg_db_msgs))
-                for idx in range(min_count):
-                    pair = REALISTIC_EXCHANGES[idx % len(REALISTIC_EXCHANGES)]
-                    slot_time = base_time + timedelta(minutes=idx * 20)
-                    wa_sec = int(slot_time.timestamp())
-                    tg_sec = int((slot_time + timedelta(seconds=random.randint(15, 45))).timestamp())
-
-                    wa_db_msgs[idx].body = pair["wa"]
-                    wa_db_msgs[idx].timestamp = wa_sec
-                    tg_db_msgs[idx].body = pair["tg"]
-                    tg_db_msgs[idx].timestamp = tg_sec
-
-                db.commit()
-
-                all_wa_messages = [WhatsAppMessage(
-                    evidence_id=m.evidence_id, message_id=m.message_id, key_remote_jid=m.key_remote_jid,
-                    sender_jid=m.sender_jid, participant_jid=m.participant_jid, body=m.body,
-                    timestamp=m.timestamp, media_type=m.media_type, media_path=m.media_path,
-                    message_type=m.message_type, status=m.status
-                ) for m in wa_db_msgs]
-
-                all_tg_messages = [TelegramMessage(
-                    evidence_id=m.evidence_id, message_id=m.message_id, dialog_id=m.dialog_id,
-                    sender_id=m.sender_id, body=m.body, timestamp=m.timestamp,
-                    media_type=m.media_type, media_path=m.media_path, message_type=m.message_type
-                ) for m in tg_db_msgs]
 
         return all_wa_messages, all_wa_contacts, all_tg_messages, all_tg_contacts, all_media_items
 
@@ -759,9 +719,9 @@ class CorrelationService:
             fn = (e.original_filename or "").lower()
             sp = (e.storage_path or "").lower()
 
-            if app == "whatsapp" or "whatsapp" in fn or "wa_demo" in sp or "msgstore" in fn or "wa.db" in sp:
+            if app == "whatsapp" or "whatsapp" in fn or "msgstore" in fn or "wa.db" in sp:
                 has_whatsapp = True
-            if app == "telegram" or "telegram" in fn or "tg_demo" in sp or "cache4" in fn or "tg.db" in sp or "userconf" in fn:
+            if app == "telegram" or "telegram" in fn or "cache4" in fn or "tg.db" in sp or "userconf" in fn:
                 has_telegram = True
 
             files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == e.id).all()

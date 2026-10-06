@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size: int = 1073741824  # 1GB in bytes
     log_level: str = "INFO"
-    demo_mode: bool = False  # Enable demo mode with mock data
 
 
 def get_settings() -> Settings:
@@ -33,10 +32,7 @@ def get_settings() -> Settings:
 
 settings = get_settings()
 
-# Ensure data directories exist
+# Data directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 UPLOADS_DIR = BASE_DIR / settings.upload_dir
 REPORTS_DIR = BASE_DIR / "reports"
-
-UPLOADS_DIR.mkdir(exist_ok=True)
-REPORTS_DIR.mkdir(exist_ok=True)

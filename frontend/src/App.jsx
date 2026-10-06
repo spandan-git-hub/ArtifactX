@@ -14,12 +14,9 @@ import RecoveryPage from './pages/RecoveryPage';
 import DecryptionPage from './pages/DecryptionPage';
 import CaseForm from './components/cases/CaseForm';
 import { Layout } from './components/layout';
-import DemoModal from './components/demo/DemoModal';
-import { Shield, Sparkles } from 'lucide-react';
+import { Shield, FolderPlus } from 'lucide-react';
 
 function HomeScreen() {
-  const [demoModalOpen, setDemoModalOpen] = useState(false);
-
   return (
     <div className="min-h-screen bg-forensic-950 flex items-center justify-center">
       <div className="text-center animate-in">
@@ -38,23 +35,12 @@ function HomeScreen() {
           <Link to="/cases" className="btn-primary inline-flex items-center gap-2">
             Access Dashboard
           </Link>
-          <button
-            onClick={() => setDemoModalOpen(true)}
-            className="btn-secondary inline-flex items-center gap-2"
-          >
-            <Sparkles className="w-4 h-4 text-accent-cyan" />
-            Create Demo Case
-          </button>
+          <Link to="/cases/create" className="btn-secondary inline-flex items-center gap-2">
+            <FolderPlus className="w-4 h-4 text-accent-cyan" />
+            Create New Case
+          </Link>
         </div>
-        <p className="text-xs text-forensic-600 mt-4">
-          Demo mode creates sample WhatsApp and Telegram forensic data for testing
-        </p>
       </div>
-
-      <DemoModal
-        isOpen={demoModalOpen}
-        onClose={() => setDemoModalOpen(false)}
-      />
     </div>
   );
 }

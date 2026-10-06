@@ -25,18 +25,6 @@ export const healthService = {
     }
   },
 
-  /**
-   * Check if demo mode is enabled.
-   * @returns {Promise<boolean>}
-   */
-  isDemoMode: async () => {
-    try {
-      const health = await healthService.check();
-      return health.demo_mode || false;
-    } catch {
-      return false;
-    }
-  },
 
   /**
    * Check if the system is healthy (status === 'ok').

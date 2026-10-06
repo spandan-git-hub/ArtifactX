@@ -13,7 +13,9 @@ from backend.models.models import (
     WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
     TelegramMessage, TelegramContact, TelegramGroup,
     TimelineEvent, DeletedMessage, MediaItem,
-    CorrelationEdge, ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
+    CorrelationEdge, CorrelationFinding, PersonEntity, DerivedArtifact,
+    RecoveredFinding, RecoveryRun, DecryptionOperation,
+    ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
 )
 from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
 from backend.services.log_service import get_log_service
@@ -246,6 +248,12 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
         db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete(synchronize_session=False)
         db.query(MediaItem).filter(MediaItem.case_id == case_id).delete(synchronize_session=False)
         db.query(CorrelationEdge).filter(CorrelationEdge.case_id == case_id).delete(synchronize_session=False)
+        db.query(CorrelationFinding).filter(CorrelationFinding.case_id == case_id).delete(synchronize_session=False)
+        db.query(PersonEntity).filter(PersonEntity.case_id == case_id).delete(synchronize_session=False)
+        db.query(DerivedArtifact).filter(DerivedArtifact.case_id == case_id).delete(synchronize_session=False)
+        db.query(RecoveredFinding).filter(RecoveredFinding.case_id == case_id).delete(synchronize_session=False)
+        db.query(RecoveryRun).filter(RecoveryRun.case_id == case_id).delete(synchronize_session=False)
+        db.query(DecryptionOperation).filter(DecryptionOperation.case_id == case_id).delete(synchronize_session=False)
         db.query(ActivityLog).filter(ActivityLog.case_id == case_id).delete(synchronize_session=False)
         db.query(ErrorLog).filter(ErrorLog.case_id == case_id).delete(synchronize_session=False)
         db.query(GeneratedReport).filter(GeneratedReport.case_id == case_id).delete(synchronize_session=False)

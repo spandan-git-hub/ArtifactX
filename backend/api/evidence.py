@@ -695,14 +695,7 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
 
         main_file_match = False
         actual_hashes = {}
-        if evidence.evidence_type == "demo":
-            main_file_match = True
-            actual_hashes = {
-                "sha256": expected_sha256 or "0" * 64,
-                "md5": expected_md5 or "d41d8cd98f00b204e9800998ecf8427e",
-                "sha1": expected_sha1 or "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-            }
-        elif evidence.content_bytes:
+        if evidence.content_bytes:
             actual_hashes = compute_multi_hashes_bytes(evidence.content_bytes)
             sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
             md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
@@ -1046,45 +1039,7 @@ def inspect_sqlite_database(
         if not db_source and evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
             db_source = Path(evidence.storage_path)
 
-    if evidence.evidence_type == "demo":
-        demo_tables = [
-            {
-                "name": "messages",
-                "sql": "CREATE TABLE messages (_id INTEGER PRIMARY KEY, key_remote_jid TEXT, data TEXT, timestamp INTEGER)",
-                "row_count": 100
-            },
-            {
-                "name": "chat",
-                "sql": "CREATE TABLE chat (_id INTEGER PRIMARY KEY, jid TEXT, subject TEXT, created_timestamp INTEGER)",
-                "row_count": 15
-            },
-            {
-                "name": "jid",
-                "sql": "CREATE TABLE jid (_id INTEGER PRIMARY KEY, user TEXT, server TEXT, raw_string TEXT)",
-                "row_count": 15
-            }
-        ]
-        selected_table = table_name or "messages"
-        sample_rows = [
-            {"_id": i + 1, "key_remote_jid": "+12025551234@s.whatsapp.net", "data": f"Demo forensic message payload #{i + 1}", "timestamp": 1718000000 + i * 60}
-            for i in range(min(limit, 10))
-        ]
-        return {
-            "status": "success",
-            "evidence_id": evidence_id,
-            "file_id": selected_file_id,
-            "file_path": target_rel_path,
-            "is_demo": True,
-            "available_databases": [{"id": 0, "relative_path": target_rel_path, "size": 102400}],
-            "table_count": len(demo_tables),
-            "tables": demo_tables,
-            "selected_table": selected_table,
-            "total_rows": 100,
-            "limit": limit,
-            "offset": offset,
-            "columns": ["_id", "key_remote_jid", "data", "timestamp"],
-            "rows": sample_rows
-        }
+
 
     if not db_source or (isinstance(db_source, (str, Path)) and not Path(db_source).exists()):
         raise HTTPException(
