@@ -31,7 +31,7 @@ def get_report_service(db: Session = Depends(get_db)) -> ReportService:
 
 
 @router.post("/cases/{case_id}/reports")
-async def generate_court_report(
+async def generate_report(
     case_id: int,
     request: ReportGenerateRequest = ReportGenerateRequest(),
     stream: bool = Query(True, description="Whether to stream PDF bytes directly or return metadata"),
@@ -39,7 +39,7 @@ async def generate_court_report(
     service: ReportService = Depends(get_report_service),
 ):
     """
-    Generate a court-ready PDF report for a case into memory.
+    Generate a Forensic Evidence Report PDF for a case into memory.
     Streams PDF directly to browser (zero workspace disk storage).
     Tracks generated report metadata in database.
     """
@@ -62,7 +62,7 @@ async def generate_court_report(
             sworn_declaration=request.sworn_declaration,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate court report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate forensic report: {str(e)}")
 
     if not stream:
         return ReportGenerateResponse(

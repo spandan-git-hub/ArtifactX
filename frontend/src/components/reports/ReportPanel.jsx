@@ -61,7 +61,7 @@ const ReportPanel = ({
       <div className="flex items-center justify-between pb-3 border-b border-forensic-800">
         <h2 className="text-base font-semibold text-forensic-100 flex items-center gap-2">
           <FileText className="h-5 w-5 text-accent-cyan" />
-          Court Report Configuration
+          Forensic Report Configuration
         </h2>
         <button
           type="button"
@@ -177,7 +177,7 @@ const ReportPanel = ({
         />
       </div>
 
-      {/* Sworn Integrity Declaration Checkbox */}
+      {/* Analyst Declaration Checkbox */}
       <div className="p-3 rounded-lg bg-accent-cyan/5 border border-accent-cyan/20">
         <label className="flex items-start gap-2.5 cursor-pointer">
           <input
@@ -187,8 +187,8 @@ const ReportPanel = ({
             className="w-4 h-4 mt-0.5 rounded border-forensic-600 bg-forensic-800 text-accent-cyan focus:ring-accent-cyan"
           />
           <span className="text-xs text-forensic-300 leading-relaxed">
-            <b>Sworn Forensic Declaration:</b> I solemnly attest under penalty of perjury that this report
-            compiles deterministic evidence extracted without alteration in accordance with ISO/IEC 27037 standards.
+            <b>Analyst Declaration:</b> I attest that this report
+            compiles deterministic evidence extracted in accordance with ISO/IEC 27037 standards (draft for expert review).
           </span>
         </label>
       </div>
@@ -202,12 +202,12 @@ const ReportPanel = ({
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin text-forensic-950" />
-            <span>Compiling In-Memory Court PDF...</span>
+            <span>Compiling In-Memory Forensic Report...</span>
           </>
         ) : (
           <>
             <ShieldCheck className="h-4 w-4" />
-            <span>Generate & Stream Court PDF</span>
+            <span>Generate & Stream Forensic Report</span>
           </>
         )}
       </button>
@@ -217,7 +217,7 @@ const ReportPanel = ({
         <div className="p-3 bg-accent-emerald/10 border border-accent-emerald/30 rounded-lg space-y-1.5 animate-in">
           <div className="flex items-center gap-2 text-accent-emerald font-semibold text-xs">
             <CheckCircle className="h-4 w-4" />
-            <span>Court Report Generated & Streamed!</span>
+            <span>Forensic Report Generated & Streamed!</span>
           </div>
           <p className="text-[11px] text-forensic-300 font-mono break-all">
             SHA-256: <span className="text-accent-cyan">{lastReport.sha256}</span>

@@ -23,7 +23,7 @@ const ReportPdfPreview = ({
           <div className="h-3 w-3 rounded-full bg-accent-rose/80" />
           <div className="h-3 w-3 rounded-full bg-accent-amber/80" />
           <div className="h-3 w-3 rounded-full bg-accent-emerald/80" />
-          <span className="text-xs font-mono text-forensic-400 ml-2">Live Court PDF Layout Preview</span>
+          <span className="text-xs font-mono text-forensic-400 ml-2">Live Forensic Report Layout Preview</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-mono text-accent-cyan bg-accent-cyan/10 px-2 py-0.5 rounded border border-accent-cyan/20">
@@ -42,7 +42,7 @@ const ReportPdfPreview = ({
         <div className="text-center pb-4 border-b-2 border-forensic-700 space-y-1">
           <div className="inline-flex items-center gap-2 text-accent-rose text-xs font-mono font-bold tracking-widest uppercase">
             <Shield className="w-3.5 h-3.5" />
-            Law Enforcement & Judicial Evidence Document // Restricted
+            Law Enforcement & Forensic Evidence Document // Restricted
           </div>
           <h1 className="text-xl font-bold font-mono text-forensic-50 tracking-tight">
             DIGITAL EVIDENCE EXAMINATION REPORT
@@ -78,7 +78,7 @@ const ReportPdfPreview = ({
         <div className="bg-blue-950/20 border border-blue-800/40 rounded-lg p-3 text-xs flex items-start gap-2.5">
           <Scale className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
           <div className="text-blue-200/90 leading-relaxed text-[11px]">
-            <b>Judicial Admissibility Guarantee:</b> This court document compiles bit-level hashes, chronological timeline
+            <b>Forensic Integrity Notice:</b> This report compiles bit-level hashes, chronological timeline
             reconstructions, and unallocated sequence gap anomalies. In accordance with evidentiary standards,
             all subjective predictive models and speculative automated analyses are strictly excluded.
           </div>
@@ -173,20 +173,20 @@ const ReportPdfPreview = ({
           </div>
         )}
 
-        {/* Sworn Attestation Block Preview */}
+        {/* Analyst Declaration Block Preview */}
         <div className="border border-forensic-700 bg-forensic-950/80 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold uppercase text-accent-emerald flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
-              Sworn Forensic Attestation & Sign-off
+              Analyst Declaration (draft for expert review)
             </span>
             <span className="text-[10px] font-mono text-forensic-500">Date: {currentDate}</span>
           </div>
 
           <p className="text-[11px] text-forensic-300 leading-relaxed">
             "I, <b>{leadAnalyst || 'Forensic Examiner'}</b>, representing <b>{agency || 'Digital Forensics Unit'}</b>,
-            solemnly attest under penalty of perjury that the digital forensic findings compiled herein were
-            extracted from original seized evidence without alteration, maintaining complete cryptographic chain of custody."
+            declare that the digital forensic findings compiled herein were
+            extracted from original seized evidence without alteration, maintaining complete cryptographic chain of custody (draft for expert review)."
           </p>
 
           <div className="pt-3 border-t border-forensic-800 flex items-center justify-between text-xs font-mono">

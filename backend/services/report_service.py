@@ -1,7 +1,7 @@
-"""Report service for in-memory court-ready PDF generation.
+"""Report service for in-memory Forensic Evidence Report generation.
 
-JUDICIAL ADMISSIBILITY GUARANTEE (Phase 15 - B30):
-Official court PDF reports strictly query only deterministic evidence tables
+FORENSIC INTEGRITY SPECIFICATION:
+Official forensic evidence reports strictly query only deterministic evidence tables
 (evidence files, cryptographic hashes, raw message transcripts, timeline events,
 detected deletion gaps, and chain-of-custody audit logs).
 All external predictive models, subjective scoring metrics, and speculative outputs
@@ -69,7 +69,7 @@ class NumberedCanvas(canvas.Canvas):
             self.drawString(40, 760, f"ARTIFACTX DIGITAL FORENSICS — CASE #{self.case_id}: {self.case_name.upper()}")
             self.setFont("Helvetica-Bold", 7)
             self.setFillColor(colors.HexColor("#dc2626"))
-            self.drawRightString(572, 760, "CONFIDENTIAL // LAW ENFORCEMENT SENSITIVE // COURT ADMISSIBLE")
+            self.drawRightString(572, 760, "CONFIDENTIAL // LAW ENFORCEMENT SENSITIVE // FORENSIC EVIDENCE")
 
             # Header Line
             self.setStrokeColor(colors.HexColor("#334155"))
@@ -88,7 +88,7 @@ class NumberedCanvas(canvas.Canvas):
 
 
 class ReportService:
-    """Service for in-memory court-ready forensic report generation."""
+    """Service for in-memory forensic report generation."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -109,7 +109,7 @@ class ReportService:
         sworn_declaration: bool = True,
     ) -> Dict[str, Any]:
         """
-        Generate a court-ready PDF entirely in memory and record metadata in database.
+        Generate a Forensic Evidence Report PDF entirely in memory and record metadata in database.
 
         Returns:
             Dict containing:
@@ -128,12 +128,12 @@ class ReportService:
         report_id = str(uuid.uuid4())
         gen_timestamp = datetime.utcnow()
         timestamp_str = gen_timestamp.strftime("%Y%m%d_%H%M%S")
-        filename = f"ArtifactX_CourtReport_Case{case_id}_{report_type.upper()}_{timestamp_str}.pdf"
+        filename = f"ArtifactX_ForensicReport_Case{case_id}_{report_type.upper()}_{timestamp_str}.pdf"
 
         # Build PDF in memory
         buffer = BytesIO()
 
-        self._build_court_pdf(
+        self._build_forensic_pdf(
             buffer=buffer,
             case=case,
             report_id=report_id,
@@ -180,9 +180,9 @@ class ReportService:
         log_service = get_log_service(self.db)
         log_service.log_activity(
             case_id=case_id,
-            action="export_court_report",
+            action="export_forensic_report",
             description=(
-                f"Generated court-ready PDF ({report_type}): {filename} | "
+                f"Generated Forensic Evidence Report ({report_type}): {filename} | "
                 f"SHA-256: {pdf_sha256[:16]}... | Examiner: {lead_analyst} | Pages: {total_pages}"
             )
         )
@@ -224,7 +224,7 @@ class ReportService:
         )
         return result
 
-    def _build_court_pdf(
+    def _build_forensic_pdf(
         self,
         buffer: BytesIO,
         case: Case,
@@ -255,7 +255,7 @@ class ReportService:
         styles = getSampleStyleSheet()
 
         title_style = ParagraphStyle(
-            "CourtTitle",
+            "ReportTitle",
             parent=styles["Normal"],
             fontName="Helvetica-Bold",
             fontSize=22,
@@ -264,7 +264,7 @@ class ReportService:
             alignment=1,  # Center
         )
         subtitle_style = ParagraphStyle(
-            "CourtSubtitle",
+            "ReportSubtitle",
             parent=styles["Normal"],
             fontName="Helvetica-Bold",
             fontSize=11,
@@ -364,7 +364,7 @@ class ReportService:
         # SECTION 1: OFFICIAL COVER PAGE
         # =========================================================================
         elements.append(Spacer(1, 15))
-        elements.append(Paragraph("LAW ENFORCEMENT & JUDICIAL EVIDENCE DOCUMENT", classification_style))
+        elements.append(Paragraph("LAW ENFORCEMENT & FORENSIC EVIDENCE DOCUMENT", classification_style))
         elements.append(Spacer(1, 4))
         elements.append(Paragraph("CONFIDENTIAL // RESTRICTED DISSEMINATION", ParagraphStyle(
             "SubConf", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.HexColor("#dc2626"), alignment=1
@@ -493,7 +493,7 @@ class ReportService:
             elements.append(Paragraph("1. Evidence Ingestion Manifest & Cryptographic Hashes", section_h1))
             elements.append(Paragraph(
                 "The following inventory details all original evidence containers and extracted artifact databases. "
-                "Cryptographic SHA-256 signatures are calculated at intake to guarantee bit-stream preservation.",
+                "Cryptographic SHA-256 signatures are calculated at intake to verify bit-stream preservation.",
                 body_text
             ))
             elements.append(Spacer(1, 8))
@@ -755,17 +755,17 @@ class ReportService:
             elements.append(Spacer(1, 14))
 
         # =========================================================================
-        # SECTION 8: SWORN ANALYST SIGN-OFF & ATTESTATION BLOCK
+        # SECTION 8: ANALYST DECLARATION BLOCK (DRAFT FOR EXPERT REVIEW)
         # =========================================================================
         elements.append(KeepTogether([
-            Paragraph("7. Sworn Forensic Analyst Attestation", section_h1),
+            Paragraph("7. Analyst Declaration (draft for expert review)", section_h1),
             HRFlowable(width="100%", thickness=1, color=colors.HexColor("#0f172a"), spaceAfter=10),
             Paragraph(
-                f"I, <b>{lead_analyst}</b>, representing <b>{agency}</b>, do solemnly declare and attest under "
-                f"penalty of perjury that the examination and digital analysis documented in this report was performed "
-                f"in adherence to scientifically validated computer forensic procedures. All cryptographic hashes "
-                f"were computed using standard cryptographic implementations and verify that no evidence was altered, "
-                f"tampered with, or fabricated during intake, parsing, and reporting.",
+                f"I, <b>{lead_analyst}</b>, representing <b>{agency}</b>, declare that the "
+                f"examination and digital analysis documented in this report was performed "
+                f"in adherence to validated computer forensic procedures. All cryptographic hashes "
+                f"were computed using standard cryptographic implementations to verify that no evidence was altered "
+                f"during intake, parsing, and reporting.",
                 body_text
             ),
             Spacer(1, 10),
@@ -792,7 +792,7 @@ class ReportService:
                         "<br/>[ ARTIFACTX FORENSIC ENGINE ]<br/>"
                         f"SHA-256 MANIFEST VERIFIED<br/>"
                         f"ID: {report_id[:18]}...<br/>"
-                        "STATUS: ADMISSIBLE",
+                        "STATUS: DRAFT FOR REVIEW",
                         mono_bold
                     ),
                 ]

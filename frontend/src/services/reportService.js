@@ -3,10 +3,10 @@ import axios from 'axios';
 const API_BASE = '/api';
 
 /**
- * Generate a court-ready PDF report streamed directly into the browser
+ * Generate a Forensic Evidence Report PDF streamed directly into the browser
  * with zero files stored on the workspace disk.
  */
-export const generateCourtReportStream = async (caseId, options = {}) => {
+export const generateReportStream = async (caseId, options = {}) => {
   const payload = {
     case_id: parseInt(caseId, 10),
     report_type: options.reportType || 'full',
@@ -19,6 +19,7 @@ export const generateCourtReportStream = async (caseId, options = {}) => {
     agency: options.agency || 'Digital Forensics Unit',
     case_notes: options.caseNotes || '',
     sworn_declaration: options.swornDeclaration !== false,
+    analyst_declaration: options.analystDeclaration !== false,
   };
 
   const response = await axios.post(`${API_BASE}/cases/${caseId}/reports`, payload, {
@@ -26,7 +27,7 @@ export const generateCourtReportStream = async (caseId, options = {}) => {
   });
 
   // Extract filename from Content-Disposition header
-  let filename = `ArtifactX_CourtReport_Case${caseId}.pdf`;
+  let filename = `ArtifactX_ForensicReport_Case${caseId}.pdf`;
   const disposition = response.headers['content-disposition'];
   if (disposition && disposition.includes('filename=')) {
     const match = disposition.match(/filename="?([^";]+)"?/);
@@ -111,13 +112,15 @@ export const getDeletedSummary = async (caseId) => {
   return response.data;
 };
 
-// Legacy compatibility
-export const generateReport = generateCourtReportStream;
+// Backward-compatibility aliases
+export const generateReport = generateReportStream;
+export const generateCourtReportStream = generateReportStream;
 export const downloadReport = (caseId, filename) => {
   window.open(`${API_BASE}/reports/download/${caseId}/${filename}`, '_blank');
 };
 
 export default {
+  generateReportStream,
   generateCourtReportStream,
   generateReport,
   downloadReport,

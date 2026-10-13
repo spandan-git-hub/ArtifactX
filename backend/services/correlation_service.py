@@ -495,7 +495,7 @@ class CorrelationService:
 
     def get_deep_graph(self, db: Session, case_id: int) -> Dict[str, Any]:
         """
-        Generate a stable court-ready JSON graph of nodes and edges for visual forensic analysis:
+        Generate a stable forensic JSON graph of nodes and edges for visual forensic analysis:
         {
           "nodes": [...],
           "edges": [...],

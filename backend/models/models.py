@@ -311,7 +311,7 @@ class ErrorLog(Base):
 
 
 class GeneratedReport(Base):
-    """In-app report history tracker for generated court-ready reports."""
+    """In-app report history tracker for generated forensic evidence reports."""
 
     __tablename__ = "generated_reports"
 

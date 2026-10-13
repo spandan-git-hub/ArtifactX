@@ -24,7 +24,31 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   ```
 - **Demo routes status:** No `/api/demo` routes exist (returns 404). All demo endpoints and schemas are absent.
 
-## 2026-10-13 A3 — /api/assistant & /api/sentiment (Absence / Removal)
-- **Old contract (per legacy design):** AI forensic assistant chat (`POST /api/assistant/chat`) and sentiment query endpoints.
-- **New contract (verified & enforced in A3):** All assistant and sentiment routes are absent from the application router (return HTTP 404). Subjective AI predictions and sentiment scores are strictly excluded from the platform.
+## 2026-10-13 A4 — GET /api/cases/{case_id} & POST /api/cases/{case_id}/reports
+- **Endpoint:** `GET /api/cases/{case_id}`
+  - **Old contract:** Analysis stage 4 was named `"Court Export"` with description `"Forensic audit complete; ready for court PDF report export."`:
+    ```json
+    {
+      "analysis_stage": {
+        "stage_number": 4,
+        "stage_name": "Court Export",
+        "description": "Forensic audit complete; ready for court PDF report export."
+      }
+    }
+    ```
+  - **New contract:** Stage 4 renamed to `"Report Export"` with description `"Forensic audit complete; ready for report export."`:
+    ```json
+    {
+      "analysis_stage": {
+        "stage_number": 4,
+        "stage_name": "Report Export",
+        "description": "Forensic audit complete; ready for report export."
+      }
+    }
+    ```
+- **Endpoint:** `POST /api/cases/{case_id}/reports`
+  - Route path remains unchanged (`/api/cases/{case_id}/reports`).
+  - Function renamed internally from `generate_court_report` to `generate_report`.
+  - Filename in `Content-Disposition` header changed from `ArtifactX_CourtReport_Case{case_id}_{type}_{timestamp}.pdf` to `ArtifactX_ForensicReport_Case{case_id}_{type}_{timestamp}.pdf`.
+  - Response error messages on generation failure sanitized from `"Failed to generate court report: ..."` to `"Failed to generate forensic report: ..."`.
 

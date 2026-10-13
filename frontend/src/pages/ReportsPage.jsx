@@ -104,7 +104,7 @@ const ReportsPage = () => {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-accent-cyan mx-auto" />
-          <span className="text-forensic-400 font-mono text-sm block">Loading Court Reporting Subsystem...</span>
+          <span className="text-forensic-400 font-mono text-sm block">Loading Forensic Reporting Subsystem...</span>
         </div>
       </div>
     );
@@ -122,10 +122,10 @@ const ReportsPage = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold font-mono text-forensic-50 flex items-center gap-2">
-                Court-Ready PDF Reports & Custody Tracker
+                Forensic Evidence Reports & Custody Tracker
               </h1>
               <p className="text-xs text-forensic-400">
-                In-memory zero-workspace report compiler. Generates deterministic, ISO/IEC 27037 compliant court documentation.
+                In-memory zero-workspace report compiler. Generates deterministic, ISO/IEC 27037 compliant forensic documentation.
               </p>
             </div>
           </div>
@@ -270,9 +270,9 @@ const ReportsPage = () => {
         ) : history.length === 0 ? (
           <div className="py-12 text-center text-forensic-500 space-y-2">
             <FileText className="w-8 h-8 text-forensic-600 mx-auto opacity-50" />
-            <p className="text-sm font-mono text-forensic-400">No court reports recorded for Case #{caseId} yet.</p>
+            <p className="text-sm font-mono text-forensic-400">No forensic reports recorded for Case #{caseId} yet.</p>
             <p className="text-xs text-forensic-500">
-              Configure parameters above and click "Generate & Stream Court PDF" to generate the first official court report.
+              Configure parameters above and click "Generate & Stream Forensic Report" to generate the first official forensic report.
             </p>
           </div>
         ) : (

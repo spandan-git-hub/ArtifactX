@@ -115,8 +115,8 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
         stage_desc = "Forensic messages, timeline, and identity correlation active."
     else:
         stage_num = 4
-        stage_name = "Court Export"
-        stage_desc = "Forensic audit complete; ready for court PDF report export."
+        stage_name = "Report Export"
+        stage_desc = "Forensic audit complete; ready for report export."
 
     return {
         "case": case,

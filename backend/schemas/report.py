@@ -133,7 +133,7 @@ class ReportGenerateResponse(BaseModel):
 
 
 class GeneratedReportResponse(BaseModel):
-    """Metadata response for a generated court report."""
+    """Metadata response for a generated forensic report."""
     id: int
     report_id: str
     case_id: int

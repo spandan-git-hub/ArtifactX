@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import * as reportService from '../services/reportService';
 
 /**
- * Hook for court-ready report generation and history tracking
+ * Hook for Forensic Evidence Report generation and history tracking
  */
 export const useReports = () => {
   const [loading, setLoading] = useState(false);
@@ -29,13 +29,13 @@ export const useReports = () => {
     setError(null);
 
     try {
-      const result = await reportService.generateCourtReportStream(caseId, options);
+      const result = await reportService.generateReportStream(caseId, options);
       setLastReport(result);
       // Automatically refresh history after generating a report
       await loadHistory(caseId);
       return result;
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to generate court report';
+      const msg = err.response?.data?.detail || err.message || 'Failed to generate forensic report';
       setError(msg);
       throw err;
     } finally {

@@ -32,7 +32,7 @@ const STAGES = [
   {
     step: 4,
     id: 'export',
-    label: 'Court Export',
+    label: 'Report Export',
     desc: 'In-Memory PDF & Custody Audit',
     icon: FileText,
     route: (caseId) => `/cases/${caseId}/reports`,
