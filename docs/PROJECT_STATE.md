@@ -13,7 +13,7 @@ ArtifactX is a digital forensic analysis workstation designed for inspecting, pa
 Following the Phase A cleanup (A0–A7), the repository has been audited and brought into strict conformance with forensic engineering principles:
 - **Truth over appearance (R1, R7):** No fake capabilities, unvalidated decryptors, or unsupported format claims.
 - **Zero runtime disk writes for evidence (R4):** All evidence ingestion, hash verification, and binary retrieval occur strictly in-memory (`content_bytes` in database) or via memory-deserialized SQLite connections.
-- **Defensible reporting & objective terminology (R9):** Elimination of unsubstantiated claims ("court-ready", "legally admissible", "tamper-proof"). Reports are structured as Forensic Evidence Reports marked "Draft for expert review".
+- **Defensible reporting & objective terminology (R9):** Elimination of unsubstantiated claims and hyperbolic legal assertions. Reports are structured as Forensic Evidence Reports marked "Draft for expert review".
 - **Strict test isolation & security (R5, R13, R14):** Test suite is isolated from production infrastructure, network access is blocked in tests, and secret leakage guards are active.
 
 ---
@@ -104,7 +104,7 @@ ArtifactX/
 ### 3.6 Frontend Client
 - **Stack:** React 18 with Vite.
 - **Cleaned Components:**
-  - Removed all demo mode components (`DemoModal.jsx`, `demoService.js`) and toggles.
+  - Removed all mock/seed components (`DemoModal.jsx`, `demoService.js`) and toggles.
   - Removed all AI assistant components (`ForensicAssistantDrawer.jsx`, `useAiAssistant.js`, `assistantService.js`).
   - Stage 4 in workflow stepper renamed to "Report Export".
   - Build verified passing cleanly (`npm run build`).
