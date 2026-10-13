@@ -4,7 +4,7 @@ JUDICIAL ADMISSIBILITY GUARANTEE (Phase 15 - B30):
 Official court PDF reports strictly query only deterministic evidence tables
 (evidence files, cryptographic hashes, raw message transcripts, timeline events,
 detected deletion gaps, and chain-of-custody audit logs).
-All AI Forensic Assistant responses, sentiment scores, and copilot outputs
+All external predictive models, subjective scoring metrics, and speculative outputs
 are STRICTLY EXCLUDED from this service and all generated PDF artifacts.
 """
 
@@ -469,7 +469,7 @@ class ReportService:
                 "<b>FORENSIC INTEGRITY NOTICE:</b> This official report contains deterministic digital evidence "
                 "extracted directly from seized mobile artifacts. In accordance with legal rules of evidence, all "
                 "cryptographic signatures, sequence continuity checks, and chain of custody logs are permanently "
-                "recorded. <b>No synthetic predictions or speculative AI copilot analyses are incorporated into this report.</b>",
+                "recorded. <b>No synthetic predictions or speculative analyses are incorporated into this report.</b>",
                 ParagraphStyle("NoticeStyle", parent=styles["Normal"], fontName="Helvetica", fontSize=8, leading=11, textColor=colors.HexColor("#0f172a"))
             )
         ]]

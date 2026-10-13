@@ -80,7 +80,7 @@ const ReportPdfPreview = ({
           <div className="text-blue-200/90 leading-relaxed text-[11px]">
             <b>Judicial Admissibility Guarantee:</b> This court document compiles bit-level hashes, chronological timeline
             reconstructions, and unallocated sequence gap anomalies. In accordance with evidentiary standards,
-            all subjective AI copilot analyses and conversational sentiment scores are strictly excluded.
+            all subjective predictive models and speculative automated analyses are strictly excluded.
           </div>
         </div>
 

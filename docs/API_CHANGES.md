@@ -23,3 +23,8 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   }
   ```
 - **Demo routes status:** No `/api/demo` routes exist (returns 404). All demo endpoints and schemas are absent.
+
+## 2026-10-13 A3 — /api/assistant & /api/sentiment (Absence / Removal)
+- **Old contract (per legacy design):** AI forensic assistant chat (`POST /api/assistant/chat`) and sentiment query endpoints.
+- **New contract (verified & enforced in A3):** All assistant and sentiment routes are absent from the application router (return HTTP 404). Subjective AI predictions and sentiment scores are strictly excluded from the platform.
+
