@@ -41,7 +41,7 @@ class EvidenceSummary(BaseModel):
     evidence_breakdown: Dict[str, int] = Field(default_factory=dict)
     media_summary: Dict[str, int] = Field(default_factory=dict)
     apps_found: List[str] = Field(default_factory=list)
-    date_range: Optional[Dict[str, datetime]] = None
+    date_range: Optional[Dict[str, Optional[datetime]]] = None
 
 
 class EvidenceReportData(BaseModel):
@@ -58,7 +58,7 @@ class TimelineSummary(BaseModel):
     total_events: int
     events_by_type: Dict[str, int] = Field(default_factory=dict)
     events_by_app: Dict[str, int] = Field(default_factory=dict)
-    date_range: Optional[Dict[str, datetime]] = None
+    date_range: Optional[Dict[str, Optional[datetime]]] = None
     app_breakdown: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -78,7 +78,7 @@ class DeletedMessageSummary(BaseModel):
     high_confidence_count: int
     medium_confidence_count: int
     low_confidence_count: int
-    date_range: Optional[Dict[str, datetime]] = None
+    date_range: Optional[Dict[str, Optional[datetime]]] = None
 
 
 class DeletedMessageReportData(BaseModel):

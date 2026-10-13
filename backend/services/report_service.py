@@ -12,6 +12,7 @@ import hashlib
 import uuid
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from reportlab.lib import colors
@@ -510,7 +511,7 @@ class ReportService:
                 for item in evidence_hashes[:30]:
                     size_kb = f"{item['size'] / 1024:.1f} KB" if item['size'] > 1024 else f"{item['size']} B"
                     manifest_rows.append([
-                        Paragraph(f"<b>{os.path.basename(item['filename'])}</b>", table_cell),
+                        Paragraph(f"<b>{Path(item['filename']).name}</b>", table_cell),
                         Paragraph(item["type"], table_cell),
                         Paragraph(size_kb, table_cell),
                         Paragraph(item["sha256"], mono_text),

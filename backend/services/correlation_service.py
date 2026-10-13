@@ -726,7 +726,7 @@ class CorrelationService:
 
             files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == e.id).all()
             for f in files:
-                rp = (f.file_path or "").lower()
+                rp = (getattr(f, "relative_path", "") or getattr(f, "file_path", "") or "").lower()
                 if "msgstore" in rp or "wa.db" in rp or "whatsapp" in rp:
                     has_whatsapp = True
                 if "cache4" in rp or "tg.db" in rp or "telegram" in rp or "userconf" in rp:
