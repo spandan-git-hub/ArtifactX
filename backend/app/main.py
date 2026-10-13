@@ -20,25 +20,8 @@ from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup with auto-retry for serverless PostgreSQL (Neon)."""
+    """Application lifespan managing logging and startup initialization."""
     configure_logging(settings.log_level)
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            Base.metadata.create_all(bind=engine)
-            from sqlalchemy import text
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE evidence ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
-                conn.execute(text("ALTER TABLE evidence_files ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
-                conn.execute(text("ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS pdf_data BYTEA;"))
-                conn.execute(text("ALTER TABLE derived_artifacts ADD COLUMN IF NOT EXISTS content_bytes BYTEA;"))
-            break
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise e
-            import time
-            engine.dispose()  # Clear stale connections from pool
-            time.sleep(1.5)
     yield
 
 

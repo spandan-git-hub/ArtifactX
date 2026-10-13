@@ -6,14 +6,18 @@ from sqlalchemy.pool import NullPool
 
 from backend.app.config import settings
 
-# Serverless PostgreSQL configuration (Neon cloud DB)
-# NullPool prevents stale pooled sockets when Neon serverless compute suspends/resumes
+# Serverless PostgreSQL configuration (Neon cloud DB) vs In-memory SQLite for tests
 engine_kwargs = {
-    "poolclass": NullPool,
     "echo": settings.debug,
 }
 
-if settings.database_url.startswith("postgresql"):
+if settings.database_url.startswith("sqlite"):
+    from sqlalchemy.pool import StaticPool
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+    engine_kwargs["poolclass"] = StaticPool
+elif settings.database_url.startswith("postgresql"):
+    # NullPool prevents stale pooled sockets when Neon serverless compute suspends/resumes
+    engine_kwargs["poolclass"] = NullPool
     engine_kwargs["connect_args"] = {
         "sslmode": "require",
         "connect_timeout": 10,
@@ -22,6 +26,8 @@ if settings.database_url.startswith("postgresql"):
         "keepalives_interval": 10,
         "keepalives_count": 5,
     }
+else:
+    engine_kwargs["poolclass"] = NullPool
 
 
 engine = create_engine(settings.database_url, **engine_kwargs)
