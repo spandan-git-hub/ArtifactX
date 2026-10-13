@@ -1,7 +1,7 @@
 """
 Pydantic schemas for the Cryptographic Decryption Subsystem.
 Strictly adheres to 09_API_DATA_CONTRACTS.md.
-Never exposes raw cryptographic keys or passcodes in responses.
+Never exposes raw cryptographic keys or secrets in responses.
 """
 
 from datetime import datetime
@@ -22,13 +22,13 @@ class FormatDetectionResponse(BaseModel):
 class DecryptionRunRequest(BaseModel):
     """
     Investigator request to decrypt an encrypted evidence container.
-    Key material / passcodes are processed in ephemeral memory and never logged or stored.
+    Key material is processed in ephemeral memory and never logged or stored.
+    Passcodes (Telegram PIN) removed per Section A6 / DEC-004.
     """
     key_material: Optional[str] = Field(None, description="WhatsApp key file (base64 or hex) or raw 32-byte key")
-    passcode: Optional[str] = Field(None, description="Telegram in-app passcode / numeric PIN")
-    format_override: Optional[str] = Field(None, description="Explicit format override (e.g. crypt12, crypt14, crypt15, sqlcipher, enc, mtproto)")
+    format_override: Optional[str] = Field(None, description="Explicit format override (e.g. crypt12, crypt14, crypt15)")
     candidate_file_id: Optional[int] = Field(None, description="EvidenceFile ID if targeting an extracted archive member")
-    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Algorithm profile options (e.g. SQLCipher profile, iterations)")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Algorithm options (iterations, etc.)")
 
 
 class DecryptionOperationResponse(BaseModel):
@@ -38,7 +38,7 @@ class DecryptionOperationResponse(BaseModel):
     evidence_id: int
     file_id: Optional[int] = None
     format: str
-    status: str  # QUEUED, RUNNING, SUCCEEDED, FAILED
+    status: str  # QUEUED, RUNNING, SUCCEEDED, FAILED, DECRYPTOR_NOT_AVAILABLE
     input_sha256: str
     output_sha256: Optional[str] = None
     derived_artifact_id: Optional[int] = None

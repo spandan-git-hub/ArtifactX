@@ -1,14 +1,24 @@
 """
-ArtifactX Forensic Decryption Subsystem (Phase E / R3).
-Provides auditable, zero-local-storage decryption for WhatsApp databases (Crypt12, Crypt14, Crypt15),
-WhatsApp encrypted media (.enc with HKDF RFC 5869), and Telegram SQLCipher & MTProto Secret Chats.
+ArtifactX Forensic Decryption Subsystem.
+Provides plugin-based decryption orchestrator and honest format/entropy detection.
+Telegram secret chats/SQLCipher and unvalidated decryptors demoted per Section A6 / DEC-004 / DEC-005.
 """
 
 from forensic.decryption.detector import EncryptionDetector, FormatDetectionResult
-from forensic.decryption.orchestrator import DecryptionOrchestrator
+from forensic.decryption.orchestrator import (
+    DecryptionOrchestrator,
+    Decryptor,
+    DecryptorNotAvailableError,
+    KeyMaterial,
+    DecryptionResult,
+)
 
 __all__ = [
     "EncryptionDetector",
     "FormatDetectionResult",
     "DecryptionOrchestrator",
+    "Decryptor",
+    "DecryptorNotAvailableError",
+    "KeyMaterial",
+    "DecryptionResult",
 ]

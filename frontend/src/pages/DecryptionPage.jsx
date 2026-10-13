@@ -39,9 +39,6 @@ export default function DecryptionPage() {
   // Workbench Form State
   const [selectedFormat, setSelectedFormat] = useState('auto_detect');
   const [keyInput, setKeyInput] = useState('');
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [mediaType, setMediaType] = useState('image');
-  const [sqlcipherProfile, setSqlcipherProfile] = useState('v4');
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -103,20 +100,18 @@ export default function DecryptionPage() {
 
       const payload = {
         key_material: keyInput.trim() || null,
-        passcode: passcodeInput.trim() || null,
         format_override: selectedFormat !== 'auto_detect' ? selectedFormat : null,
-        parameters: {
-          media_type: mediaType,
-          profile: sqlcipherProfile,
-        },
       };
 
       const res = await decryptionService.runDecryption(selectedEvidence.id, payload);
-      setSuccessMsg(`Decryption SUCCEEDED! Derived exhibit SHA-256: ${res.output_sha256}`);
-      setKeyInput('');
-      setPasscodeInput('');
-      await loadData();
-      setActiveTab('derived');
+      if (res.status === 'DECRYPTOR_NOT_AVAILABLE') {
+        setError(res.error_message || 'Decryption engine is not available (demoted pending Phase B6).');
+      } else {
+        setSuccessMsg(`Decryption SUCCEEDED! Derived exhibit SHA-256: ${res.output_sha256}`);
+        setKeyInput('');
+        await loadData();
+        setActiveTab('derived');
+      }
     } catch (err) {
       console.error('Decryption execution failed:', err);
       setError(err.response?.data?.detail || err.message || 'Decryption failed.');
@@ -148,7 +143,7 @@ export default function DecryptionPage() {
             <span>Cryptographic Decryption Subsystem</span>
           </h1>
           <p className="text-sm text-forensic-400 mt-1">
-            Auditable in-memory decryption for WhatsApp Crypt12/14/15, .enc Media, and Telegram SQLCipher & MTProto
+            Auditable in-memory decryption for WhatsApp Crypt12/14/15 backups
           </p>
         </div>
 
@@ -359,100 +354,28 @@ export default function DecryptionPage() {
                 <option value="auto_detect">Automatic Detection (Entropy & Header Inspection)</option>
                 <option value="crypt12">WhatsApp Crypt12 (AES-256-GCM)</option>
                 <option value="crypt14">WhatsApp Crypt14 (PBKDF2-HMAC-SHA256 + AES-GCM)</option>
-                <option value="crypt15">WhatsApp Crypt15 (64-Hex Passkey + SHA512 PBKDF2)</option>
-                <option value="whatsapp_enc">WhatsApp Media .enc (HKDF RFC 5869 + AES-CBC)</option>
-                <option value="sqlcipher">Telegram SQLCipher (cache4.db)</option>
-                <option value="mtproto">Telegram MTProto Secret Chat (enc_chats IGE)</option>
+                <option value="crypt15">WhatsApp Crypt15 (64-Hex Passkey)</option>
               </select>
             </div>
 
-            {/* Key / Passcode Inputs based on format */}
-            {selectedFormat !== 'sqlcipher' && selectedFormat !== 'mtproto' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-forensic-300 mb-2 uppercase">
-                    WhatsApp Key Material / 64-Hex Passkey
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={keyInput}
-                    onChange={(e) => setKeyInput(e.target.value)}
-                    placeholder="Paste raw 32-byte key hex, base64 key file contents, or 64-char Crypt15 passkey..."
-                    className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-3 text-xs font-mono text-forensic-100 focus:border-accent-cyan outline-none"
-                  />
-                  <span className="text-[11px] text-forensic-500 font-mono mt-1 block">
-                    Supports 158-byte /data/data/com.whatsapp/files/key or 64-character hexadecimal passkeys.
-                  </span>
-                </div>
-
-                {selectedFormat === 'whatsapp_enc' && (
-                  <div>
-                    <label className="block text-xs font-mono text-forensic-300 mb-2 uppercase">
-                      Media Attachment Type
-                    </label>
-                    <div className="grid grid-cols-4 gap-3">
-                      {['image', 'audio', 'video', 'document'].map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setMediaType(m)}
-                          className={`p-2 rounded text-xs font-mono uppercase border transition-all ${
-                            mediaType === m
-                              ? 'border-accent-cyan bg-accent-cyan/20 text-accent-cyan font-bold'
-                              : 'border-forensic-800 bg-forensic-950 text-forensic-400 hover:border-forensic-700'
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* Key Inputs based on format */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-forensic-300 mb-2 uppercase">
+                  WhatsApp Key Material / 64-Hex Passkey
+                </label>
+                <textarea
+                  rows={3}
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder="Paste raw 32-byte key hex, base64 key file contents, or 64-char Crypt15 passkey..."
+                  className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-3 text-xs font-mono text-forensic-100 focus:border-accent-cyan outline-none"
+                />
+                <span className="text-[11px] text-forensic-500 font-mono mt-1 block">
+                  Supports 158-byte /data/data/com.whatsapp/files/key or 64-character hexadecimal passkeys.
+                </span>
               </div>
-            )}
-
-            {selectedFormat === 'sqlcipher' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-forensic-300 mb-2 uppercase">
-                    Telegram App Passcode / PIN
-                  </label>
-                  <input
-                    type="password"
-                    value={passcodeInput}
-                    onChange={(e) => setPasscodeInput(e.target.value)}
-                    placeholder="Enter known Telegram PIN or passcode..."
-                    className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-2.5 text-sm font-mono text-forensic-100 focus:border-accent-cyan outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-forensic-300 mb-2 uppercase">
-                    SQLCipher Parameter Profile
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: 'v4', label: 'SQLCipher v4 (Default)', desc: '4096B page, PBKDF2-SHA512 (256,000 iter)' },
-                      { id: 'v3', label: 'SQLCipher v3 (Legacy)', desc: '1024B page, PBKDF2-SHA1 (64,000 iter)' },
-                    ].map((prof) => (
-                      <button
-                        key={prof.id}
-                        type="button"
-                        onClick={() => setSqlcipherProfile(prof.id)}
-                        className={`p-3 rounded-lg text-left border transition-all ${
-                          sqlcipherProfile === prof.id
-                            ? 'border-accent-cyan bg-accent-cyan/10 text-forensic-100'
-                            : 'border-forensic-800 bg-forensic-950 text-forensic-400'
-                        }`}
-                      >
-                        <div className="text-xs font-bold font-mono">{prof.label}</div>
-                        <div className="text-[11px] text-forensic-500 mt-1">{prof.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
 
             {/* Execute Button */}
             <div className="pt-4 border-t border-forensic-800 flex items-center justify-between">
@@ -506,9 +429,6 @@ export default function DecryptionPage() {
                 </div>
                 <div>
                   <span className="text-accent-cyan">Crypt15 Passkey:</span> 64 hexadecimal characters configured during backup creation.
-                </div>
-                <div>
-                  <span className="text-accent-cyan">SQLCipher:</span> 4-to-6 digit device passcode or alphanumeric app lock password.
                 </div>
               </div>
             </div>

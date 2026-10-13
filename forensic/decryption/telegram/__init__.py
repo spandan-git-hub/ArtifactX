@@ -1,12 +1,7 @@
 """
-Telegram Decryption Subsystem: SQLCipher and MTProto Secret Chats.
+Telegram Decryption Subsystem (demoted / out of scope).
+Telegram cache4.db on Android is plain unencrypted SQLite.
+Secret chats and MTProto network captures are out of scope (DEC-004).
 """
 
-from forensic.decryption.telegram.sqlcipher import TelegramSQLCipherDecryptor, SQLCipherProfile
-from forensic.decryption.telegram.mtproto import TelegramMTProtoDecryptor
-
-__all__ = [
-    "TelegramSQLCipherDecryptor",
-    "SQLCipherProfile",
-    "TelegramMTProtoDecryptor",
-]
+__all__ = []

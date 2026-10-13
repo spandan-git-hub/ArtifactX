@@ -27,7 +27,7 @@ from backend.schemas.decryption import (
     DerivedArtifactResponse,
     FormatDetectionResponse,
 )
-from forensic.decryption.orchestrator import DecryptionOrchestrator
+from forensic.decryption.orchestrator import DecryptionOrchestrator, DecryptorNotAvailableError
 
 
 router = APIRouter(tags=["decryption"])
@@ -130,12 +130,12 @@ def run_decryption(
     import hashlib
     input_sha256 = hashlib.sha256(target_bytes).hexdigest()
 
-    # Determine secret input (key_material or passcode)
-    secret_input = req.key_material or req.passcode
+    # Determine secret input (key_material)
+    secret_input = req.key_material
     if not secret_input:
         raise HTTPException(
             status_code=400,
-            detail="Either key_material (WhatsApp key/passkey) or passcode (Telegram PIN) must be provided.",
+            detail="key_material (WhatsApp key file or passkey hex) must be provided.",
         )
 
     # Create audit operation record
@@ -168,15 +168,11 @@ def run_decryption(
 
         # Determine clean derived filename
         base_name = filename
-        for ext in (".crypt12", ".crypt14", ".crypt15", ".enc"):
+        for ext in (".crypt12", ".crypt14", ".crypt15"):
             if base_name.endswith(ext):
                 base_name = base_name[: -len(ext)]
         if not base_name.endswith(".db") and artifact_type == "decrypted_sqlite":
             derived_filename = f"{base_name}_decrypted.db"
-        elif artifact_type == "decrypted_media":
-            mime = meta.get("operation_details", {}).get("mime_type", "")
-            ext = ".jpg" if "jpeg" in mime else (".png" if "png" in mime else (".mp4" if "mp4" in mime else ".bin"))
-            derived_filename = f"{base_name}_decrypted{ext}"
         else:
             derived_filename = f"{base_name}_decrypted"
 
@@ -239,6 +235,43 @@ def run_decryption(
             error_message=None,
             created_at=op.created_at,
             completed_at=op.completed_at,
+        )
+
+    except DecryptorNotAvailableError as dne:
+        db.rollback()
+        op_demoted = db.query(DecryptionOperation).filter(DecryptionOperation.id == op.id).first()
+        if op_demoted:
+            op_demoted.status = "DECRYPTOR_NOT_AVAILABLE"
+            op_demoted.error_message = _clean_pg_text(str(dne))
+            op_demoted.completed_at = datetime.utcnow()
+            db.commit()
+            db.refresh(op_demoted)
+
+        # Log to ActivityLog
+        act_log = ActivityLog(
+            case_id=evidence.case_id,
+            action="DECRYPTION_UNAVAILABLE",
+            description=f"Decryption unavailable for format {op.format}: {str(dne)}",
+            timestamp=datetime.utcnow(),
+        )
+        db.add(act_log)
+        db.commit()
+
+        return DecryptionOperationResponse(
+            operation_id=op.id,
+            case_id=op.case_id,
+            evidence_id=op.evidence_id,
+            file_id=op.file_id,
+            format=op.format,
+            status="DECRYPTOR_NOT_AVAILABLE",
+            input_sha256=op.input_sha256,
+            output_sha256=None,
+            derived_artifact_id=None,
+            validation={},
+            parameters=op.parameters or {},
+            error_message=_clean_pg_text(str(dne)),
+            created_at=op.created_at,
+            completed_at=datetime.utcnow(),
         )
 
     except Exception as e:

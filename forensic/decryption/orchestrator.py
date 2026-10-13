@@ -1,26 +1,82 @@
 """
-Unified Forensic Decryption Orchestrator.
-Dispatches encrypted payloads to the appropriate engine (WhatsApp Crypt12/14/15,
-WhatsApp .enc media, Telegram SQLCipher, or Telegram MTProto) and returns verified
-in-memory artifacts with complete judicial provenance.
+Unified Forensic Decryption Orchestrator with plugin interface.
+Legacy unvalidated decryptors have been unregistered per Section A6 / DEC-006.
+Phase B6 will introduce independently validated decryptors adhering to Decryptor Protocol.
 """
 
+from dataclasses import dataclass, field
 import hashlib
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from forensic.decryption.detector import EncryptionDetector, FormatDetectionResult
-from forensic.decryption.whatsapp.crypt12 import Crypt12Decryptor
-from forensic.decryption.whatsapp.crypt14 import Crypt14Decryptor
-from forensic.decryption.whatsapp.crypt15 import Crypt15Decryptor
-from forensic.decryption.whatsapp.key_parser import WhatsAppKey, WhatsAppKeyParser
-from forensic.decryption.whatsapp.media import WhatsAppMediaDecryptor
-from forensic.decryption.whatsapp.validator import SQLiteValidator
-from forensic.decryption.telegram.sqlcipher import TelegramSQLCipherDecryptor, SQLCipherProfile
-from forensic.decryption.telegram.mtproto import TelegramMTProtoDecryptor
+
+
+@dataclass
+class KeyMaterial:
+    """Container for cryptographic key inputs without logging secrets."""
+    raw_key: Optional[bytes] = None
+    key_hex: Optional[str] = None
+    key_file_bytes: Optional[bytes] = None
+    key_type: str = "raw"
+
+
+@dataclass
+class DecryptionResult:
+    """Result of a successful in-memory decryption operation."""
+    plaintext: bytes
+    format_id: str
+    output_sha256: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@runtime_checkable
+class Decryptor(Protocol):
+    """Clean plugin interface for forensic decryption engines (A6.4)."""
+    format_id: str
+
+    def can_handle(self, header: bytes, filename: Optional[str] = None) -> bool:
+        """Inspect header or filename to determine engine compatibility."""
+        ...
+
+    def decrypt(self, data: bytes, key_material: KeyMaterial) -> DecryptionResult:
+        """Execute in-memory decryption with integrity checks."""
+        ...
+
+
+class DecryptorNotAvailableError(Exception):
+    """Raised when no validated decryptor plugin is available for the requested format."""
+
+    def __init__(self, format_name: str, message: Optional[str] = None):
+        self.format_name = format_name
+        super().__init__(
+            message
+            or f"Decryptor for format '{format_name}' is not available. "
+            "Unvalidated decryptors were demoted pending Phase B6."
+        )
 
 
 class DecryptionOrchestrator:
-    """Central coordinator for cryptographic forensic decryption."""
+    """
+    Central coordinator for cryptographic forensic decryption plugins.
+    Zero disk writes: operates strictly on in-memory buffers.
+    """
+
+    _registry: Dict[str, Decryptor] = {}
+
+    @classmethod
+    def register(cls, decryptor: Decryptor) -> None:
+        """Register a validated decryptor engine plugin."""
+        cls._registry[decryptor.format_id.lower()] = decryptor
+
+    @classmethod
+    def unregister(cls, format_id: str) -> None:
+        """Unregister a decryptor engine plugin."""
+        cls._registry.pop(format_id.lower(), None)
+
+    @classmethod
+    def get_registered_formats(cls) -> List[str]:
+        """Return list of currently registered format IDs."""
+        return list(cls._registry.keys())
 
     @classmethod
     def detect_format(cls, data: bytes, filename: Optional[str] = None) -> FormatDetectionResult:
@@ -31,14 +87,14 @@ class DecryptionOrchestrator:
     def decrypt(
         cls,
         data: bytes,
-        key_or_passcode: Union[str, bytes, WhatsAppKey],
+        key_or_passcode: Union[str, bytes, KeyMaterial],
         format_hint: Optional[str] = None,
         filename: Optional[str] = None,
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bytes, Dict[str, Any]]:
         """
-        Execute decryption workflow.
-        Returns: (decrypted_bytes, provenance_metadata)
+        Execute decryption workflow via registered plugins.
+        Raises DecryptorNotAvailableError when no validated plugin is registered for format.
         """
         if not data:
             raise ValueError("Encrypted data buffer is empty.")
@@ -47,72 +103,42 @@ class DecryptionOrchestrator:
 
         # 1. Format resolution
         fmt = (format_hint or "").lower()
-        if not fmt:
+        if not fmt or fmt == "auto_detect":
             det = cls.detect_format(data, filename)
             if not det.is_encrypted or not det.format:
                 raise ValueError(f"Could not automatically identify encryption format: {det.reasons}")
-            fmt = det.format
+            fmt = det.format.lower()
 
-        input_sha256 = hashlib.sha256(data).hexdigest()
+        # 2. Lookup registered plugin
+        decryptor = cls._registry.get(fmt)
+        if decryptor is None:
+            raise DecryptorNotAvailableError(format_name=fmt)
 
-        # 2. Dispatch by format
-        if fmt in ("crypt12", "whatsapp_crypt12"):
-            wa_key = key_or_passcode if isinstance(key_or_passcode, WhatsAppKey) else WhatsAppKeyParser.parse(key_or_passcode)
-            plain_bytes, meta = Crypt12Decryptor.decrypt(data, wa_key)
-            artifact_type = "decrypted_sqlite"
-
-        elif fmt in ("crypt14", "whatsapp_crypt14"):
-            wa_key = key_or_passcode if isinstance(key_or_passcode, WhatsAppKey) else WhatsAppKeyParser.parse(key_or_passcode)
-            plain_bytes, meta = Crypt14Decryptor.decrypt(data, wa_key)
-            artifact_type = "decrypted_sqlite"
-
-        elif fmt in ("crypt15", "whatsapp_crypt15"):
-            plain_bytes, meta = Crypt15Decryptor.decrypt(
-                data,
-                key_or_passcode,
-                iterations=params.get("iterations", Crypt15Decryptor.DEFAULT_ITERATIONS),
-            )
-            artifact_type = "decrypted_sqlite"
-
-        elif fmt in ("enc", "whatsapp_enc", "media_enc"):
-            media_type = params.get("media_type", "image")
-            raw_media_key = key_or_passcode.cipher_key if isinstance(key_or_passcode, WhatsAppKey) else key_or_passcode
-            plain_bytes, meta = WhatsAppMediaDecryptor.decrypt(data, raw_media_key, media_type)
-            artifact_type = "decrypted_media"
-
-        elif fmt in ("sqlcipher", "telegram_sqlcipher", "sqlcipher_v3", "sqlcipher_v4"):
-            prof_name = "v3" if "v3" in fmt else params.get("profile", "v4")
-            profile = SQLCipherProfile.get_profile(prof_name)
-            if "page_size" in params:
-                profile.page_size = int(params["page_size"])
-            if "kdf_iterations" in params:
-                profile.kdf_iterations = int(params["kdf_iterations"])
-
-            plain_bytes, meta = TelegramSQLCipherDecryptor.decrypt(data, key_or_passcode, profile)
-            artifact_type = "decrypted_sqlite"
-
-        elif fmt in ("mtproto", "telegram_secret_chat", "enc_chat"):
-            client_mode = params.get("client_mode", True)
-            raw_auth_key = key_or_passcode.cipher_key if isinstance(key_or_passcode, WhatsAppKey) else key_or_passcode
-            if isinstance(raw_auth_key, str):
-                raw_auth_key = bytes.fromhex(raw_auth_key) if len(raw_auth_key) == 512 else raw_auth_key.encode("utf-8")
-            plain_bytes, meta = TelegramMTProtoDecryptor.decrypt(data, raw_auth_key, client_mode)
-            artifact_type = "recovered_secret_chat"
-
+        # 3. Normalize key material
+        if isinstance(key_or_passcode, KeyMaterial):
+            km = key_or_passcode
+        elif isinstance(key_or_passcode, bytes):
+            km = KeyMaterial(raw_key=key_or_passcode, key_type="raw_bytes")
+        elif isinstance(key_or_passcode, str):
+            clean = key_or_passcode.strip()
+            km = KeyMaterial(key_hex=clean, key_type="hex_string")
         else:
-            raise ValueError(f"Unsupported decryption format: '{fmt}'.")
+            raise ValueError("Invalid key material input type.")
 
-        # Judicial provenance summary
-        output_sha256 = hashlib.sha256(plain_bytes).hexdigest()
+        # 4. Execute decryption plugin
+        input_sha256 = hashlib.sha256(data).hexdigest()
+        result = decryptor.decrypt(data, km)
+
+        output_sha256 = result.output_sha256 or hashlib.sha256(result.plaintext).hexdigest()
         provenance = {
-            "format": fmt,
-            "artifact_type": artifact_type,
+            "format": result.format_id,
+            "artifact_type": "decrypted_sqlite",
             "status": "SUCCEEDED",
             "input_sha256": input_sha256,
             "output_sha256": output_sha256,
-            "size_bytes": len(plain_bytes),
+            "size_bytes": len(result.plaintext),
             "parameters": {k: v for k, v in params.items() if "key" not in k.lower() and "pass" not in k.lower()},
-            "operation_details": meta,
+            "operation_details": result.metadata,
         }
 
-        return plain_bytes, provenance
+        return result.plaintext, provenance
