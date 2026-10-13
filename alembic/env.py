@@ -32,8 +32,13 @@ def get_url() -> str:
     """Retrieve database URL from configuration or environment.
     
     Prefers explicit alembic configuration, then TEST_DATABASE_URL, then DATABASE_URL.
-    Guarantees isolation from Neon (R13).
+    Guarantees isolation from Neon unless explicitly authorized via ALLOW_NEON_MIGRATION=1 (R13, R17).
     """
+    allow_neon = os.environ.get("ALLOW_NEON_MIGRATION") == "1"
+    if allow_neon:
+        from backend.app.config import Settings
+        return Settings().database_url
+
     ini_url = config.get_main_option("sqlalchemy.url")
     if ini_url and "driver://user:pass" not in ini_url and "neon.tech" not in ini_url:
         return ini_url
@@ -47,10 +52,11 @@ def assert_safe_url(url: str) -> None:
     """Ensure Alembic never touches the Neon production database without explicit authorization (R17, Q-004)."""
     parsed = urlparse(url)
     if parsed.hostname and "neon.tech" in parsed.hostname.lower():
-        raise RuntimeError(
-            "R17 Violation: Alembic migrations cannot be run directly against Neon production DB. "
-            "Refer to Q-004 in DECISIONS_AND_BLOCKERS.md."
-        )
+        if os.environ.get("ALLOW_NEON_MIGRATION") != "1":
+            raise RuntimeError(
+                "R17 Violation: Alembic migrations cannot be run directly against Neon production DB without explicit authorization (ALLOW_NEON_MIGRATION=1). "
+                "Refer to Q-004 in DECISIONS_AND_BLOCKERS.md."
+            )
 
 
 def run_migrations_offline() -> None:
