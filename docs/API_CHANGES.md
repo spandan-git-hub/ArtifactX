@@ -126,3 +126,10 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   - Never claims `sqlcipher`, `mtproto`, or `whatsapp_enc`.
   - Reports unknown high-entropy inputs (>7.5 bits/byte without recognized container or crypt markers) honestly as `UNKNOWN_ENCRYPTED_KEY_REQUIRED` with no format claim.
 
+## 2026-10-13 A7 — Configuration & Environment Consistency
+- **Configuration Contract:**
+  - `MAX_UPLOAD_SIZE`: Default adjusted from `1073741824` (1 GiB) to `268435456` (256 MiB; DEC-009) to prevent OOM during in-memory forensic deserialization (~2-3x file size peak memory) and align with storage constraints.
+  - `TEST_DATABASE_URL`: Explicitly recognized in settings and environment configuration with default `sqlite+pysqlite:///:memory:` to isolate tests from production databases.
+  - `UPLOAD_DIR` & `DEMO_MODE`: Confirmed absent from configuration models and `.env.example`.
+
+
