@@ -156,11 +156,26 @@ def audit_hook_enforcement():
 
 @pytest.fixture(autouse=True)
 def block_network(request, monkeypatch):
-    """Block network access during tests (R13). Allow loopback only when marked with 'pg'."""
+    """Block network access during tests (R13). Allow loopback only when marked with 'pg' or internal socketpair."""
     orig_connect = socket.socket.connect
     is_pg = request.node.get_closest_marker("pg") is not None
+    in_socketpair = False
+
+    orig_socketpair = getattr(socket, "socketpair", None)
+    if orig_socketpair:
+        def guarded_socketpair(*args, **kwargs):
+            nonlocal in_socketpair
+            prev = in_socketpair
+            in_socketpair = True
+            try:
+                return orig_socketpair(*args, **kwargs)
+            finally:
+                in_socketpair = prev
+        monkeypatch.setattr(socket, "socketpair", guarded_socketpair)
 
     def guarded_connect(self, address):
+        if in_socketpair:
+            return orig_connect(self, address)
         if is_pg and isinstance(address, tuple) and len(address) >= 1:
             host = address[0]
             if host in ("127.0.0.1", "localhost", "::1"):
