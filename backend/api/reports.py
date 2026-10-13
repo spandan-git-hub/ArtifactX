@@ -1,7 +1,5 @@
 """Report API endpoints."""
 
-import os
-import tempfile
 from io import BytesIO
 from typing import List, Optional
 

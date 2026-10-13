@@ -29,5 +29,6 @@ class EvidenceRead(EvidenceBase):
         serialization_alias="metadata",
     )
     extracted_path: Optional[str] = None
+    integrity_state: str = "OK"
     uploaded_at: datetime
     analyzed_at: Optional[datetime] = None

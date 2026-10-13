@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     # Format: postgresql://user:password@host:port/database
     database_url: str = "postgresql://artifactx:artifactx_password@localhost:5432/artifactx"
 
-    upload_dir: str = "uploads"
     max_upload_size: int = 1073741824  # 1GB in bytes
     log_level: str = "INFO"
 
@@ -31,8 +30,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
-# Data directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-UPLOADS_DIR = BASE_DIR / settings.upload_dir
-REPORTS_DIR = BASE_DIR / "reports"

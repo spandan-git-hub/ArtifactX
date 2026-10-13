@@ -9,8 +9,6 @@ are STRICTLY EXCLUDED from this service and all generated PDF artifacts.
 """
 
 import hashlib
-import os
-import tempfile
 import uuid
 from datetime import datetime
 from io import BytesIO

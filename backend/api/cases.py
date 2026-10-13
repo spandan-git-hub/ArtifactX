@@ -6,7 +6,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.config import UPLOADS_DIR
 from backend.app.database import get_db
 from backend.models.models import (
     Case, Evidence, EvidenceFile, AnalysisResult,
@@ -19,7 +18,6 @@ from backend.models.models import (
 )
 from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
 from backend.services.log_service import get_log_service
-from backend.utils.file_storage import delete_file
 
 router = APIRouter()
 
@@ -72,17 +70,22 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
     total_evidence_files = 0
     valid_hash_count = 0
 
+    legacy_unverifiable_count = 0
     for ev in evidence_items:
         file_count = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == ev.id).count()
         total_evidence_files += 1
         if ev.sha256 and len(ev.sha256) == 64:
             valid_hash_count += 1
+        ev_integrity = getattr(ev, "integrity_state", "OK") or "OK"
+        if ev_integrity == "LEGACY_UNVERIFIABLE":
+            legacy_unverifiable_count += 1
         evidence_summaries.append({
             "id": ev.id,
             "original_filename": ev.original_filename,
             "sha256": ev.sha256 or "",
             "evidence_type": ev.evidence_type,
             "file_count": file_count,
+            "integrity_state": ev_integrity,
             "uploaded_at": ev.uploaded_at,
             "analyzed_at": ev.analyzed_at
         })
@@ -129,6 +132,7 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
         },
         "summary_counts": {
             "evidence_count": len(evidence_items),
+            "legacy_unverifiable_count": legacy_unverifiable_count,
             "whatsapp_messages": wa_msgs,
             "telegram_messages": tg_msgs,
             "total_messages": total_msgs,
@@ -194,41 +198,9 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
 
         case_name = case_row[0]
 
-        # Fetch evidence details as tuple rows (no ORM objects in session)
-        evidence_rows = db.query(
-            Evidence.id,
-            Evidence.storage_path,
-            Evidence.extracted_path
-        ).filter(Evidence.case_id == case_id).all()
-
+        # Fetch evidence IDs for cascade cleanup
+        evidence_rows = db.query(Evidence.id).filter(Evidence.case_id == case_id).all()
         evidence_ids = [r[0] for r in evidence_rows]
-
-        # Delete evidence storage & extracted files from disk
-        for ev_id, storage_path, extracted_path in evidence_rows:
-            if storage_path:
-                try:
-                    p = Path(storage_path)
-                    if not p.is_absolute():
-                        p = UPLOADS_DIR / storage_path
-                    delete_file(p)
-                except Exception:
-                    pass
-            if extracted_path:
-                try:
-                    p = Path(extracted_path)
-                    if not p.is_absolute():
-                        p = UPLOADS_DIR / extracted_path
-                    delete_file(p)
-                except Exception:
-                    pass
-
-        # Delete generated report directory for this case
-        reports_dir = Path("reports") / str(case_id)
-        if reports_dir.exists():
-            try:
-                delete_file(reports_dir)
-            except Exception:
-                pass
 
 
         # Bulk delete evidence-dependent tables

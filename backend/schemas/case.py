@@ -45,12 +45,14 @@ class EvidenceWorkspaceSummary(BaseModel):
     sha256: str
     evidence_type: Optional[str] = None
     file_count: int = 0
+    integrity_state: str = "OK"
     uploaded_at: Optional[datetime] = None
     analyzed_at: Optional[datetime] = None
 
 
 class WorkspaceCounts(BaseModel):
     evidence_count: int = 0
+    legacy_unverifiable_count: int = 0
     whatsapp_messages: int = 0
     telegram_messages: int = 0
     total_messages: int = 0

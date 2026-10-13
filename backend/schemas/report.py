@@ -37,6 +37,7 @@ class EvidenceSummary(BaseModel):
     case_name: str
     total_evidence_files: int
     total_extracted_files: int
+    legacy_unverifiable_count: int = 0
     evidence_breakdown: Dict[str, int] = Field(default_factory=dict)
     media_summary: Dict[str, int] = Field(default_factory=dict)
     apps_found: List[str] = Field(default_factory=list)

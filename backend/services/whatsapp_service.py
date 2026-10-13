@@ -7,7 +7,6 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from backend.app.database import SessionLocal
-from backend.app.config import UPLOADS_DIR
 from forensic.whatsapp.detector import is_whatsapp_database
 from forensic.whatsapp.message_parser import extract_messages
 from forensic.whatsapp.contact_parser import extract_contacts

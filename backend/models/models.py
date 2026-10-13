@@ -65,6 +65,7 @@ class Evidence(Base):
     metadata_ = Column("metadata_", JSON, default=dict)
     extracted_path = Column(String(1024))
     content_bytes = Column(LargeBinary, nullable=True)
+    integrity_state = Column(String(50), nullable=False, default="OK", server_default="OK")
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime)
 

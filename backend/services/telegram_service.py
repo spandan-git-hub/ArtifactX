@@ -7,7 +7,6 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from backend.app.database import SessionLocal
-from backend.app.config import UPLOADS_DIR
 from forensic.telegram.detector import is_telegram_database
 from forensic.telegram.message_parser import extract_messages
 from forensic.telegram.contact_parser import extract_contacts

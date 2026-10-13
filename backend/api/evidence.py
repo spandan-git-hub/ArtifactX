@@ -3,7 +3,6 @@
 import io
 import logging
 import mimetypes
-import shutil
 import traceback
 import uuid
 import zipfile
@@ -20,12 +19,8 @@ from backend.app.database import get_db
 from backend.models.models import ActivityLog, Case, Evidence, EvidenceFile
 from backend.utils.hashing import (
     compute_sha256_bytes,
-    compute_sha256,
-    compute_multi_hashes,
     compute_multi_hashes_bytes,
 )
-from backend.utils.file_storage import delete_file
-from backend.app.config import UPLOADS_DIR
 from backend.schemas.evidence import EvidenceRead
 from backend.services.log_service import get_log_service
 from forensic.media.metadata import extract_image_metadata
@@ -197,22 +192,6 @@ def _extract_zip_in_memory(zip_data: bytes) -> List[dict]:
     return extracted_info
 
 
-def _cleanup_upload_artifacts(*paths: Optional[Path]) -> None:
-    """Best-effort cleanup for files/directories created before an error."""
-    for path in paths:
-        if not path:
-            continue
-        try:
-            if path.exists():
-                if path.is_dir():
-                    shutil.rmtree(path)
-                else:
-                    path.unlink()
-                logger.info("Cleaned up upload artifact path=%s", path)
-        except Exception:
-            logger.error("Failed to clean up upload artifact path=%s\n%s", path, traceback.format_exc())
-
-
 def _evidence_to_response(evidence: Evidence) -> dict:
     """Serialize Evidence explicitly so response validation cannot hit SQLAlchemy metadata."""
     meta = evidence.metadata_ or {}
@@ -228,6 +207,7 @@ def _evidence_to_response(evidence: Evidence) -> dict:
         "evidence_type": evidence.evidence_type,
         "metadata": meta,
         "extracted_path": evidence.extracted_path,
+        "integrity_state": getattr(evidence, "integrity_state", "OK") or "OK",
         "uploaded_at": evidence.uploaded_at,
         "analyzed_at": evidence.analyzed_at,
     }
@@ -397,7 +377,6 @@ def upload_evidence(
             traceback.format_exc(),
         )
         db.rollback()
-        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise
     except IntegrityError as exc:
         logger.error(
@@ -407,7 +386,6 @@ def upload_evidence(
             traceback.format_exc(),
         )
         db.rollback()
-        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Evidence upload conflicts with existing database state",
@@ -420,7 +398,6 @@ def upload_evidence(
             traceback.format_exc(),
         )
         db.rollback()
-        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error while uploading evidence",
@@ -435,7 +412,6 @@ def upload_evidence(
             traceback.format_exc(),
         )
         db.rollback()
-        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="File storage error while uploading evidence",
@@ -448,7 +424,6 @@ def upload_evidence(
             traceback.format_exc(),
         )
         db.rollback()
-        _cleanup_upload_artifacts(storage_path, extract_dir)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected error while uploading evidence",
@@ -642,26 +617,18 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
         )
         if not evidence_file:
             raise HTTPException(status_code=404, detail="File not found in evidence")
-        # Build absolute path to the stored file
-        if evidence.evidence_type == "zip" and evidence.extracted_path:
-            base_path = Path(evidence.extracted_path)
-        else:
-            if evidence_file:
-                base_path = Path(evidence.storage_path)
-                relative_path = Path(evidence_file.relative_path)
-            else:
-                base_path = Path(evidence.storage_path)
-                relative_path = Path(evidence.original_filename)
-        file_path = base_path / relative_path
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="Stored file not found")
-        from fastapi.responses import FileResponse
+        if not evidence_file.content_bytes:
+            raise HTTPException(status_code=404, detail="File content not available in storage (legacy unverifiable row)")
 
-        return FileResponse(
-            path=file_path,
-            filename=evidence_file.original_filename if hasattr(evidence_file, "original_filename") else evidence.original_filename,
+        from fastapi.responses import Response
+        filename = Path(evidence_file.relative_path).name or evidence.original_filename
+        return Response(
+            content=evidence_file.content_bytes,
             media_type=evidence_file.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+    except HTTPException:
+        raise
     except Exception as e:
         log_service = get_log_service(db)
         log_service.log_error(
@@ -678,37 +645,33 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
 
 @router.post("/{evidence_id}/verify-hashes")
 def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
-    """Verify on-disk evidence files against recorded cryptographic hashes (SHA-256, MD5, SHA-1)."""
+    """Verify in-memory evidence files against recorded cryptographic hashes (SHA-256, MD5, SHA-1)."""
     try:
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
             raise HTTPException(status_code=404, detail="Evidence not found")
 
-        # 1. Main file verification
-        main_file_path = Path(evidence.storage_path)
-        if not main_file_path.is_absolute():
-            main_file_path = UPLOADS_DIR / evidence.storage_path
-
         expected_sha256 = evidence.sha256 or ""
         expected_md5 = (evidence.metadata_ or {}).get("md5")
         expected_sha1 = (evidence.metadata_ or {}).get("sha1")
 
+        is_legacy = (evidence.content_bytes is None) or (getattr(evidence, "integrity_state", "OK") == "LEGACY_UNVERIFIABLE")
+
         main_file_match = False
         actual_hashes = {}
-        if evidence.content_bytes:
+        if is_legacy or not evidence.content_bytes:
+            actual_hashes = {
+                "sha256": "LEGACY_UNVERIFIABLE",
+                "md5": "LEGACY_UNVERIFIABLE",
+                "sha1": "LEGACY_UNVERIFIABLE"
+            }
+            main_file_match = False
+        else:
             actual_hashes = compute_multi_hashes_bytes(evidence.content_bytes)
             sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
             md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
             sha1_match = True if not expected_sha1 else actual_hashes["sha1"].lower() == expected_sha1.lower()
             main_file_match = sha256_match and md5_match and sha1_match
-        elif main_file_path.exists() and main_file_path.is_file():
-            actual_hashes = compute_multi_hashes(main_file_path)
-            sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
-            md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
-            sha1_match = True if not expected_sha1 else actual_hashes["sha1"].lower() == expected_sha1.lower()
-            main_file_match = sha256_match and md5_match and sha1_match
-        else:
-            actual_hashes = {"sha256": "FILE_NOT_FOUND", "md5": "FILE_NOT_FOUND", "sha1": "FILE_NOT_FOUND"}
 
         # 2. Extracted files verification (if archive)
         extracted_results = []
@@ -730,20 +693,13 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
                 m_match = True if not exp_md5 else act_hashes["md5"].lower() == exp_md5.lower()
                 sh_match = True if not exp_sha1 else act_hashes["sha1"].lower() == exp_sha1.lower()
                 f_match = s_match and m_match and sh_match
-            elif evidence.extracted_path:
-                ext_base = Path(evidence.extracted_path)
-                if not ext_base.is_absolute():
-                    ext_base = UPLOADS_DIR / evidence.extracted_path
-                target_path = ext_base / f.relative_path
-
-                if target_path.exists() and target_path.is_file():
-                    act_hashes = compute_multi_hashes(target_path)
-                    s_match = act_hashes["sha256"].lower() == exp_sha256.lower()
-                    m_match = True if not exp_md5 else act_hashes["md5"].lower() == exp_md5.lower()
-                    sh_match = True if not exp_sha1 else act_hashes["sha1"].lower() == exp_sha1.lower()
-                    f_match = s_match and m_match and sh_match
-                else:
-                    act_hashes = {"sha256": "FILE_NOT_FOUND", "md5": "FILE_NOT_FOUND", "sha1": "FILE_NOT_FOUND"}
+            else:
+                act_hashes = {
+                    "sha256": "LEGACY_UNVERIFIABLE",
+                    "md5": "LEGACY_UNVERIFIABLE",
+                    "sha1": "LEGACY_UNVERIFIABLE"
+                }
+                f_match = False
 
             if f_match:
                 matched_count += 1
@@ -762,8 +718,12 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
                 "is_intact": f_match,
             })
 
-        overall_intact = main_file_match and (mismatched_count == 0)
-        verification_status = "VERIFIED_INTACT" if overall_intact else "HASH_MISMATCH"
+        if is_legacy:
+            overall_intact = False
+            verification_status = "LEGACY_UNVERIFIABLE"
+        else:
+            overall_intact = main_file_match and (mismatched_count == 0)
+            verification_status = "VERIFIED_INTACT" if overall_intact else "HASH_MISMATCH"
 
         # Log Activity for Chain-of-Custody (B20)
         log_service = get_log_service(db)
@@ -778,6 +738,7 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
             "case_id": evidence.case_id,
             "filename": evidence.original_filename,
             "verification_status": verification_status,
+            "integrity_state": getattr(evidence, "integrity_state", "OK") or "OK",
             "is_valid": overall_intact,
             "verified_at": datetime.utcnow().isoformat(),
             "main_file": {
@@ -806,38 +767,18 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
-    """Delete evidence and its associated files."""
+    """Delete evidence and its associated records."""
     row = db.query(
         Evidence.case_id,
         Evidence.original_filename,
         Evidence.sha256,
-        Evidence.storage_path,
-        Evidence.extracted_path,
     ).filter(Evidence.id == evidence_id).first()
 
     if not row:
         raise HTTPException(status_code=404, detail="Evidence not found")
 
-    case_id, original_filename, sha256, storage_path, extracted_path = row
+    case_id, original_filename, sha256 = row
     sha_prefix = sha256[:8] if sha256 else "unknown"
-
-    if storage_path:
-        try:
-            p = Path(storage_path)
-            if not p.is_absolute():
-                p = UPLOADS_DIR / storage_path
-            delete_file(p)
-        except Exception as e:
-            logger.warning(f"Could not delete storage file {storage_path}: {e}")
-
-    if extracted_path:
-        try:
-            p = Path(extracted_path)
-            if not p.is_absolute():
-                p = UPLOADS_DIR / extracted_path
-            delete_file(p)
-        except Exception as e:
-            logger.warning(f"Could not delete extracted path {extracted_path}: {e}")
 
     from backend.models.models import (
         WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
@@ -914,18 +855,12 @@ def get_evidence_exif(
             raise HTTPException(status_code=404, detail="Requested file not found in evidence")
 
         target_source = file_row.content_bytes
-        if target_source is None:
-            target_path = Path(evidence.extracted_path or evidence.storage_path) / file_row.relative_path
-            if not target_path.exists() and evidence.storage_path:
-                target_path = Path(evidence.storage_path)
-            target_source = target_path
-
-        meta = extract_image_metadata(target_source)
+        meta = extract_image_metadata(target_source) if target_source else {}
         results.append({
             "file_id": file_row.id,
             "relative_path": file_row.relative_path,
             "mime_type": file_row.mime_type,
-            "file_size": file_row.file_size,
+            "file_size": file_row.file_size or (len(target_source) if target_source else 0),
             "metadata": meta,
         })
     else:
@@ -939,32 +874,24 @@ def get_evidence_exif(
         if image_files:
             for f in image_files:
                 target_source = f.content_bytes
-                if target_source is None:
-                    base_dir = Path(evidence.extracted_path) if evidence.extracted_path else Path(evidence.storage_path).parent
-                    target_source = base_dir / f.relative_path
-
-                meta = extract_image_metadata(target_source)
+                meta = extract_image_metadata(target_source) if target_source else {}
                 results.append({
                     "file_id": f.id,
                     "relative_path": f.relative_path,
                     "mime_type": f.mime_type,
-                    "file_size": f.file_size,
+                    "file_size": f.file_size or (len(target_source) if target_source else 0),
                     "metadata": meta,
                 })
         else:
-            # Check main evidence storage path if it's an image
+            # Check main evidence in-memory bytes if it's an image
             target_source = evidence.content_bytes
-            if target_source is None and evidence.storage_path:
-                p = Path(evidence.storage_path)
-                if p.exists():
-                    target_source = p
             if target_source is not None and (evidence.content_type or "").startswith("image/"):
                 meta = extract_image_metadata(target_source)
                 results.append({
                     "file_id": None,
                     "relative_path": evidence.original_filename,
                     "mime_type": evidence.content_type,
-                    "file_size": len(target_source) if isinstance(target_source, bytes) else target_source.stat().st_size,
+                    "file_size": len(target_source),
                     "metadata": meta,
                 })
 
@@ -1017,34 +944,20 @@ def inspect_sqlite_database(
         selected_file_id = file_row.id
         target_rel_path = file_row.relative_path
         db_source = file_row.content_bytes
-        if not db_source:
-            if evidence.extracted_path and not str(evidence.extracted_path).startswith("db://"):
-                db_source = Path(evidence.extracted_path) / file_row.relative_path
-            elif evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
-                db_source = Path(evidence.storage_path)
     elif db_files:
         # Default to first database file found
         first_db = db_files[0]
         selected_file_id = first_db.id
         target_rel_path = first_db.relative_path
         db_source = first_db.content_bytes
-        if not db_source:
-            if evidence.extracted_path and not str(evidence.extracted_path).startswith("db://"):
-                db_source = Path(evidence.extracted_path) / first_db.relative_path
-            elif evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
-                db_source = Path(evidence.storage_path)
     else:
-        # Check main storage file
+        # Check main in-memory evidence bytes
         db_source = evidence.content_bytes
-        if not db_source and evidence.storage_path and not str(evidence.storage_path).startswith("db://"):
-            db_source = Path(evidence.storage_path)
 
-
-
-    if not db_source or (isinstance(db_source, (str, Path)) and not Path(db_source).exists()):
+    if not db_source:
         raise HTTPException(
             status_code=404,
-            detail=f"SQLite database file not found: {target_rel_path}"
+            detail=f"SQLite database file content not available in storage: {target_rel_path}"
         )
 
     # 2. Inspect SQLite Database

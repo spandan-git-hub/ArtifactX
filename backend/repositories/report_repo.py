@@ -53,16 +53,21 @@ class ReportRepository:
         # Count extracted files
         total_extracted = 0
         evidence_list = []
+        legacy_unverifiable_count = 0
         for ev in evidence_items:
             file_count = self.db.query(EvidenceFile).filter(
                 EvidenceFile.evidence_id == ev.id
             ).count()
             total_extracted += file_count
+            ev_integrity = getattr(ev, "integrity_state", "OK") or "OK"
+            if ev_integrity == "LEGACY_UNVERIFIABLE":
+                legacy_unverifiable_count += 1
             evidence_list.append({
                 "id": ev.id,
                 "filename": ev.original_filename,
                 "type": ev.evidence_type,
                 "file_count": file_count,
+                "integrity_state": ev_integrity,
                 "uploaded_at": ev.uploaded_at.isoformat() if ev.uploaded_at else None,
             })
 
@@ -99,6 +104,7 @@ class ReportRepository:
             "case_name": case.name,
             "total_evidence_files": len(evidence_items),
             "total_extracted_files": total_extracted,
+            "legacy_unverifiable_count": legacy_unverifiable_count,
             "evidence_breakdown": {
                 "WhatsApp databases": sum(1 for e in evidence_list if "wa" in str(e.get("filename", "")).lower()),
                 "Telegram databases": sum(1 for e in evidence_list if "tg" in str(e.get("filename", "")).lower()),
@@ -122,6 +128,7 @@ class ReportRepository:
             "case_name": data.get("case_name"),
             "total_evidence_files": data.get("total_evidence_files", 0),
             "total_extracted_files": data.get("total_extracted_files", 0),
+            "legacy_unverifiable_count": data.get("legacy_unverifiable_count", 0),
             "evidence_breakdown": data.get("evidence_breakdown", {}),
             "media_summary": data.get("media_summary", {}),
             "apps_found": data.get("apps_found", []),

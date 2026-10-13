@@ -69,13 +69,6 @@ def _get_target_bytes_and_name(
         filename = evidence.original_filename
         resolved_file_id = None
 
-    # Fallback if content_bytes was not populated (e.g. legacy row)
-    if not target_bytes and evidence.storage_path:
-        import os
-        if os.path.exists(evidence.storage_path):
-            with open(evidence.storage_path, "rb") as f:
-                target_bytes = f.read()
-
     if not target_bytes:
         raise HTTPException(
             status_code=400,
