@@ -101,6 +101,7 @@ def generate_whatsapp_plain_dataset(
     dataset_id: str = "DS-01",
     variant: str = "dev",
     seed: Optional[int] = None,
+    extra_messages: Optional[List[Dict[str, Any]]] = None,
 ) -> DatasetManifest:
     """Generate the complete WhatsApp plain ground-truth dataset (DS-01)."""
     if seed is None:
@@ -588,6 +589,76 @@ def generate_whatsapp_plain_dataset(
                 flags=flags,
             )
         )
+
+    # Insert any external / cross-app extra messages (B4)
+    if extra_messages:
+        for em in extra_messages:
+            em_row_id = em.get("row_id")
+            if em_row_id is None:
+                cursor.execute("SELECT COALESCE(MAX(_id), 0) + 1 FROM message")
+                em_row_id = cursor.fetchone()[0]
+
+            em_chat_id = em.get("chat_id", chat_rohan_id)
+            em_chat_jid = em.get("chat_jid", CONTACT_POOL[0].jid)
+            em_from_me = em.get("from_me", 1)
+            em_sender_jid = PRIMARY_USER.jid if em_from_me else em_chat_jid
+            em_sender_id = primary_jid_id if em_from_me else contact_jid_ids.get("919876540001", primary_jid_id)
+            em_key_id = em.get("key_id", rng.whatsapp_key_id())
+            em_ts = em.get("ts", 1726050000000)
+            em_text = em.get("text", "")
+            em_type_code = em.get("type_code", 0)
+            em_type_str = em.get("type_str", "text" if em_type_code == 0 else "location")
+            em_media_ref = em.get("media_ref")
+
+            cursor.execute(
+                """
+                INSERT INTO message (
+                    _id, chat_row_id, from_me, key_id, sender_jid_row_id,
+                    timestamp, received_timestamp, receipt_server_timestamp,
+                    message_type, text_data, origination_flags
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                """,
+                (
+                    em_row_id,
+                    em_chat_id,
+                    em_from_me,
+                    em_key_id,
+                    em_sender_id,
+                    em_ts,
+                    em_ts + 100,
+                    em_ts + 200,
+                    em_type_code,
+                    em_text,
+                ),
+            )
+            if em_type_code == 5:
+                lat = em.get("latitude", 18.921984)
+                lon = em.get("longitude", 72.834654)
+                cursor.execute(
+                    """
+                    INSERT INTO message_location (
+                        message_row_id, chat_row_id, latitude, longitude,
+                        place_name, place_address
+                    ) VALUES (?, ?, ?, ?, 'Rendezvous Point', 'Apollo Bandar, Colaba, Mumbai')
+                    """,
+                    (em_row_id, em_chat_id, lat, lon),
+                )
+
+            messages_manifest.append(
+                WAMessageEntry(
+                    row_id=em_row_id,
+                    key_id=em_key_id,
+                    chat_jid=em_chat_jid,
+                    sender_jid=em_sender_jid,
+                    from_me=em_from_me,
+                    ts_raw=em_ts,
+                    ts_utc_ms=em_ts,
+                    type=em_type_str,
+                    body=em_text,
+                    media_ref=em_media_ref,
+                    flags=[],
+                )
+            )
 
     # Update last_message_row_id in chats
     for cm in chats_meta:

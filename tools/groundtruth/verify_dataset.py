@@ -13,15 +13,124 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+# UTF-8 stdout encoding safeguard on Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+from tools.groundtruth.crypto.bitcoin_address import base58check_validate
+from tools.groundtruth.crypto.evm_address import validate_evm_address
+from tools.groundtruth.crypto.iban import validate_iban
+from tools.groundtruth.crossapp import compute_image_dhash, dhash_hamming_distance, haversine_distance_m, normalize_url
+
 
 def _compute_sha256(path: Path) -> Tuple[str, int]:
     data = path.read_bytes()
     return hashlib.sha256(data).hexdigest(), len(data)
+
+
+def _validate_manifest_schema(data: Dict[str, Any], schema_path: Path) -> List[str]:
+    """Validate manifest data against manifest.schema.json structurally."""
+    errors: List[str] = []
+    if not schema_path.is_file():
+        errors.append(f"manifest.schema.json missing at {schema_path}")
+        return errors
+
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        errors.append(f"Failed to read schema JSON: {e}")
+        return errors
+
+    # Check required top-level keys
+    for req in schema.get("required", []):
+        if req not in data:
+            errors.append(f"Missing required manifest key per schema: {req}")
+
+    # Dataset ID pattern
+    ds_id = data.get("dataset_id")
+    if not isinstance(ds_id, str) or not re.fullmatch(r"^DS-[0-9]{2}$", ds_id):
+        errors.append(f"Invalid dataset_id format: {ds_id} (expected ^DS-[0-9]{{2}}$)")
+
+    # Variant
+    variant = data.get("variant")
+    if variant not in ("dev", "holdout"):
+        errors.append(f"Invalid variant: {variant} (expected 'dev' or 'holdout')")
+
+    # Seed
+    if not isinstance(data.get("seed"), int):
+        errors.append(f"Seed must be an integer, got: {type(data.get('seed'))}")
+
+    # Origin
+    origin = data.get("origin")
+    if origin not in ("synthetic", "device_capture"):
+        errors.append(f"Invalid origin: {origin} (expected 'synthetic' or 'device_capture')")
+
+    # Files array
+    files = data.get("files")
+    if not isinstance(files, list) or not files:
+        errors.append("Manifest 'files' must be a non-empty list of file objects.")
+    else:
+        for idx, f in enumerate(files):
+            if not isinstance(f, dict):
+                errors.append(f"File entry {idx} is not an object")
+                continue
+            for k in ("path", "sha256", "size"):
+                if k not in f:
+                    errors.append(f"File entry {idx} missing required key: {k}")
+            if "sha256" in f and not re.fullmatch(r"^[0-9a-f]{64}$", str(f["sha256"]).lower()):
+                errors.append(f"File entry {idx} ({f.get('path')}) has invalid SHA-256 format")
+            if "size" in f and (not isinstance(f["size"], int) or f["size"] < 0):
+                errors.append(f"File entry {idx} ({f.get('path')}) size must be non-negative integer")
+
+    # Shared entities validation
+    shared_entities = data.get("shared_entities", [])
+    if isinstance(shared_entities, list):
+        for idx, se in enumerate(shared_entities):
+            for k in ("type", "value_norm", "occurrences", "expected_link"):
+                if k not in se:
+                    errors.append(f"Shared entity {idx} missing required key: {k}")
+            if se.get("expected_link") is not True:
+                errors.append(f"Shared entity {idx} expected_link must be True")
+
+    # Decoys validation
+    decoys = data.get("decoys", [])
+    if isinstance(decoys, list):
+        for idx, dec in enumerate(decoys):
+            for k in ("type", "value_norm", "occurrences", "expected_link", "decoy_reason"):
+                if k not in dec:
+                    errors.append(f"Decoy {idx} missing required key: {k}")
+            if dec.get("expected_link") is not False:
+                errors.append(f"Decoy {idx} expected_link must be False")
+
+    # Controls validation
+    controls = data.get("controls", [])
+    if isinstance(controls, list):
+        for idx, ctrl in enumerate(controls):
+            if not isinstance(ctrl, dict):
+                errors.append(f"Control {idx} is not an object")
+
+    # Tamper records validation
+    tamper_records = data.get("tamper_records")
+    if tamper_records is not None:
+        if not isinstance(tamper_records, list):
+            errors.append("tamper_records must be an array")
+        else:
+            for idx, tr in enumerate(tamper_records):
+                for k in ("fixture_path", "original_sha256", "tampered_sha256", "flip_offset", "original_byte", "flipped_byte"):
+                    if k not in tr:
+                        errors.append(f"Tamper record {idx} missing required key: {k}")
+
+    return errors
 
 
 def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
@@ -44,13 +153,11 @@ def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
     except Exception as e:
         return False, [f"manifest.json is not valid JSON: {e}"]
 
-    # 1. Basic schema checks
-    required_keys = ["dataset_id", "variant", "seed", "generator_version", "origin", "files", "modelled_vs_observed"]
-    for k in required_keys:
-        if k not in manifest_data:
-            errors.append(f"Missing required manifest key: {k}")
-
-    if errors:
+    # 1. Manifest Schema Validation against manifest.schema.json (B4.3)
+    schema_path = Path(__file__).parent / "manifest.schema.json"
+    schema_errors = _validate_manifest_schema(manifest_data, schema_path)
+    if schema_errors:
+        errors.extend(schema_errors)
         return False, errors
 
     # 2. File hash & existence checks
@@ -77,6 +184,7 @@ def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
     # 3. WhatsApp Plain DB Content Verification
     wa_data = manifest_data.get("whatsapp")
     if wa_data:
+        manifest_deletions = wa_data.get("deletions", [])
         db_path = dataset_dir / "msgstore.db"
         if db_path.is_file():
             try:
@@ -374,6 +482,120 @@ def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
                     errors.append(f"Negative fixture file missing: {fixture_rel}")
                 if not item.get("expected_outcome"):
                     errors.append(f"Missing expected_outcome for negative fixture: {fixture_rel}")
+
+    # 6. Cross-App Shared Entities & Decoys Verification (B4.1 / DS-06)
+    shared_entities = manifest_data.get("shared_entities", [])
+    decoys = manifest_data.get("decoys", [])
+
+    if shared_entities:
+        for idx, se in enumerate(shared_entities):
+            se_type = se.get("type")
+            val_norm = se.get("value_norm")
+            occs = se.get("occurrences", [])
+
+            # Check that occurrences exist for both WhatsApp and Telegram
+            apps = {o.get("app") for o in occs}
+            if not ({"whatsapp", "telegram"} <= apps):
+                errors.append(f"Shared entity {se_type} ({val_norm}) missing occurrences in both apps: found {apps}")
+
+            # Type-specific validation
+            if se_type == "btc_address":
+                is_val, rsn = base58check_validate(val_norm)
+                if not is_val:
+                    errors.append(f"Shared BTC entity {val_norm} invalid Base58Check: {rsn}")
+            elif se_type == "evm_address":
+                is_val, rsn = validate_evm_address(val_norm)
+                if not is_val:
+                    errors.append(f"Shared EVM entity {val_norm} invalid EIP-55: {rsn}")
+            elif se_type == "iban":
+                is_val, rsn = validate_iban(val_norm)
+                if not is_val:
+                    errors.append(f"Shared IBAN entity {val_norm} invalid mod-97: {rsn}")
+            elif se_type == "url":
+                norm_check = normalize_url(val_norm)
+                if norm_check != val_norm:
+                    errors.append(f"Shared URL {val_norm} not normalized (got {norm_check})")
+            elif se_type == "image_near_duplicate":
+                img_paths = [dataset_dir / o.get("location") for o in occs]
+                if len(img_paths) == 2 and all(p.is_file() for p in img_paths):
+                    h1 = compute_image_dhash(img_paths[0].read_bytes())
+                    h2 = compute_image_dhash(img_paths[1].read_bytes())
+                    dist = dhash_hamming_distance(h1, h2)
+                    if dist > 4:
+                        errors.append(f"Near-duplicate image dHash distance {dist} exceeds threshold 4")
+
+    if decoys:
+        for idx, dec in enumerate(decoys):
+            dec_type = dec.get("type")
+            val_norm = dec.get("value_norm")
+            reason = dec.get("decoy_reason")
+
+            if dec.get("expected_link") is not False:
+                errors.append(f"Decoy {dec_type} expected_link must be False")
+
+            if dec_type == "btc_address" and reason == "invalid_btc_checksum":
+                is_val, _ = base58check_validate(val_norm)
+                if is_val:
+                    errors.append(f"Decoy BTC address {val_norm} unexpectedly valid (must fail checksum)")
+            elif dec_type == "evm_address" and reason == "invalid_evm_checksum":
+                is_val, _ = validate_evm_address(val_norm)
+                if is_val:
+                    errors.append(f"Decoy EVM address {val_norm} unexpectedly valid (must fail EIP-55)")
+            elif dec_type == "iban" and reason == "invalid_iban_checksum":
+                is_val, _ = validate_iban(val_norm)
+                if is_val:
+                    errors.append(f"Decoy IBAN {val_norm} unexpectedly valid (must fail mod-97)")
+            elif dec_type == "image_near_duplicate" and reason == "image_dissimilar":
+                img_paths = [dataset_dir / o.get("location") for o in dec.get("occurrences", [])]
+                if len(img_paths) == 2 and all(p.is_file() for p in img_paths):
+                    h1 = compute_image_dhash(img_paths[0].read_bytes())
+                    h2 = compute_image_dhash(img_paths[1].read_bytes())
+                    dist = dhash_hamming_distance(h1, h2)
+                    if dist < 10:
+                        errors.append(f"Decoy dissimilar image dHash distance {dist} unexpectedly low (< 10)")
+
+    # 7. Control Dataset Verification (B4.2 / DS-07)
+    if manifest_data.get("dataset_id") == "DS-07":
+        if shared_entities:
+            errors.append(f"Control dataset DS-07 must have 0 shared_entities, found {len(shared_entities)}")
+        if decoys:
+            errors.append(f"Control dataset DS-07 must have 0 decoys, found {len(decoys)}")
+
+    # 8. Tamper Dataset Verification (B4 / DS-08)
+    tamper_records = manifest_data.get("tamper_records")
+    if tamper_records:
+        ref_db = dataset_dir / "reference_base.db"
+        if not ref_db.is_file():
+            errors.append("DS-08 missing reference_base.db")
+        else:
+            base_bytes = ref_db.read_bytes()
+            base_sha = hashlib.sha256(base_bytes).hexdigest()
+
+            for tr in tamper_records:
+                fix_rel = tr.get("fixture_path")
+                fix_path = dataset_dir / fix_rel
+                if not fix_path.is_file():
+                    errors.append(f"Tamper fixture missing: {fix_rel}")
+                    continue
+
+                mut_bytes = fix_path.read_bytes()
+                mut_sha = hashlib.sha256(mut_bytes).hexdigest()
+
+                if mut_sha == base_sha:
+                    errors.append(f"Tamper fixture {fix_rel} SHA-256 identical to reference_base.db")
+                if mut_sha.lower() != tr.get("tampered_sha256", "").lower():
+                    errors.append(f"Tamper fixture {fix_rel} SHA-256 mismatch: expected {tr.get('tampered_sha256')}, got {mut_sha}")
+
+                offset = tr.get("flip_offset")
+                orig_b = tr.get("original_byte")
+                flip_b = tr.get("flipped_byte")
+
+                if len(mut_bytes) != len(base_bytes):
+                    errors.append(f"Tamper fixture {fix_rel} size changed from {len(base_bytes)} to {len(mut_bytes)}")
+                elif mut_bytes[offset] != flip_b:
+                    errors.append(f"Tamper fixture {fix_rel} offset {offset} byte {mut_bytes[offset]} != expected flipped {flip_b}")
+                elif base_bytes[offset] != orig_b:
+                    errors.append(f"Reference base byte at offset {offset} {base_bytes[offset]} != expected {orig_b}")
 
     is_valid = len(errors) == 0
     return is_valid, errors

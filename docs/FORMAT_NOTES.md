@@ -374,3 +374,69 @@ MTProto TL serialization format:
    - `trailing_bytes`: Valid TL object followed by extra bookkeeping bytes (e.g., local flags). Telethon parser reads the TL object successfully and reports remaining trailing bytes.
    - `unknown_constructor`: Unregistered constructor ID (e.g. `0xDEADBEEF`), testing `UNPARSED_BLOB` error handling (`TypeNotFoundError`).
    - `older_layer`: Message constructor from a legacy layer (e.g., Layer 133 `0x38114ee2`) to test layer migration/detection.
+
+---
+
+## 5. Cross-Platform Entity Normalization & Checksum Specifications (B4, B12)
+
+> Verified against BIP-173, EIP-55, ISO 7064 Mod 97-10, and standard URL/perceptual-hash specifications.
+
+### 5.1 Bitcoin Base58Check Checksum (B4.1, B12.3)
+- **Base58Check Algorithm**:
+  - `data = version_byte || payload` (version 0x00 for P2PKH `1...`, 0x05 for P2SH `3...`).
+  - `checksum = SHA256(SHA256(data))[:4]` (first 4 bytes of double SHA-256).
+  - Encoded with Base58 alphabet `123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz`. Leading zero bytes are preserved as `'1'`.
+- **Validation Rule**: Address must decode to bytes, length >= 5, and trailing 4 bytes must equal `SHA256(SHA256(payload))[:4]`.
+- **Decoys**: Addresses with 1 mutated character fail checksum verification and produce 0 matches.
+
+### 5.2 Ethereum (EVM) EIP-55 Mixed-Case Checksum (B4.1, B12.3)
+- **EIP-55 Specification**:
+  - Clean address hex (40 characters without `0x`, lowercased).
+  - Compute Keccak-256 (SHA3) of the ASCII hex string: `hash = Keccak256(address_ascii)`.
+  - For each i-th character: if `i`-th nibble of `hash >= 8`, capitalize the letter; otherwise leave lowercase.
+  - Prefix with `0x`.
+- **Validation Rule**: If an EVM address is mixed-case, its casing must strictly match the EIP-55 algorithm. If all-lowercase or all-uppercase, it is accepted as format-valid but flags `format_valid_no_checksum` with lower match certainty.
+- **Decoys**: Flipped casing on any letter fails checksum validation and produces 0 links.
+
+### 5.3 ISO 7064 Mod 97-10 IBAN Validation (B4.1, B12.3)
+- **Mod-97 Checksum**:
+  - Remove spaces and convert to uppercase.
+  - Move the first 4 characters (country code + 2 check digits) to the end.
+  - Replace each letter with two digits (A=10, B=11, ..., Z=35).
+  - Compute integer modulo 97: `int(numeric_string) % 97 == 1`.
+- **Validation Rule**: Must satisfy national length (e.g., 22 characters for Germany `DE`) and `mod 97 == 1`.
+- **Decoys**: Check digit mutations fail mod-97 and produce 0 links.
+
+### 5.4 URL Canonical Normalization (B4.1, B12.3)
+- **Normalization Pipeline**:
+  1. Lowercase scheme (`http`, `https`) and hostname.
+  2. Strip `www.` subdomain prefix.
+  3. Strip default ports (`:80` for http, `:443` for https).
+  4. Strip URI fragments (`#...`).
+  5. Strip trailing slash on root paths.
+  6. Filter out tracking parameters: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `fbclid`, `gclid`, `ref`.
+  7. Path and significant query parameters remain strictly preserved.
+- **Decoys**: Identical domains with different paths (e.g. `/folder-alpha` vs `/folder-beta`) must NOT link.
+
+### 5.5 Perceptual Image Similarity: dHash (B4.1, B12.4)
+- **Difference Hash (dHash) Algorithm**:
+  1. Convert image to 8-bit grayscale (`L`).
+  2. Resize to 9x8 pixels (72 pixels) using Lanczos downsampling.
+  3. Compare adjacent pixels across each 8-pixel row: `pixel[col] > pixel[col + 1]`.
+  4. Yields 64-bit boolean hash.
+  5. Distance is the Hamming distance (count of differing bits, XOR bit count).
+- **Thresholds**:
+  - Exact file duplicate: `match_certainty = 1.0` (SHA-256 match).
+  - Near-duplicate (resize/re-encode): Hamming distance <= 4.
+  - Decoys (dissimilar pattern): Hamming distance >= 10.
+
+### 5.6 GPS Spatiotemporal Rendezvous (B4.1, B12.5)
+- **Spatial Metric**: Great-circle Haversine formula on WGS84 decimal latitude and longitude.
+- **Rendezvous Window**:
+  - Spatial threshold: Distance <= 250 meters.
+  - Temporal threshold: Absolute timestamp difference <= 2 hours (120 minutes, 7,200,000 ms).
+- **Decoys**:
+  - Distance > 250 m at same time -> rejected (decoy reason `rendezvous_distance_exceeded`).
+  - Same place at delta > 2 hours -> rejected (decoy reason `rendezvous_time_exceeded`).
+  - Different place at exact same time -> rejected (decoy reason `rendezvous_different_place`).
+

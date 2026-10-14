@@ -1,0 +1,371 @@
+{
+  "controls": [
+    {
+      "assertion": "every_single_byte_mutation_detected",
+      "expected_outcome": "detection_rate == 1.0",
+      "name": "tamper_detection_rate"
+    }
+  ],
+  "created_by_tool_versions": {
+    "python": "3.14.6",
+    "sqlite3": "3.53.1"
+  },
+  "dataset_id": "DS-08",
+  "decoys": [],
+  "encryption": null,
+  "files": [
+    {
+      "path": "reference_base.db",
+      "sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_000000.db",
+      "sha256": "6fd4c75f9f7a5d849f2a6e98d416441b134b6ab6e3772c77783700242f966876",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_000015.db",
+      "sha256": "10e7ee5285f6e59b6e0625720c6affbadacfc0d5fc3327491daffb81057c9cc7",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_000016.db",
+      "sha256": "0e21a2fcd9fc8e281ea81e5fd25a093d3fcf7ad2d821365d90d239dd84c831e0",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_000100.db",
+      "sha256": "44fbd71a9b836a013b7daef746a739a480fdda599ce45af207075c9bc1eb3259",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_000512.db",
+      "sha256": "223fb608e77f3870a9935b0461bd86998cdc517135ae6eeb9ce7f68881271484",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_001024.db",
+      "sha256": "eb25585dabce0c4455cfe448552c95b2b7f7df0eec0d50f42e07f8dc0325399d",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_002048.db",
+      "sha256": "1ceebbcb6968f98b7cf72e7085f7c4a89819b1ece6b7dbb9857a748cc64316e6",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_002389.db",
+      "sha256": "612f706f0406d770eca93bdc23f5ae78e69a1f513feed57cd0478837ebf53b23",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_003799.db",
+      "sha256": "6a03556168e06e8a122bbdd05f105aa29c1cd273c423c641406216e31cb5079f",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_004095.db",
+      "sha256": "da3a206b3e4fd23ce92cd2e0685c7f893a4d06a8edfe3cae526cebbe0b42985b",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_007217.db",
+      "sha256": "abab208e624da3686a21a25c45d080746c1b84c7537f00685d7a78c4440cfcf8",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_007708.db",
+      "sha256": "16b871b05f024db4f9fe5a8bc9126682e8d9b737198007944171683a1521d0d1",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_008946.db",
+      "sha256": "36f2b8c87979c7693e97f2a105b17e69b80a0fb81ff7794f2a1a19cdb807c6bc",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_009001.db",
+      "sha256": "0a5d682f8700ce99d8563b6ada561421e22a9be7521cd0290f18039181db81d6",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_009425.db",
+      "sha256": "881e723170a52d78e3c5128ed9e5e8573367f71cbb998ac793b2efb0d5afc10e",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_009575.db",
+      "sha256": "a4beab235c221752f314f69d4a4640084720a8f0f6b12252e11a7a311574de94",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_010396.db",
+      "sha256": "9201f87877194bd9a07d6fa492e4df9600fea0c389611d4d3783e74a23ac7b67",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_013543.db",
+      "sha256": "4d357d547637f456cf4443a8d178a085592f2d815cbdb112af1f4938ee6e8f95",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_016699.db",
+      "sha256": "68b0019ec17c6395f2e8ae0f13beae71909d1c99db9f797af8e53c5a88b60828",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_017021.db",
+      "sha256": "7a2f8cc1135ab668010bbd0b27730658ac240f4894fc0e96b9217a852b3011cc",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_018017.db",
+      "sha256": "ff7e4fc914f5563bab2b334a6cd408c9eb74db663de12489ebb812a8d2457a12",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_018275.db",
+      "sha256": "f6065b28230d1eeddf47ab95350ba0ccb996c84cf63f5ddad2fc459aa96562f7",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_019498.db",
+      "sha256": "b1ad460042fd27c7e0f9564b3f729209351bb76a223bebb79c6d42a5085cf1a6",
+      "size": 20480
+    },
+    {
+      "path": "tampered_offset_020479.db",
+      "sha256": "55b95fec84eb4595fd4d2ddd28f5f68069e5d23a8a99d06bd2b1e8f47d393257",
+      "size": 20480
+    }
+  ],
+  "generator_version": "1.0.0",
+  "modelled_vs_observed": {
+    "sqlite_tamper_mutations": "modelled"
+  },
+  "origin": "synthetic",
+  "seed": 8102604,
+  "shared_entities": [],
+  "tamper_records": [
+    {
+      "description": "Single-byte flip at offset 0 (83 -> 6)",
+      "fixture_path": "tampered_offset_000000.db",
+      "flip_offset": 0,
+      "flipped_byte": 6,
+      "original_byte": 83,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "6fd4c75f9f7a5d849f2a6e98d416441b134b6ab6e3772c77783700242f966876"
+    },
+    {
+      "description": "Single-byte flip at offset 15 (0 -> 85)",
+      "fixture_path": "tampered_offset_000015.db",
+      "flip_offset": 15,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "10e7ee5285f6e59b6e0625720c6affbadacfc0d5fc3327491daffb81057c9cc7"
+    },
+    {
+      "description": "Single-byte flip at offset 16 (16 -> 69)",
+      "fixture_path": "tampered_offset_000016.db",
+      "flip_offset": 16,
+      "flipped_byte": 69,
+      "original_byte": 16,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "0e21a2fcd9fc8e281ea81e5fd25a093d3fcf7ad2d821365d90d239dd84c831e0"
+    },
+    {
+      "description": "Single-byte flip at offset 100 (13 -> 88)",
+      "fixture_path": "tampered_offset_000100.db",
+      "flip_offset": 100,
+      "flipped_byte": 88,
+      "original_byte": 13,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "44fbd71a9b836a013b7daef746a739a480fdda599ce45af207075c9bc1eb3259"
+    },
+    {
+      "description": "Single-byte flip at offset 512 (0 -> 85)",
+      "fixture_path": "tampered_offset_000512.db",
+      "flip_offset": 512,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "223fb608e77f3870a9935b0461bd86998cdc517135ae6eeb9ce7f68881271484"
+    },
+    {
+      "description": "Single-byte flip at offset 1024 (0 -> 85)",
+      "fixture_path": "tampered_offset_001024.db",
+      "flip_offset": 1024,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "eb25585dabce0c4455cfe448552c95b2b7f7df0eec0d50f42e07f8dc0325399d"
+    },
+    {
+      "description": "Single-byte flip at offset 2048 (0 -> 85)",
+      "fixture_path": "tampered_offset_002048.db",
+      "flip_offset": 2048,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "1ceebbcb6968f98b7cf72e7085f7c4a89819b1ece6b7dbb9857a748cc64316e6"
+    },
+    {
+      "description": "Single-byte flip at offset 2389 (0 -> 85)",
+      "fixture_path": "tampered_offset_002389.db",
+      "flip_offset": 2389,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "612f706f0406d770eca93bdc23f5ae78e69a1f513feed57cd0478837ebf53b23"
+    },
+    {
+      "description": "Single-byte flip at offset 3799 (0 -> 85)",
+      "fixture_path": "tampered_offset_003799.db",
+      "flip_offset": 3799,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "6a03556168e06e8a122bbdd05f105aa29c1cd273c423c641406216e31cb5079f"
+    },
+    {
+      "description": "Single-byte flip at offset 4095 (41 -> 124)",
+      "fixture_path": "tampered_offset_004095.db",
+      "flip_offset": 4095,
+      "flipped_byte": 124,
+      "original_byte": 41,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "da3a206b3e4fd23ce92cd2e0685c7f893a4d06a8edfe3cae526cebbe0b42985b"
+    },
+    {
+      "description": "Single-byte flip at offset 7217 (25 -> 76)",
+      "fixture_path": "tampered_offset_007217.db",
+      "flip_offset": 7217,
+      "flipped_byte": 76,
+      "original_byte": 25,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "abab208e624da3686a21a25c45d080746c1b84c7537f00685d7a78c4440cfcf8"
+    },
+    {
+      "description": "Single-byte flip at offset 7708 (136 -> 221)",
+      "fixture_path": "tampered_offset_007708.db",
+      "flip_offset": 7708,
+      "flipped_byte": 221,
+      "original_byte": 136,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "16b871b05f024db4f9fe5a8bc9126682e8d9b737198007944171683a1521d0d1"
+    },
+    {
+      "description": "Single-byte flip at offset 8946 (51 -> 102)",
+      "fixture_path": "tampered_offset_008946.db",
+      "flip_offset": 8946,
+      "flipped_byte": 102,
+      "original_byte": 51,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "36f2b8c87979c7693e97f2a105b17e69b80a0fb81ff7794f2a1a19cdb807c6bc"
+    },
+    {
+      "description": "Single-byte flip at offset 9001 (74 -> 31)",
+      "fixture_path": "tampered_offset_009001.db",
+      "flip_offset": 9001,
+      "flipped_byte": 31,
+      "original_byte": 74,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "0a5d682f8700ce99d8563b6ada561421e22a9be7521cd0290f18039181db81d6"
+    },
+    {
+      "description": "Single-byte flip at offset 9425 (51 -> 102)",
+      "fixture_path": "tampered_offset_009425.db",
+      "flip_offset": 9425,
+      "flipped_byte": 102,
+      "original_byte": 51,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "881e723170a52d78e3c5128ed9e5e8573367f71cbb998ac793b2efb0d5afc10e"
+    },
+    {
+      "description": "Single-byte flip at offset 9575 (49 -> 100)",
+      "fixture_path": "tampered_offset_009575.db",
+      "flip_offset": 9575,
+      "flipped_byte": 100,
+      "original_byte": 49,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "a4beab235c221752f314f69d4a4640084720a8f0f6b12252e11a7a311574de94"
+    },
+    {
+      "description": "Single-byte flip at offset 10396 (200 -> 157)",
+      "fixture_path": "tampered_offset_010396.db",
+      "flip_offset": 10396,
+      "flipped_byte": 157,
+      "original_byte": 200,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "9201f87877194bd9a07d6fa492e4df9600fea0c389611d4d3783e74a23ac7b67"
+    },
+    {
+      "description": "Single-byte flip at offset 13543 (24 -> 77)",
+      "fixture_path": "tampered_offset_013543.db",
+      "flip_offset": 13543,
+      "flipped_byte": 77,
+      "original_byte": 24,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "4d357d547637f456cf4443a8d178a085592f2d815cbdb112af1f4938ee6e8f95"
+    },
+    {
+      "description": "Single-byte flip at offset 16699 (0 -> 85)",
+      "fixture_path": "tampered_offset_016699.db",
+      "flip_offset": 16699,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "68b0019ec17c6395f2e8ae0f13beae71909d1c99db9f797af8e53c5a88b60828"
+    },
+    {
+      "description": "Single-byte flip at offset 17021 (0 -> 85)",
+      "fixture_path": "tampered_offset_017021.db",
+      "flip_offset": 17021,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "7a2f8cc1135ab668010bbd0b27730658ac240f4894fc0e96b9217a852b3011cc"
+    },
+    {
+      "description": "Single-byte flip at offset 18017 (0 -> 85)",
+      "fixture_path": "tampered_offset_018017.db",
+      "flip_offset": 18017,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "ff7e4fc914f5563bab2b334a6cd408c9eb74db663de12489ebb812a8d2457a12"
+    },
+    {
+      "description": "Single-byte flip at offset 18275 (0 -> 85)",
+      "fixture_path": "tampered_offset_018275.db",
+      "flip_offset": 18275,
+      "flipped_byte": 85,
+      "original_byte": 0,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "f6065b28230d1eeddf47ab95350ba0ccb996c84cf63f5ddad2fc459aa96562f7"
+    },
+    {
+      "description": "Single-byte flip at offset 19498 (90 -> 15)",
+      "fixture_path": "tampered_offset_019498.db",
+      "flip_offset": 19498,
+      "flipped_byte": 15,
+      "original_byte": 90,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "b1ad460042fd27c7e0f9564b3f729209351bb76a223bebb79c6d42a5085cf1a6"
+    },
+    {
+      "description": "Single-byte flip at offset 20479 (143 -> 218)",
+      "fixture_path": "tampered_offset_020479.db",
+      "flip_offset": 20479,
+      "flipped_byte": 218,
+      "original_byte": 143,
+      "original_sha256": "a89aeea19cbf46f488f5c15f3d5632de8ad7afcffdd10a46b18f4c6485e3c664",
+      "tampered_sha256": "55b95fec84eb4595fd4d2ddd28f5f68069e5d23a8a99d06bd2b1e8f47d393257"
+    }
+  ],
+  "telegram": null,
+  "variant": "holdout",
+  "whatsapp": null
+}

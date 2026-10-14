@@ -31,6 +31,7 @@
   "origin": "synthetic",
   "seed": 876543210,
   "shared_entities": [],
+  "tamper_records": null,
   "telegram": {
     "blob_variants": [
       {
@@ -5332,6 +5333,6 @@
       }
     ]
   },
-  "variant": "exact",
+  "variant": "holdout",
   "whatsapp": {}
 }

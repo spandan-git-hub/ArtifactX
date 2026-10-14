@@ -92,6 +92,7 @@ def generate_telegram_dataset(
     dataset_id: str = "DS-05",
     variant: str = "dev",
     seed: Optional[int] = None,
+    extra_messages: Optional[List[Dict[str, Any]]] = None,
 ) -> DatasetManifest:
     """Generate the complete Telegram ground-truth dataset (DS-05)."""
     if seed is None:
@@ -700,6 +701,64 @@ def generate_telegram_dataset(
             }
         )
 
+    # Insert any external / cross-app extra messages (B4)
+    if extra_messages:
+        for em in extra_messages:
+            em_mid = em.get("mid")
+            if em_mid is None:
+                cursor.execute("SELECT COALESCE(MAX(mid), 0) + 1 FROM messages_v2")
+                em_mid = cursor.fetchone()[0]
+
+            em_uid = em.get("uid", 1001)
+            em_date = em.get("date", 1726050000)
+            em_text = em.get("text", "")
+            em_type_code = em.get("type_code", 0)
+            em_media_ref = em.get("media_ref")
+
+            em_media = None
+            if em_type_code == 5:
+                em_lat = em.get("latitude", 18.922850)
+                em_lon = em.get("longitude", 72.835250)
+                geo = types.GeoPoint(lat=em_lat, long=em_lon, access_hash=0)
+                em_media = types.MessageMediaGeo(geo=geo)
+                em_media_ref = f"{em_lat},{em_lon}"
+
+            tl_msg = types.Message(
+                id=em_mid,
+                peer_id=types.PeerUser(user_id=em_uid),
+                date=em_date,
+                message=em_text,
+                out=True,
+                media=em_media,
+            )
+            blob = bytes(tl_msg)
+            cursor.execute(
+                """
+                INSERT INTO messages_v2 (mid, uid, read_state, send_state, date, data, out, ttl, media)
+                VALUES (?, ?, 1, 0, ?, ?, 1, 0, ?)
+                """,
+                (em_mid, em_uid, em_date, blob, em_type_code),
+            )
+            cursor.execute(
+                "INSERT INTO messages_search (mid, body) VALUES (?, ?)",
+                (em_mid, em_text),
+            )
+            messages_manifest.append(
+                TGMessageEntry(
+                    mid=em_mid,
+                    uid=em_uid,
+                    from_id=1001,
+                    date_raw=em_date,
+                    date_utc_ms=em_date * 1000,
+                    text=em_text,
+                    media_type="location" if em_type_code == 5 else ("photo" if em_type_code == 1 else None),
+                    media_ref=em_media_ref,
+                    out=1,
+                    blob_variant="exact",
+                    flags=[],
+                )
+            )
+
     # Update dialogs table with last_mid and date
     for d_uid in dialog_uids:
         cursor.execute(
@@ -975,10 +1034,10 @@ def generate_telegram_dataset(
 
     for msg in created_messages:
         raw_blob = msg["raw_blob"]
-        variant = msg["variant"]
+        b_variant = msg["variant"]
         reader = BinaryReader(raw_blob)
 
-        if variant in ("exact", "trailing_bytes"):
+        if b_variant in ("exact", "trailing_bytes"):
             re_read_target_count += 1
             try:
                 parsed_obj = reader.tgread_object()
@@ -987,13 +1046,13 @@ def generate_telegram_dataset(
                 re_read_success_count += 1
             except Exception as e:
                 raise RuntimeError(f"Telethon failed to re-read well-formed blob mid={msg['mid']}: {e}")
-        elif variant == "unknown_constructor":
+        elif b_variant == "unknown_constructor":
             try:
                 reader.tgread_object()
                 raise RuntimeError(f"Unknown constructor blob mid={msg['mid']} unexpectedly parsed without error!")
             except Exception:
                 pass  # Expected failure
-        elif variant == "older_layer":
+        elif b_variant == "older_layer":
             try:
                 reader.tgread_object()
                 raise RuntimeError(f"Older layer blob mid={msg['mid']} unexpectedly parsed without error!")

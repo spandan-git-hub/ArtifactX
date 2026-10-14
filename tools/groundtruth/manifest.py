@@ -155,12 +155,13 @@ class DatasetManifest:
     origin: str                # "synthetic"
     created_by_tool_versions: Dict[str, str]
     files: List[DatasetFileInfo]
-    whatsapp: Dict[str, Any]
+    whatsapp: Optional[Dict[str, Any]] = None
     telegram: Optional[Dict[str, Any]] = None
     shared_entities: List[Dict[str, Any]] = field(default_factory=list)
     decoys: List[Dict[str, Any]] = field(default_factory=list)
     controls: List[Dict[str, Any]] = field(default_factory=list)
     encryption: Optional[Dict[str, Any]] = None
+    tamper_records: Optional[List[Dict[str, Any]]] = None
     modelled_vs_observed: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -186,12 +187,13 @@ class DatasetManifest:
             origin=data["origin"],
             created_by_tool_versions=data["created_by_tool_versions"],
             files=files,
-            whatsapp=data.get("whatsapp", {}),
+            whatsapp=data.get("whatsapp"),
             telegram=data.get("telegram"),
             shared_entities=data.get("shared_entities", []),
             decoys=data.get("decoys", []),
             controls=data.get("controls", []),
             encryption=data.get("encryption"),
+            tamper_records=data.get("tamper_records"),
             modelled_vs_observed=data.get("modelled_vs_observed", {}),
         )
 

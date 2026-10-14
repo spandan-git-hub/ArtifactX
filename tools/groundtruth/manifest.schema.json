@@ -50,7 +50,7 @@
       }
     },
     "whatsapp": {
-      "type": "object",
+      "type": ["object", "null"],
       "properties": {
         "contacts": { "type": "array" },
         "chats": { "type": "array" },
@@ -60,19 +60,80 @@
       }
     },
     "telegram": {
-      "type": ["object", "null"]
+      "type": ["object", "null"],
+      "properties": {
+        "users": { "type": "array" },
+        "chats": { "type": "array" },
+        "messages": { "type": "array" },
+        "deletions": { "type": "array" },
+        "edits": { "type": "array" },
+        "blob_variants": { "type": "array" }
+      }
     },
     "shared_entities": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "value_norm", "occurrences", "expected_link"],
+        "properties": {
+          "type": { "type": "string" },
+          "value_norm": { "type": "string" },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["app", "location"],
+              "properties": {
+                "app": { "type": "string", "enum": ["whatsapp", "telegram"] },
+                "location": { "type": "string" },
+                "raw_value": { "type": "string" }
+              }
+            }
+          },
+          "expected_link": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
     },
     "decoys": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "value_norm", "occurrences", "expected_link", "decoy_reason"],
+        "properties": {
+          "type": { "type": "string" },
+          "value_norm": { "type": "string" },
+          "occurrences": { "type": "array" },
+          "expected_link": { "type": "boolean" },
+          "decoy_reason": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
     },
     "controls": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
     },
     "encryption": {
       "type": ["object", "null"]
+    },
+    "tamper_records": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["fixture_path", "original_sha256", "tampered_sha256", "flip_offset", "original_byte", "flipped_byte"],
+        "properties": {
+          "fixture_path": { "type": "string" },
+          "original_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "tampered_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "flip_offset": { "type": "integer", "minimum": 0 },
+          "original_byte": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "flipped_byte": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "description": { "type": "string" }
+        }
+      }
     },
     "modelled_vs_observed": {
       "type": "object",
