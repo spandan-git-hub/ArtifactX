@@ -71,3 +71,29 @@ Offline decryption of WhatsApp `.crypt15` backup databases requires:
 
 ### 6.2 Corroboration Requirement
 - Automated correlations (phone numbers, cryptocurrency addresses, near-duplicate images) represent investigative hypotheses and indicators. Every finding must be corroborated by independent sources before being relied upon in legal or administrative proceedings.
+
+---
+
+## 7. Ingestion, Memory Ceilings & Streaming Boundaries (B5.1, B5.7, DEC-012, DEC-026)
+
+### 7.1 Exhibit Size Ceiling (MAX_UPLOAD_SIZE)
+- The global maximum upload size ceiling is configured via `MAX_UPLOAD_SIZE` (default: **256 MiB** / `268,435,456` bytes).
+- Streams or uploads exceeding this ceiling are aborted at the stream boundary with `HTTP 413 (Content Too Large)`.
+- Rejection is recorded as an immutable audit event (`INGEST_REJECTED_TOO_LARGE`) with the declared filename and byte limit, and zero bytes are persisted to the database.
+
+### 7.2 Zero-Disk-Write Streaming vs Multipart Spooling (DEC-012)
+- **Multipart Framework Limitation:** Standard HTTP `POST /api/evidence/upload` utilizes Starlette / FastAPI `UploadFile`, which internally leverages Python's `tempfile.SpooledTemporaryFile`. For files exceeding 1 MiB, Starlette's underlying implementation spools buffer segments to local OS temporary directories.
+- **Pure In-Memory Streaming:** To guarantee absolute compliance with Rule R4 (zero runtime forensic evidence disk writes) on large extractions, forensic clients and integrations should utilize `PUT /api/evidence/upload-stream`. This endpoint reads raw chunked streams directly into in-memory buffers without framework tempfile spooling.
+
+### 7.3 ZIP Safety and Decompression Ceilings (R12)
+- Ingested ZIP archives are parsed strictly in memory with hard enforcement of forensic safety ceilings:
+  - **Member Count:** Maximum 10,000 members per archive.
+  - **Uncompressed Size:** Maximum 1 GiB total uncompressed payload.
+  - **Compression Ratio:** Maximum 100:1 expansion ratio per member.
+  - **Path Traversal & Depth:** Rejection of path traversal (`../`) and directory nesting depth > 2.
+- Violations result in exhibit status `ARCHIVE_REJECTED` and an `ARCHIVE_SAFETY_VIOLATION` audit log entry.
+
+### 7.4 Deferred BYTEA Query Isolation (R19)
+- Evidence exhibit binaries stored in PostgreSQL `BYTEA` (or SQLite `BLOB`) columns are configured with SQLAlchemy deferred loading (`deferred(Column(LargeBinary, ...))`).
+- Bulk collection endpoints (`GET /api/evidence`) explicitly exclude `content_bytes` from the SQL column projection via `load_only()`, ensuring that querying case exhibits never causes memory exhaustion even with dozens of 256 MiB exhibits.
+

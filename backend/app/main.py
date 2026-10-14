@@ -15,7 +15,7 @@ from backend.app.config import settings
 from backend.app.database import Base, engine
 from backend.utils.logging_config import configure_logging
 from backend.middleware import ErrorLoggingMiddleware
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, chats, recovery, decryption
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, chats, recovery, decryption, audit
 
 
 @asynccontextmanager
@@ -23,7 +23,6 @@ async def lifespan(app: FastAPI):
     """Application lifespan managing logging and startup initialization."""
     configure_logging(settings.log_level)
     yield
-
 
 
 app = FastAPI(
@@ -61,8 +60,7 @@ app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 app.include_router(recovery.router, prefix="/api", tags=["recovery"])
 app.include_router(decryption.router, prefix="/api", tags=["decryption"])
-
-
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 
 @app.get("/api/health")

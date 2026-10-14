@@ -126,10 +126,78 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   - Never claims `sqlcipher`, `mtproto`, or `whatsapp_enc`.
   - Reports unknown high-entropy inputs (>7.5 bits/byte without recognized container or crypt markers) honestly as `UNKNOWN_ENCRYPTED_KEY_REQUIRED` with no format claim.
 
-## 2026-10-13 A7 — Configuration & Environment Consistency
-- **Configuration Contract:**
-  - `MAX_UPLOAD_SIZE`: Default adjusted from `1073741824` (1 GiB) to `268435456` (256 MiB; DEC-009) to prevent OOM during in-memory forensic deserialization (~2-3x file size peak memory) and align with storage constraints.
-  - `TEST_DATABASE_URL`: Explicitly recognized in settings and environment configuration with default `sqlite+pysqlite:///:memory:` to isolate tests from production databases.
-  - `UPLOAD_DIR` & `DEMO_MODE`: Confirmed absent from configuration models and `.env.example`.
+## 2026-10-14 B5 — Ingest, Integrity & Audit Chain (spec: 03_INGEST_INTEGRITY_AUDIT.md)
+
+- **New Endpoint:** `PUT /api/evidence/upload-stream` (B5.1, DEC-012)
+  - **Purpose:** Pure in-memory streaming upload endpoint that bypasses FastAPI/Starlette `tempfile.SpooledTemporaryFile` disk spooling, strictly enforcing Rule R4 (zero disk writes).
+  - **Query Parameters / Headers:**
+    - `case_id` (query) or `X-Case-ID` (header) [required]
+    - `filename` (query) or `X-Original-Filename` (header)
+    - `X-Declared-Mime` (header)
+    - `X-Acquisition-Method` (header, e.g. `logical_extraction`, `physical_extraction`, `cloud_export`)
+    - `X-Device-Make-Model` (header, e.g. `Google Pixel 8 Pro`)
+    - `X-Device-Os-Version` (header, e.g. `Android 14 (UP1A.231105.003)`)
+    - `X-App-Version` (header, e.g. `2.24.12.7`)
+    - `X-Acquired-By` (header, examiner / technician identifier)
+    - `X-Acquisition-Hash-Claimed` (header, pre-acquisition hex hash)
+    - `X-Acquisition-Hash-Algorithm` (header, e.g. `SHA-256`, `MD5`)
+    - `X-Uploader` (header, analyst / user identifier)
+  - **Status Codes:**
+    - `201 Created`: Exhibit ingested, multi-hashed, format-detected, and verified against claimed hash.
+    - `400 Bad Request`: Empty stream (0 bytes), invalid ZIP path traversal, or missing case ID.
+    - `404 Not Found`: Target case ID does not exist.
+    - `413 Content Too Large`: Stream exceeded `MAX_UPLOAD_SIZE` (default 256 MiB). Rejection is recorded as `INGEST_REJECTED_TOO_LARGE` in the audit log; 0 bytes persisted.
+  - **Sample Response (201 Created):**
+    ```json
+    {
+      "id": 42,
+      "filename": "msgstore.db",
+      "sha256": "4b971a823e...",
+      "sha512": "7f098a...",
+      "md5": "a3b1...",
+      "sha1": "c9d2...",
+      "size": 1048576,
+      "evidence_type": "file",
+      "detected_format": "SQLITE_PLAIN",
+      "claimed_vs_computed": "MATCH",
+      "integrity_state": "OK",
+      "is_zip": false,
+      "extracted_files_count": 0
+    }
+    ```
+
+- **New Endpoint:** `GET /api/audit/verify` (B5.5)
+  - **Purpose:** Cryptographically verifies the unbroken hash chain of the append-only `audit_log` table from genesis to head.
+  - **Query Parameters:** `case_id: Optional[int]`
+  - **Response (200 OK):**
+    ```json
+    {
+      "ok": true,
+      "checked": 128,
+      "head_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "first_bad_seq": null,
+      "error_detail": null
+    }
+    ```
+  - **Tamper Response (when discrepancy detected):**
+    ```json
+    {
+      "ok": false,
+      "checked": 45,
+      "head_hash": "...",
+      "first_bad_seq": 46,
+      "error_detail": "Entry hash mismatch at seq 46: recomputed != stored"
+    }
+    ```
+
+- **Updated Endpoint:** `GET /api/evidence` & `GET /api/evidence/{id}` (B5.1, B5.2, R19)
+  - `EvidenceRead` schema updated to expose acquisition metadata and multi-hashes:
+    - `sha512`, `md5`, `sha1`
+    - `declared_mime`, `detected_format`, `uploader`
+    - `acquisition_method`, `device_make_model`, `device_os_version`, `app_version`
+    - `acquisition_time_utc`, `acquired_by`, `acquisition_hash_claimed`, `acquisition_hash_algorithm`
+    - `claimed_vs_computed` (`"MATCH"` | `"MISMATCH"` | `"NOT_PROVIDED"`)
+  - **Deferred BYTEA Query Optimization (R19):** `GET /api/evidence` strictly excludes `content_bytes` from the SQL column list via `load_only`, preventing memory spikes during exhibit listing.
+
 
 

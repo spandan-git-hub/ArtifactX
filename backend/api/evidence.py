@@ -11,18 +11,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, UploadFile, File, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
+from backend.app.config import settings
 from backend.app.database import get_db
 from backend.models.models import ActivityLog, Case, Evidence, EvidenceFile
 from backend.utils.hashing import (
+    IncrementalHasher,
     compute_sha256_bytes,
     compute_multi_hashes_bytes,
 )
+from backend.utils.zip_safety import (
+    ZipLimitExceeded,
+    extract_zip_safe_in_memory,
+    SafeZipMember,
+)
 from backend.schemas.evidence import EvidenceRead
+from backend.services.audit_service import AuditService
+from backend.services.integrity_service import (
+    ensure_integrity,
+    EvidenceIntegrityError,
+    LegacyUnverifiableError,
+)
 from backend.services.log_service import get_log_service
+from forensic.detectors.format_detector import detect_format
 from forensic.media.metadata import extract_image_metadata
 from forensic.common.sqlite import open_sqlite
 
@@ -201,243 +215,400 @@ def _evidence_to_response(evidence: Evidence) -> dict:
         "original_filename": evidence.original_filename,
         "storage_path": evidence.storage_path,
         "sha256": evidence.sha256,
-        "md5": meta.get("md5"),
-        "sha1": meta.get("sha1"),
+        "sha512": getattr(evidence, "sha512", None) or meta.get("sha512"),
+        "md5": getattr(evidence, "md5", None) or meta.get("md5"),
+        "sha1": getattr(evidence, "sha1", None) or meta.get("sha1"),
         "content_type": evidence.content_type,
+        "declared_mime": getattr(evidence, "declared_mime", None),
+        "detected_format": getattr(evidence, "detected_format", None),
+        "uploader": getattr(evidence, "uploader", None),
         "evidence_type": evidence.evidence_type,
         "metadata": meta,
         "extracted_path": evidence.extracted_path,
         "integrity_state": getattr(evidence, "integrity_state", "OK") or "OK",
+        "acquisition_method": getattr(evidence, "acquisition_method", None),
+        "device_make_model": getattr(evidence, "device_make_model", None),
+        "device_os_version": getattr(evidence, "device_os_version", None),
+        "app_version": getattr(evidence, "app_version", None),
+        "acquisition_time_utc": getattr(evidence, "acquisition_time_utc", None),
+        "acquired_by": getattr(evidence, "acquired_by", None),
+        "acquisition_hash_claimed": getattr(evidence, "acquisition_hash_claimed", None),
+        "acquisition_hash_algorithm": getattr(evidence, "acquisition_hash_algorithm", None),
+        "claimed_vs_computed": getattr(evidence, "claimed_vs_computed", "NOT_PROVIDED") or "NOT_PROVIDED",
         "uploaded_at": evidence.uploaded_at,
         "analyzed_at": evidence.analyzed_at,
     }
+
+
+def _process_and_store_evidence(
+    db: Session,
+    case_id: int,
+    filename: str,
+    file_bytes: bytes,
+    declared_content_type: Optional[str] = None,
+    uploader: Optional[str] = "system",
+    acquisition_metadata: Optional[dict] = None,
+) -> dict:
+    """Shared core pipeline for in-memory evidence hashing, format detection, ZIP safety, and audit ingestion."""
+    safe_name = _safe_filename(filename)
+    file_size = len(file_bytes)
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty (0 bytes)",
+        )
+
+    # 1. Compute multi-hashes in one incremental pass (B5.1)
+    upload_hashes = compute_multi_hashes_bytes(file_bytes)
+    sha256 = upload_hashes["sha256"]
+    sha512 = upload_hashes["sha512"]
+    md5 = upload_hashes["md5"]
+    sha1 = upload_hashes["sha1"]
+
+    # 2. Signature-based format detection (B5.4)
+    detection = detect_format(file_bytes, safe_name)
+    detected_format = detection.format
+
+    # 3. ZIP archive safety checks (B5.1, R12)
+    is_zip = (detected_format == "ZIP") or _is_zip_file(safe_name, declared_content_type)
+    evidence_type = "zip" if is_zip else "file"
+    stored_name = f"{uuid.uuid4().hex}_{safe_name}"
+    storage_path = f"db://evidence/{stored_name}"
+
+    extracted_files: List[SafeZipMember] = []
+    evidence_integrity_state = "OK"
+
+    if is_zip:
+        try:
+            extracted_files = extract_zip_safe_in_memory(file_bytes)
+        except ZipLimitExceeded as zle:
+            evidence_integrity_state = "ARCHIVE_REJECTED"
+            AuditService.append(
+                db=db,
+                action="ARCHIVE_SAFETY_VIOLATION",
+                actor=uploader or "system",
+                case_id=case_id,
+                details={
+                    "filename": safe_name,
+                    "reason": zle.reason,
+                    "error": str(zle),
+                },
+            )
+
+    # 4. Acquisition metadata verification (B5.2)
+    acq_meta = acquisition_metadata or {}
+    claimed_hash = acq_meta.get("acquisition_hash_claimed")
+    claimed_algo = (acq_meta.get("acquisition_hash_algorithm") or "sha256").lower()
+
+    if claimed_hash:
+        computed_for_claimed = upload_hashes.get(claimed_algo, sha256)
+        if computed_for_claimed.lower() == claimed_hash.lower():
+            claimed_vs_computed = "MATCH"
+        else:
+            claimed_vs_computed = "MISMATCH"
+            AuditService.append(
+                db=db,
+                action="ACQUISITION_HASH_MISMATCH",
+                actor=uploader or "system",
+                case_id=case_id,
+                details={
+                    "filename": safe_name,
+                    "algorithm": claimed_algo,
+                    "claimed": claimed_hash,
+                    "computed": computed_for_claimed,
+                },
+            )
+    else:
+        claimed_vs_computed = "NOT_PROVIDED"
+
+    evidence_metadata = {
+        "original_content_type": declared_content_type,
+        "upload_size": file_size,
+        "is_zip": is_zip,
+        "original_filename": filename or "unnamed",
+        "stored_filename": stored_name,
+        "sha512": sha512,
+        "md5": md5,
+        "sha1": sha1,
+        "storage_mode": "postgres_bytea",
+        "detection": detection.to_dict(),
+    }
+
+    evidence = Evidence(
+        case_id=case_id,
+        original_filename=safe_name,
+        storage_path=storage_path,
+        sha256=sha256,
+        sha512=sha512,
+        md5=md5,
+        sha1=sha1,
+        content_type=declared_content_type,
+        declared_mime=declared_content_type,
+        detected_format=detected_format,
+        uploader=uploader,
+        evidence_type=evidence_type,
+        metadata_=evidence_metadata,
+        content_bytes=file_bytes,
+        integrity_state=evidence_integrity_state,
+        extracted_path=f"db://evidence/{stored_name}/extracted" if is_zip else None,
+        acquisition_method=acq_meta.get("acquisition_method"),
+        device_make_model=acq_meta.get("device_make_model"),
+        device_os_version=acq_meta.get("device_os_version"),
+        app_version=acq_meta.get("app_version"),
+        acquisition_time_utc=acq_meta.get("acquisition_time_utc"),
+        acquired_by=acq_meta.get("acquired_by"),
+        acquisition_hash_claimed=claimed_hash,
+        acquisition_hash_algorithm=claimed_algo if claimed_hash else None,
+        claimed_vs_computed=claimed_vs_computed,
+    )
+    db.add(evidence)
+    db.flush()
+
+    if is_zip and evidence_integrity_state != "ARCHIVE_REJECTED":
+        for member in extracted_files:
+            file_meta = {
+                "size": member.size,
+                "mime_type": member.mime_type,
+                "sha512": member.sha512,
+                "md5": member.md5,
+                "sha1": member.sha1,
+                "parent_sha256": sha256,
+                "storage_mode": "postgres_bytea",
+                "original_filename": member.original_filename,
+            }
+            media_type = _media_type_from_mime(member.mime_type)
+            evidence_file = EvidenceFile(
+                evidence_id=evidence.id,
+                relative_path=member.normalized_path,
+                sha256=member.sha256,
+                sha512=member.sha512,
+                md5=member.md5,
+                sha1=member.sha1,
+                file_size=member.size,
+                mime_type=member.mime_type,
+                metadata_=file_meta,
+                content_bytes=member.content_bytes,
+                is_media=media_type is not None,
+                media_type=media_type,
+            )
+            db.add(evidence_file)
+        db.flush()
+
+    # 5. Append-only cryptographic audit chain entry (B5.5, R3)
+    AuditService.append(
+        db=db,
+        action="INGEST",
+        actor=uploader or "system",
+        case_id=case_id,
+        evidence_id=evidence.id,
+        details={
+            "filename": safe_name,
+            "sha256": sha256,
+            "size": file_size,
+            "detected_format": detected_format,
+            "claimed_vs_computed": claimed_vs_computed,
+            "integrity_state": evidence_integrity_state,
+        },
+    )
+
+    db.add(ActivityLog(
+        case_id=case_id,
+        action="upload_evidence",
+        description=f"Evidence uploaded: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)",
+    ))
+    db.commit()
+    db.refresh(evidence)
+
+    # Auto-trigger forensic parsers on uploaded evidence
+    try:
+        from backend.services.whatsapp_service import WhatsAppService
+        from backend.services.telegram_service import TelegramService
+        WhatsAppService().analyze_evidence_sync(evidence.id, db)
+        TelegramService().analyze_evidence_sync(evidence.id, db)
+    except Exception as exc:
+        logger.warning("Auto-analysis on upload encountered non-fatal error: %s", exc)
+
+    return {
+        "id": evidence.id,
+        "filename": evidence.original_filename,
+        "sha256": evidence.sha256,
+        "sha512": sha512,
+        "md5": md5,
+        "sha1": sha1,
+        "size": file_size,
+        "evidence_type": evidence.evidence_type,
+        "detected_format": detected_format,
+        "claimed_vs_computed": claimed_vs_computed,
+        "integrity_state": evidence.integrity_state,
+        "is_zip": is_zip,
+        "extracted_files_count": len(extracted_files) if is_zip else 0,
+    }
+
+
+@router.put("/upload-stream", status_code=status.HTTP_201_CREATED)
+async def upload_evidence_stream(
+    request: Request,
+    case_id: Optional[int] = Query(None),
+    x_case_id: Optional[int] = Header(None, alias="X-Case-ID"),
+    filename: Optional[str] = Query(None),
+    x_original_filename: Optional[str] = Header(None, alias="X-Original-Filename"),
+    x_declared_mime: Optional[str] = Header(None, alias="X-Declared-Mime"),
+    x_acquisition_method: Optional[str] = Header(None, alias="X-Acquisition-Method"),
+    x_device_make_model: Optional[str] = Header(None, alias="X-Device-Make-Model"),
+    x_device_os_version: Optional[str] = Header(None, alias="X-Device-Os-Version"),
+    x_app_version: Optional[str] = Header(None, alias="X-App-Version"),
+    x_acquired_by: Optional[str] = Header(None, alias="X-Acquired-By"),
+    x_acquisition_hash_claimed: Optional[str] = Header(None, alias="X-Acquisition-Hash-Claimed"),
+    x_acquisition_hash_algorithm: Optional[str] = Header(None, alias="X-Acquisition-Hash-Algorithm"),
+    x_uploader: Optional[str] = Header(None, alias="X-Uploader"),
+    db: Session = Depends(get_db),
+):
+    """
+    Streaming upload endpoint for zero-spool in-memory ingestion (B5.1, DEC-012).
+    Enforces MAX_UPLOAD_SIZE while streaming (HTTP 413 if exceeded).
+    """
+    target_case_id = case_id or x_case_id
+    if not target_case_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing required case_id")
+
+    case = db.query(Case).filter(Case.id == target_case_id).first()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Case {target_case_id} not found")
+
+    target_name = filename or x_original_filename or "evidence.bin"
+    safe_name = _safe_filename(target_name)
+
+    # Read stream incrementally and enforce ceiling
+    max_size = settings.max_upload_size
+    chunks = []
+    total_bytes = 0
+
+    async for chunk in request.stream():
+        total_bytes += len(chunk)
+        if total_bytes > max_size:
+            AuditService.append(
+                db=db,
+                action="INGEST_REJECTED_TOO_LARGE",
+                actor=x_uploader or "system",
+                case_id=target_case_id,
+                details={"filename": safe_name, "bytes_read": total_bytes, "limit": max_size},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded evidence exceeded maximum allowed size of {max_size} bytes ({max_size // (1024*1024)} MiB)",
+            )
+        chunks.append(chunk)
+
+    file_bytes = b"".join(chunks)
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty (0 bytes)")
+
+    acq_meta = {
+        "acquisition_method": x_acquisition_method,
+        "device_make_model": x_device_make_model,
+        "device_os_version": x_device_os_version,
+        "app_version": x_app_version,
+        "acquired_by": x_acquired_by,
+        "acquisition_hash_claimed": x_acquisition_hash_claimed,
+        "acquisition_hash_algorithm": x_acquisition_hash_algorithm,
+    }
+
+    return _process_and_store_evidence(
+        db=db,
+        case_id=target_case_id,
+        filename=safe_name,
+        file_bytes=file_bytes,
+        declared_content_type=x_declared_mime or request.headers.get("content-type"),
+        uploader=x_uploader or "system",
+        acquisition_metadata=acq_meta,
+    )
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 def upload_evidence(
     case_id: int,
     file: UploadFile = File(...),
+    acquisition_method: Optional[str] = None,
+    device_make_model: Optional[str] = None,
+    device_os_version: Optional[str] = None,
+    app_version: Optional[str] = None,
+    acquired_by: Optional[str] = None,
+    acquisition_hash_claimed: Optional[str] = None,
+    acquisition_hash_algorithm: Optional[str] = None,
+    uploader: Optional[str] = "system",
     db: Session = Depends(get_db),
 ):
-    """Upload evidence file (ZIP or regular) for a case."""
-    storage_path: Optional[Path] = None
-    extract_dir: Optional[Path] = None
-    extracted_files: list[dict] = []
+    """Upload evidence file via multipart/form-data with streaming cap enforcement (B5.1)."""
     safe_name = _safe_filename(file.filename)
 
-    try:
-        logger.info(
-            "Evidence upload requested case_id=%s filename=%s content_type=%s",
-            case_id,
-            file.filename,
-            file.content_type,
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Case {case_id} not found",
         )
 
-        logger.info("Validating case exists case_id=%s", case_id)
-        case = db.query(Case).filter(Case.id == case_id).first()
-        if not case:
+    _validate_supported_upload(safe_name, file.content_type)
+
+    # Read chunks while strictly enforcing upload ceiling
+    max_size = settings.max_upload_size
+    chunks = []
+    total_bytes = 0
+
+    while True:
+        chunk = file.file.read(65536)
+        if not chunk:
+            break
+        total_bytes += len(chunk)
+        if total_bytes > max_size:
+            AuditService.append(
+                db=db,
+                action="INGEST_REJECTED_TOO_LARGE",
+                actor=uploader or "system",
+                case_id=case_id,
+                details={"filename": safe_name, "bytes_read": total_bytes, "limit": max_size},
+            )
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Case {case_id} not found",
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded evidence exceeded maximum allowed size of {max_size} bytes ({max_size // (1024*1024)} MiB)",
             )
+        chunks.append(chunk)
 
-
-        logger.info("Validating supported upload filename=%s content_type=%s", safe_name, file.content_type)
-        _validate_supported_upload(safe_name, file.content_type)
-
-        logger.info("Reading uploaded file stream into memory filename=%s", safe_name)
-        file_data = file.file.read()
-        file_size = len(file_data)
-        logger.info("Uploaded file read complete filename=%s size=%s", safe_name, file_size)
-        if file_size == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is empty",
-            )
-
-        logger.info("Computing uploaded file multi-hashes (SHA-256, MD5, SHA-1) filename=%s size=%s", safe_name, file_size)
-        upload_hashes = compute_multi_hashes_bytes(file_data)
-        sha256 = upload_hashes["sha256"]
-        md5 = upload_hashes["md5"]
-        sha1 = upload_hashes["sha1"]
-        logger.info("Computed uploaded file hashes sha256=%s md5=%s sha1=%s", sha256, md5, sha1)
-
-        is_zip = _is_zip_file(safe_name, file.content_type)
-        evidence_type = "zip" if is_zip else "file"
-        stored_name = f"{uuid.uuid4().hex}_{safe_name}"
-        storage_path = f"db://evidence/{stored_name}"
-
-        extracted_files = []
-        if is_zip:
-            logger.info("Extracting ZIP in memory filename=%s", safe_name)
-            extracted_files = _extract_zip_in_memory(file_data)
-            logger.info(
-                "In-memory ZIP extraction complete filename=%s extracted_count=%s",
-                safe_name,
-                len(extracted_files),
-            )
-
-        evidence_metadata = {
-            "original_content_type": file.content_type,
-            "upload_size": file_size,
-            "is_zip": is_zip,
-            "original_filename": file.filename or "unnamed",
-            "stored_filename": stored_name,
-            "md5": md5,
-            "sha1": sha1,
-            "storage_mode": "postgres_bytea",
-        }
-
-        logger.info("Creating Evidence row case_id=%s filename=%s sha256=%s", case_id, safe_name, sha256)
-        evidence = Evidence(
-            case_id=case_id,
-            original_filename=safe_name,
-            storage_path=storage_path,
-            sha256=sha256,
-            content_type=file.content_type,
-            evidence_type=evidence_type,
-            metadata_=evidence_metadata,
-            content_bytes=file_data,
-            extracted_path=f"db://evidence/{stored_name}/extracted" if is_zip else None,
-        )
-        db.add(evidence)
-        db.flush()
-        logger.info("Evidence row flushed evidence_id=%s", evidence.id)
-
-        if is_zip:
-            for file_info in extracted_files:
-                mime_type = file_info.get("mime_type")
-                file_metadata = {
-                    "size": file_info["size"],
-                    "mime_type": mime_type,
-                    "md5": file_info.get("md5"),
-                    "sha1": file_info.get("sha1"),
-                    "parent_sha256": sha256,
-                    "storage_mode": "postgres_bytea",
-                }
-                media_type = _media_type_from_mime(mime_type)
-                logger.info(
-                    "Creating EvidenceFile row evidence_id=%s relative_path=%s size=%s mime_type=%s",
-                    evidence.id,
-                    file_info["relative_path"],
-                    file_info["size"],
-                    mime_type,
-                )
-                evidence_file = EvidenceFile(
-                    evidence_id=evidence.id,
-                    relative_path=file_info["relative_path"],
-                    sha256=file_info["sha256"],
-                    file_size=file_info["size"],
-                    mime_type=mime_type,
-                    metadata_=file_metadata,
-                    content_bytes=file_info["content_bytes"],
-                    is_media=media_type is not None,
-                    media_type=media_type,
-                )
-                db.add(evidence_file)
-            db.flush()
-        logger.info("Creating ActivityLog row case_id=%s evidence_id=%s", case_id, evidence.id)
-        db.add(ActivityLog(
-            case_id=case_id,
-            action="upload_evidence",
-            description=f"Evidence uploaded: {evidence.original_filename} (SHA-256: {evidence.sha256[:8]}...)",
-        ))
-
-        logger.info("Committing evidence upload transaction evidence_id=%s", evidence.id)
-        db.commit()
-        db.refresh(evidence)
-        logger.info("Evidence upload committed evidence_id=%s", evidence.id)
-
-        # Auto-trigger forensic parsers on uploaded evidence
-        try:
-            from backend.services.whatsapp_service import WhatsAppService
-            from backend.services.telegram_service import TelegramService
-            WhatsAppService().analyze_evidence_sync(evidence.id, db)
-            TelegramService().analyze_evidence_sync(evidence.id, db)
-        except Exception as exc:
-            logger.warning("Auto-analysis on upload encountered non-fatal error: %s", exc)
-
-
-        return {
-            "id": evidence.id,
-            "filename": evidence.original_filename,
-            "sha256": evidence.sha256,
-            "md5": md5,
-            "sha1": sha1,
-            "size": file_size,
-            "evidence_type": evidence.evidence_type,
-            "is_zip": is_zip,
-            "extracted_files_count": len(extracted_files) if is_zip else 0,
-        }
-    except HTTPException:
-        logger.warning(
-            "Evidence upload rejected case_id=%s filename=%s\n%s",
-            case_id,
-            file.filename,
-            traceback.format_exc(),
-        )
-        db.rollback()
-        raise
-    except IntegrityError as exc:
-        logger.error(
-            "Evidence upload integrity error case_id=%s filename=%s\n%s",
-            case_id,
-            file.filename,
-            traceback.format_exc(),
-        )
-        db.rollback()
+    file_bytes = b"".join(chunks)
+    if len(file_bytes) == 0:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Evidence upload conflicts with existing database state",
-        ) from exc
-    except SQLAlchemyError as exc:
-        logger.error(
-            "Evidence upload database error case_id=%s filename=%s\n%s",
-            case_id,
-            file.filename,
-            traceback.format_exc(),
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty (0 bytes)",
         )
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while uploading evidence",
-        ) from exc
-    except OSError as exc:
-        logger.error(
-            "Evidence upload file handling error case_id=%s filename=%s storage_path=%s extract_dir=%s\n%s",
-            case_id,
-            file.filename,
-            storage_path,
-            extract_dir,
-            traceback.format_exc(),
-        )
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="File storage error while uploading evidence",
-        ) from exc
-    except Exception as e:
-        logger.error(
-            "Unexpected evidence upload error case_id=%s filename=%s\n%s",
-            case_id,
-            file.filename,
-            traceback.format_exc(),
-        )
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while uploading evidence",
-        ) from e
+
+    acq_meta = {
+        "acquisition_method": acquisition_method,
+        "device_make_model": device_make_model,
+        "device_os_version": device_os_version,
+        "app_version": app_version,
+        "acquired_by": acquired_by,
+        "acquisition_hash_claimed": acquisition_hash_claimed,
+        "acquisition_hash_algorithm": acquisition_hash_algorithm,
+    }
+
+    return _process_and_store_evidence(
+        db=db,
+        case_id=case_id,
+        filename=safe_name,
+        file_bytes=file_bytes,
+        declared_content_type=file.content_type,
+        uploader=uploader or "system",
+        acquisition_metadata=acq_meta,
+    )
 
 
 @router.get("", response_model=List[EvidenceRead])
 @router.get("/", response_model=List[EvidenceRead])
 def list_evidences(case_id: int, db: Session = Depends(get_db)):
-    """List evidences for a specific case."""
+    """List evidences for a specific case with deferred BYTEA query optimization (R19)."""
     try:
         logger.info("Listing evidence requested case_id=%s", case_id)
 
-        logger.info("Validating case exists before listing evidence case_id=%s", case_id)
         case = db.query(Case).filter(Case.id == case_id).first()
         if not case:
             raise HTTPException(
@@ -445,14 +616,44 @@ def list_evidences(case_id: int, db: Session = Depends(get_db)):
                 detail=f"Case {case_id} not found",
             )
 
-        logger.info("Querying evidence rows case_id=%s", case_id)
+        # Deferred BYTEA (R19, B5.1): load_only all metadata columns, excluding content_bytes
         evidences = (
             db.query(Evidence)
+            .options(
+                load_only(
+                    Evidence.id,
+                    Evidence.case_id,
+                    Evidence.original_filename,
+                    Evidence.storage_path,
+                    Evidence.sha256,
+                    Evidence.sha512,
+                    Evidence.md5,
+                    Evidence.sha1,
+                    Evidence.content_type,
+                    Evidence.declared_mime,
+                    Evidence.detected_format,
+                    Evidence.uploader,
+                    Evidence.evidence_type,
+                    Evidence.metadata_,
+                    Evidence.extracted_path,
+                    Evidence.integrity_state,
+                    Evidence.acquisition_method,
+                    Evidence.device_make_model,
+                    Evidence.device_os_version,
+                    Evidence.app_version,
+                    Evidence.acquisition_time_utc,
+                    Evidence.acquired_by,
+                    Evidence.acquisition_hash_claimed,
+                    Evidence.acquisition_hash_algorithm,
+                    Evidence.claimed_vs_computed,
+                    Evidence.uploaded_at,
+                    Evidence.analyzed_at,
+                )
+            )
             .filter(Evidence.case_id == case_id)
             .order_by(Evidence.uploaded_at.desc())
             .all()
         )
-        logger.info("Evidence rows loaded case_id=%s count=%s", case_id, len(evidences))
 
         return [_evidence_to_response(evidence) for evidence in evidences]
     except HTTPException:

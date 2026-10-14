@@ -14,10 +14,22 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    event,
+    inspect,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred, relationship
 
 from backend.app.database import Base
+
+
+class EvidenceImmutableError(Exception):
+    """Raised when an attempt is made to mutate evidence bytes or hashes (master.md R3)."""
+    pass
+
+
+class AuditLogImmutableError(Exception):
+    """Raised when an attempt is made to update or delete audit log entries (spec B5.5, DEC-010)."""
+    pass
 
 
 class Case(Base):
@@ -32,6 +44,14 @@ class Case(Base):
     status = Column(String(50), default="open")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Case metadata fields (B5.2)
+    case_number = Column(String(100), nullable=True, index=True)
+    examiner_name = Column(String(255), nullable=True)
+    examiner_designation = Column(String(255), nullable=True)
+    agency = Column(String(255), nullable=True)
+    legal_authority = Column(Text, nullable=True)
+    jurisdiction = Column(String(255), nullable=True)
 
     evidence_items = relationship(
         "Evidence", back_populates="case", cascade="all, delete-orphan"
@@ -60,12 +80,31 @@ class Evidence(Base):
     original_filename = Column(String(512), nullable=False)
     storage_path = Column(String(1024), nullable=False)
     sha256 = Column(String(64), nullable=False, index=True)
+    sha512 = Column(String(128), nullable=True)
+    md5 = Column(String(32), nullable=True)
+    sha1 = Column(String(40), nullable=True)
     content_type = Column(String(255))
+    declared_mime = Column(String(255), nullable=True)
+    detected_format = Column(String(100), nullable=True)
+    uploader = Column(String(255), nullable=True)
     evidence_type = Column(String(50))
     metadata_ = Column("metadata_", JSON, default=dict)
     extracted_path = Column(String(1024))
-    content_bytes = Column(LargeBinary, nullable=True)
+    # Deferred BYTEA column (R19, B5.1): never loaded on list/summary queries
+    content_bytes = deferred(Column(LargeBinary, nullable=True))
     integrity_state = Column(String(50), nullable=False, default="OK", server_default="OK")
+
+    # Acquisition metadata (B5.2)
+    acquisition_method = Column(String(50), nullable=True)
+    device_make_model = Column(String(255), nullable=True)
+    device_os_version = Column(String(255), nullable=True)
+    app_version = Column(String(100), nullable=True)
+    acquisition_time_utc = Column(DateTime, nullable=True)
+    acquired_by = Column(String(255), nullable=True)
+    acquisition_hash_claimed = Column(String(128), nullable=True)
+    acquisition_hash_algorithm = Column(String(50), nullable=True)
+    claimed_vs_computed = Column(String(50), nullable=False, default="NOT_PROVIDED", server_default="NOT_PROVIDED")
+
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime)
 
@@ -95,10 +134,14 @@ class EvidenceFile(Base):
     evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
     relative_path = Column(String(1024), nullable=False)
     sha256 = Column(String(64), nullable=False)
+    sha512 = Column(String(128), nullable=True)
+    md5 = Column(String(32), nullable=True)
+    sha1 = Column(String(40), nullable=True)
     file_size = Column(Integer)
     mime_type = Column(String(255))
     metadata_ = Column("metadata_", JSON, default=dict)
-    content_bytes = Column(LargeBinary, nullable=True)
+    # Deferred BYTEA column (R19, B5.1)
+    content_bytes = deferred(Column(LargeBinary, nullable=True))
     is_media = Column(Boolean, default=False)
     media_type = Column(String(50))
 
@@ -401,7 +444,8 @@ class DerivedArtifact(Base):
     sha256 = Column(String(64), nullable=False, index=True)
     size_bytes = Column(Integer, default=0)
     mime_type = Column(String(255), nullable=True)
-    content_bytes = Column(LargeBinary, nullable=True)
+    # Deferred BYTEA column (R19, B5.1)
+    content_bytes = deferred(Column(LargeBinary, nullable=True))
     provenance = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
@@ -485,4 +529,65 @@ class CorrelationFinding(Base):
     provenance = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
-    case = relationship("Case", back_populates="correlation_findings")
+    case = relationship("Case", back_populates="correlation_findings")
+
+
+class AuditLog(Base):
+    """
+    Cryptographically hash-chained append-only forensic audit log (B5.5).
+    Maintains immutable hash chain across all forensic activities.
+    Never cascades on case deletion (DEC-010).
+    """
+
+    __tablename__ = "audit_log"
+
+    seq = Column(Integer, primary_key=True, autoincrement=True)
+    ts_utc = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    actor = Column(String(255), nullable=False, default="system")
+    action = Column(String(100), nullable=False, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    evidence_id = Column(Integer, nullable=True, index=True)
+    details_json = Column(JSON, default=dict, nullable=False)
+    prev_hash = Column(String(64), nullable=False)
+    entry_hash = Column(String(64), nullable=False, index=True)
+
+
+# ==============================================================================
+# ORM Immutability & Append-Only Event Guards (master.md R3, spec B5.3, B5.5)
+# ==============================================================================
+
+@event.listens_for(Evidence, "before_update")
+def _prevent_evidence_content_update(mapper, connection, target):
+    state = inspect(target)
+    for col in ("content_bytes", "sha256"):
+        history = state.get_history(col, True)
+        if history.has_changes():
+            raise EvidenceImmutableError(
+                f"Evidence '{col}' is strictly immutable once set (master.md R3)."
+            )
+
+
+@event.listens_for(EvidenceFile, "before_update")
+def _prevent_evidence_file_content_update(mapper, connection, target):
+    state = inspect(target)
+    for col in ("content_bytes", "sha256"):
+        history = state.get_history(col, True)
+        if history.has_changes():
+            raise EvidenceImmutableError(
+                f"EvidenceFile '{col}' is strictly immutable once set (master.md R3)."
+            )
+
+
+@event.listens_for(AuditLog, "before_update")
+def _prevent_audit_log_update(mapper, connection, target):
+    raise AuditLogImmutableError(
+        "AuditLog entries are append-only and strictly immutable (B5.5)."
+    )
+
+
+@event.listens_for(AuditLog, "before_delete")
+def _prevent_audit_log_delete(mapper, connection, target):
+    raise AuditLogImmutableError(
+        "AuditLog entries cannot be deleted (DEC-010, B5.5)."
+    )
+

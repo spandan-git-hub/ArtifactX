@@ -191,3 +191,23 @@ def block_network(request, monkeypatch):
 def fixed_now():
     """Return a fixed UTC datetime for deterministic time testing (R11)."""
     return datetime(2026, 10, 13, 12, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def db_session():
+    """Provide a database session with clean tables for tests."""
+    from backend.app.database import Base, engine, SessionLocal
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    try:
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
+    except Exception:
+        session.rollback()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
