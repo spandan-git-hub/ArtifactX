@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArtifactX Dataset Manifest Schema",
+  "type": "object",
+  "required": [
+    "dataset_id",
+    "variant",
+    "seed",
+    "generator_version",
+    "origin",
+    "created_by_tool_versions",
+    "files",
+    "modelled_vs_observed"
+  ],
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^DS-[0-9]{2}$"
+    },
+    "variant": {
+      "type": "string",
+      "enum": ["dev", "holdout"]
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "generator_version": {
+      "type": "string"
+    },
+    "origin": {
+      "type": "string",
+      "enum": ["synthetic", "device_capture"]
+    },
+    "created_by_tool_versions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "size"],
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "size": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "whatsapp": {
+      "type": "object",
+      "properties": {
+        "contacts": { "type": "array" },
+        "chats": { "type": "array" },
+        "messages": { "type": "array" },
+        "deletions": { "type": "array" },
+        "edits": { "type": "array" }
+      }
+    },
+    "telegram": {
+      "type": ["object", "null"]
+    },
+    "shared_entities": {
+      "type": "array"
+    },
+    "decoys": {
+      "type": "array"
+    },
+    "controls": {
+      "type": "array"
+    },
+    "encryption": {
+      "type": ["object", "null"]
+    },
+    "modelled_vs_observed": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

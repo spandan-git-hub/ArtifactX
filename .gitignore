@@ -50,6 +50,7 @@ dist-ssr/
 *.sqlite
 *.sqlite3
 data/
+!testdata/**
 
 # Uploads
 uploads/
