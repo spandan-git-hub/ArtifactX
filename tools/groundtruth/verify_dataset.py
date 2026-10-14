@@ -159,8 +159,112 @@ def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
                 if marker in raw_db or marker in raw_wal:
                     errors.append(f"Control failure: {method} marker {deletion.get('marker')} FOUND in raw bytes (must be absent)")
 
+    # 5. Encryption & Cryptographic Fixtures Verification (B2)
+    enc_data = manifest_data.get("encryption")
+    if enc_data:
+        enc_format = enc_data.get("format")
+        keys_dir = dataset_dir / "keys"
+        if keys_dir.is_dir():
+            readme = keys_dir / "README.md"
+            if not readme.is_file():
+                errors.append("keys/README.md is missing in encrypted dataset")
+            elif "Test Keys" not in readme.read_text(encoding="utf-8"):
+                errors.append("keys/README.md does not contain required fictitious disclaimer (R5, R14)")
+
+        if enc_format == "crypt14":
+            key_path = dataset_dir / enc_data.get("key_ref", "keys/key")
+            enc_file = dataset_dir / "msgstore.db.crypt14"
+            if not key_path.is_file():
+                errors.append(f"crypt14 key file missing: {key_path}")
+            if not enc_file.is_file():
+                errors.append(f"crypt14 encrypted file missing: {enc_file}")
+
+            # Reference round-trip check
+            if key_path.is_file() and enc_file.is_file():
+                try:
+                    import subprocess
+                    import tempfile
+                    with tempfile.TemporaryDirectory() as td:
+                        dec_test = Path(td) / "decrypted.db"
+                        res = subprocess.run(
+                            [sys.executable, "-m", "wa_crypt_tools.wadecrypt", str(key_path), str(enc_file), str(dec_test), "-y"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res.returncode != 0:
+                            errors.append(f"Reference decrypt failed for crypt14: {res.stderr}")
+                        else:
+                            dec_sha, _ = _compute_sha256(dec_test)
+                            expected_sha = enc_data.get("plaintext_sha256")
+                            if expected_sha and dec_sha.lower() != expected_sha.lower():
+                                errors.append(f"crypt14 decrypted SHA-256 ({dec_sha}) != manifest plaintext_sha256 ({expected_sha})")
+                except Exception as ex:
+                    errors.append(f"Error during reference decrypt verification: {ex}")
+
+        elif enc_format == "crypt15":
+            key_path = dataset_dir / enc_data.get("key_ref", "keys/encrypted_backup.key")
+            hex_path = dataset_dir / enc_data.get("hex_key_ref", "keys/root_key.hex")
+            enc_file = dataset_dir / "msgstore.db.crypt15"
+            if not key_path.is_file():
+                errors.append(f"crypt15 encrypted_backup.key missing: {key_path}")
+            if not hex_path.is_file():
+                errors.append(f"crypt15 root_key.hex missing: {hex_path}")
+            if not enc_file.is_file():
+                errors.append(f"crypt15 encrypted file missing: {enc_file}")
+
+            if key_path.is_file() and hex_path.is_file() and enc_file.is_file():
+                try:
+                    import subprocess
+                    import tempfile
+                    hex_key = hex_path.read_text(encoding="utf-8").strip()
+                    with tempfile.TemporaryDirectory() as td:
+                        # 1. Verify with key file
+                        dec_test_1 = Path(td) / "dec1.db"
+                        res1 = subprocess.run(
+                            [sys.executable, "-m", "wa_crypt_tools.wadecrypt", str(key_path), str(enc_file), str(dec_test_1), "-y"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res1.returncode != 0:
+                            errors.append(f"Reference decrypt with encrypted_backup.key failed: {res1.stderr}")
+                        else:
+                            dec1_sha, _ = _compute_sha256(dec_test_1)
+                            expected_sha = enc_data.get("plaintext_sha256")
+                            if expected_sha and dec1_sha.lower() != expected_sha.lower():
+                                errors.append(f"crypt15 dec1 SHA-256 ({dec1_sha}) != manifest plaintext_sha256 ({expected_sha})")
+
+                        # 2. Verify with 64-hex string
+                        dec_test_2 = Path(td) / "dec2.db"
+                        res2 = subprocess.run(
+                            [sys.executable, "-m", "wa_crypt_tools.wadecrypt", hex_key, str(enc_file), str(dec_test_2), "-y"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res2.returncode != 0:
+                            errors.append(f"Reference decrypt with 64-hex string failed: {res2.stderr}")
+                        else:
+                            dec2_sha, _ = _compute_sha256(dec_test_2)
+                            expected_sha = enc_data.get("plaintext_sha256")
+                            if expected_sha and dec2_sha.lower() != expected_sha.lower():
+                                errors.append(f"crypt15 dec2 SHA-256 ({dec2_sha}) != manifest plaintext_sha256 ({expected_sha})")
+                except Exception as ex:
+                    errors.append(f"Error during crypt15 reference decrypt verification: {ex}")
+
+        elif enc_format == "crypt15_negatives":
+            expected_outcomes = enc_data.get("expected_outcomes", [])
+            if not expected_outcomes:
+                errors.append("DS-04 manifest encryption.expected_outcomes is empty")
+            for item in expected_outcomes:
+                fixture_rel = item.get("fixture")
+                fixture_file = dataset_dir / fixture_rel
+                if not fixture_file.is_file():
+                    errors.append(f"Negative fixture file missing: {fixture_rel}")
+                if not item.get("expected_outcome"):
+                    errors.append(f"Missing expected_outcome for negative fixture: {fixture_rel}")
+
     is_valid = len(errors) == 0
     return is_valid, errors
+
 
 
 def main() -> int:

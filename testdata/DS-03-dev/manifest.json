@@ -1,0 +1,55 @@
+{
+  "controls": [],
+  "created_by_tool_versions": {
+    "python": "3.14.6",
+    "wa_crypt_tools": "0.2.0 (b16a805)"
+  },
+  "dataset_id": "DS-03",
+  "decoys": [],
+  "encryption": {
+    "cipher": "AES-256-GCM",
+    "format": "crypt15",
+    "hex_key_ref": "keys/root_key.hex",
+    "iv_hex": "bc8960a91a3d1fa7ad3c2d6dbd9c66b3",
+    "kdf": "HKDF-SHA256",
+    "key_fingerprint": "cf23b86f",
+    "key_ref": "keys/encrypted_backup.key",
+    "plaintext_sha256": "3465e141b3a4a83647631445334aeaaacbfab77e8cd288b313ec8303c4340c11",
+    "roundtrip_verified": true
+  },
+  "files": [
+    {
+      "path": "keys/README.md",
+      "sha256": "1b66e62455f75e713745537f965808d6e51fefb783fa9dce87fcd645f1c47c88",
+      "size": 203
+    },
+    {
+      "path": "keys/encrypted_backup.key",
+      "sha256": "4287c9b7adbcb20903989776368d47034d337e0c659feec135ff6f7eba36e277",
+      "size": 59
+    },
+    {
+      "path": "keys/root_key.hex",
+      "sha256": "fcf1b20398881967520c9d1b6e8813b16c7dc03197902256178278b7b616f196",
+      "size": 66
+    },
+    {
+      "path": "msgstore.db.crypt15",
+      "sha256": "42a9c73a317fd72b385067c0d3355fbc6d8aab2744c4a9b33dfed3aee8feaee7",
+      "size": 40609
+    }
+  ],
+  "generator_version": "1.0.0",
+  "modelled_vs_observed": {
+    "cipher": "AES-256-GCM",
+    "container": "modelled per wa-crypt-tools 0.2.0 specification",
+    "kdf": "HKDF-SHA256 with info='backup encryption'",
+    "trailer": "MD5 checksum over container bytes"
+  },
+  "origin": "synthetic",
+  "seed": 42,
+  "shared_entities": [],
+  "telegram": null,
+  "variant": "dev",
+  "whatsapp": {}
+}

@@ -1,0 +1,147 @@
+{
+  "controls": [],
+  "created_by_tool_versions": {
+    "python": "3.14.6",
+    "wa_crypt_tools": "0.2.0 (b16a805)"
+  },
+  "dataset_id": "DS-04",
+  "decoys": [],
+  "encryption": {
+    "expected_outcomes": [
+      {
+        "description": "Valid crypt15 encrypted backup decrypted with a mismatched valid 64-hex key",
+        "expected_outcome": "AUTH_FAILED",
+        "fixture": "msgstore.db.crypt15",
+        "key_ref": "keys/wrong_key.hex"
+      },
+      {
+        "description": "Valid crypt15 encrypted backup decrypted with a mismatched encrypted_backup.key file",
+        "expected_outcome": "AUTH_FAILED",
+        "fixture": "msgstore.db.crypt15",
+        "key_ref": "keys/wrong_backup.key"
+      },
+      {
+        "description": "File truncated inside the protobuf BackupPrefix header (12 bytes)",
+        "expected_outcome": "TRUNCATED_INPUT",
+        "fixture": "truncated_header.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "File truncated halfway through the AES-GCM ciphertext payload",
+        "expected_outcome": "TRUNCATED_INPUT",
+        "fixture": "truncated_body.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "File truncated by stripping the trailing 16-byte MD5 checksum",
+        "expected_outcome": "TRUNCATED_INPUT",
+        "fixture": "truncated_trailer.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "Crypt15 file with 1-bit flip in ciphertext payload causing GCM tag authentication failure",
+        "expected_outcome": "AUTH_FAILED",
+        "fixture": "bit_flipped.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "1 MiB pseudo-random byte stream with invalid header/version named .crypt15",
+        "expected_outcome": "UNSUPPORTED_VERSION",
+        "fixture": "random_1mb.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "0-byte empty file named .crypt15",
+        "expected_outcome": "TRUNCATED_INPUT",
+        "fixture": "empty.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      },
+      {
+        "description": "Valid unencrypted SQLite database masquerading with a .crypt15 extension",
+        "expected_outcome": "NOT_ENCRYPTED",
+        "fixture": "plaintext_sqlite.crypt15",
+        "key_ref": "keys/primary_backup.key"
+      }
+    ],
+    "format": "crypt15_negatives",
+    "primary_key_fingerprint": "622f253b",
+    "wrong_key_fingerprint": "e6697911"
+  },
+  "files": [
+    {
+      "path": "bit_flipped.crypt15",
+      "sha256": "730abc7e476030d5143cba576c569b6db629847d1c52a5093ed5cf277b3c5a61",
+      "size": 40488
+    },
+    {
+      "path": "empty.crypt15",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "keys/README.md",
+      "sha256": "71050d1297a9284cd903604a98b8ad538b1f241033348dbd1080d5e7b28472dd",
+      "size": 214
+    },
+    {
+      "path": "keys/primary_backup.key",
+      "sha256": "3c93b5127af690620b71e23f09dc91a5155a49693af90b167effdd03e6a68b0a",
+      "size": 59
+    },
+    {
+      "path": "keys/primary_key.hex",
+      "sha256": "b44f7b3fd18f0a2f9a18ec51c8b42a9c66fb069b88bea3407c434d1d88f6f786",
+      "size": 66
+    },
+    {
+      "path": "keys/wrong_backup.key",
+      "sha256": "5acd96fd6a02817a3b5942f75ead5b8af1f487136d1d5901c10e62dca348df8d",
+      "size": 59
+    },
+    {
+      "path": "keys/wrong_key.hex",
+      "sha256": "379747a0d6a53296fa7de645ecba0ec2b86703c55d3aabf2635b58d07bb1beb2",
+      "size": 66
+    },
+    {
+      "path": "msgstore.db.crypt15",
+      "sha256": "be466861825ed23496614da0c333266e2d2f6b8ca45f33db5f95e3c5e6ff1d95",
+      "size": 40488
+    },
+    {
+      "path": "plaintext_sqlite.crypt15",
+      "sha256": "b03b6d0107a1e1a15582a3fed14ac2ad1c85e82ae4149f3e676b52aa0e60bc41",
+      "size": 184320
+    },
+    {
+      "path": "random_1mb.crypt15",
+      "sha256": "b4230ea907d32a943a8a90f93d8a77ed2015558033ac2c04734b6d076c679e97",
+      "size": 1048576
+    },
+    {
+      "path": "truncated_body.crypt15",
+      "sha256": "1c107a9770f6b22a5681f547b95d54d48af64937827c795d5baf219d76f0ca8b",
+      "size": 20244
+    },
+    {
+      "path": "truncated_header.crypt15",
+      "sha256": "bb7d7abc88a340e8efdce7e60abd79f038f0100434c92e8a08251860a49f7be5",
+      "size": 12
+    },
+    {
+      "path": "truncated_trailer.crypt15",
+      "sha256": "2c2b145e53ddc5624a529186ac48e8de490f0b24387113df8cf64f6608ecfca6",
+      "size": 40472
+    }
+  ],
+  "generator_version": "1.0.0",
+  "modelled_vs_observed": {
+    "negatives": "synthetic error and corruption conditions modeled per 04_WHATSAPP_DECRYPTION.md §2"
+  },
+  "origin": "synthetic",
+  "seed": 1337,
+  "shared_entities": [],
+  "telegram": null,
+  "variant": "holdout",
+  "whatsapp": {}
+}

@@ -12,6 +12,11 @@ import argparse
 import sys
 from pathlib import Path
 
+from tools.groundtruth.crypto.wa_encrypt import (
+    generate_crypt14_dataset,
+    generate_crypt15_dataset,
+    generate_negative_dataset,
+)
 from tools.groundtruth.verify_dataset import verify_dataset
 from tools.groundtruth.wa.generator import generate_whatsapp_plain_dataset
 
@@ -30,19 +35,58 @@ def build_command(dataset: str, variant: str, out_dir: Path, seed: int | None = 
             seed=seed,
         )
         print(f"[OK] {dataset} ({variant}) successfully generated: {len(manifest.files)} files, {len(manifest.whatsapp['messages'])} messages.")
-        
-        # Self-verify immediately after build
-        is_valid, errors = verify_dataset(target_dir)
-        if not is_valid:
-            print(f"[FAIL] Post-build verification failed with {len(errors)} error(s):")
-            for err in errors:
-                print(f"  - {err}")
-            return 1
-        print(f"[OK] Post-build verification passed cleanly.")
-        return 0
+    elif dataset in ("DS-02", "DS-03", "DS-04"):
+        plain_dir = out_dir / f"DS-01-{variant}"
+        if not (plain_dir / "msgstore.db").is_file():
+            print(f"Plaintext dependency DS-01-{variant} missing; generating it first...")
+            generate_whatsapp_plain_dataset(
+                output_dir=plain_dir,
+                dataset_id="DS-01",
+                variant=variant,
+                seed=seed,
+            )
+
+        if dataset == "DS-02":
+            manifest = generate_crypt14_dataset(
+                plaintext_dir=plain_dir,
+                output_dir=target_dir,
+                dataset_id=dataset,
+                variant=variant,
+                seed=seed,
+            )
+            print(f"[OK] {dataset} ({variant}) successfully generated crypt14 fixture ({len(manifest.files)} files).")
+        elif dataset == "DS-03":
+            manifest = generate_crypt15_dataset(
+                plaintext_dir=plain_dir,
+                output_dir=target_dir,
+                dataset_id=dataset,
+                variant=variant,
+                seed=seed,
+            )
+            print(f"[OK] {dataset} ({variant}) successfully generated crypt15 fixture ({len(manifest.files)} files).")
+        elif dataset == "DS-04":
+            manifest = generate_negative_dataset(
+                plaintext_dir=plain_dir,
+                output_dir=target_dir,
+                dataset_id=dataset,
+                variant=variant,
+                seed=seed,
+            )
+            print(f"[OK] {dataset} ({variant}) successfully generated {len(manifest.files)} negative fixture files.")
     else:
-        print(f"[FAIL] Unknown dataset ID: {dataset}. Currently supported: DS-01")
+        print(f"[FAIL] Unknown dataset ID: {dataset}. Currently supported: DS-01, DS-02, DS-03, DS-04")
         return 1
+
+    # Self-verify immediately after build
+    is_valid, errors = verify_dataset(target_dir)
+    if not is_valid:
+        print(f"[FAIL] Post-build verification failed with {len(errors)} error(s):")
+        for err in errors:
+            print(f"  - {err}")
+        return 1
+    print(f"[OK] Post-build verification passed cleanly.")
+    return 0
+
 
 
 def verify_command(path: Path) -> int:
@@ -66,7 +110,7 @@ def main() -> int:
 
     # Build sub-command
     build_parser = subparsers.add_parser("build", help="Build a ground-truth dataset")
-    build_parser.add_argument("--dataset", required=True, choices=["DS-01"], help="Dataset ID (e.g. DS-01)")
+    build_parser.add_argument("--dataset", required=True, choices=["DS-01", "DS-02", "DS-03", "DS-04"], help="Dataset ID (e.g. DS-01, DS-02)")
     build_parser.add_argument("--variant", required=True, choices=["dev", "holdout"], help="Variant: dev or holdout")
     build_parser.add_argument("--out", default="testdata", help="Output directory (default: testdata)")
     build_parser.add_argument("--seed", type=int, default=None, help="Explicit RNG seed (optional)")
