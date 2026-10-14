@@ -17,8 +17,10 @@ from tools.groundtruth.crypto.wa_encrypt import (
     generate_crypt15_dataset,
     generate_negative_dataset,
 )
+from tools.groundtruth.tg.generator import generate_telegram_dataset
 from tools.groundtruth.verify_dataset import verify_dataset
 from tools.groundtruth.wa.generator import generate_whatsapp_plain_dataset
+
 
 
 def build_command(dataset: str, variant: str, out_dir: Path, seed: int | None = None) -> int:
@@ -73,8 +75,24 @@ def build_command(dataset: str, variant: str, out_dir: Path, seed: int | None = 
                 seed=seed,
             )
             print(f"[OK] {dataset} ({variant}) successfully generated {len(manifest.files)} negative fixture files.")
+        elif dataset == "DS-05":
+            manifest = generate_telegram_dataset(
+                output_dir=target_dir,
+                dataset_id=dataset,
+                variant=variant,
+                seed=seed,
+            )
+            print(f"[OK] {dataset} ({variant}) successfully generated Telegram fixture: {len(manifest.files)} files, {len(manifest.telegram['messages'])} messages.")
+    elif dataset == "DS-05":
+        manifest = generate_telegram_dataset(
+            output_dir=target_dir,
+            dataset_id=dataset,
+            variant=variant,
+            seed=seed,
+        )
+        print(f"[OK] {dataset} ({variant}) successfully generated Telegram fixture: {len(manifest.files)} files, {len(manifest.telegram['messages'])} messages.")
     else:
-        print(f"[FAIL] Unknown dataset ID: {dataset}. Currently supported: DS-01, DS-02, DS-03, DS-04")
+        print(f"[FAIL] Unknown dataset ID: {dataset}. Currently supported: DS-01, DS-02, DS-03, DS-04, DS-05")
         return 1
 
     # Self-verify immediately after build
@@ -110,7 +128,8 @@ def main() -> int:
 
     # Build sub-command
     build_parser = subparsers.add_parser("build", help="Build a ground-truth dataset")
-    build_parser.add_argument("--dataset", required=True, choices=["DS-01", "DS-02", "DS-03", "DS-04"], help="Dataset ID (e.g. DS-01, DS-02)")
+    build_parser.add_argument("--dataset", required=True, choices=["DS-01", "DS-02", "DS-03", "DS-04", "DS-05"], help="Dataset ID (e.g. DS-01, DS-05)")
+
     build_parser.add_argument("--variant", required=True, choices=["dev", "holdout"], help="Variant: dev or holdout")
     build_parser.add_argument("--out", default="testdata", help="Output directory (default: testdata)")
     build_parser.add_argument("--seed", type=int, default=None, help="Explicit RNG seed (optional)")

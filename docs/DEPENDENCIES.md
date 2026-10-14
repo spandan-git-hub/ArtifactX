@@ -35,6 +35,10 @@
 | `javaobj-py3` | 0.6.1 | Apache-2.0 | dev / tools (transitive) | Java serialization reader used by `wa-crypt-tools` for crypt14 key files. |
 | `pycryptodomex` | 3.24.1 | BSD-2-Clause / Public Domain | dev / tools (transitive) | Crypto library used internally by `wa-crypt-tools`. |
 | `protobuf` | 7.36.2 | BSD-3-Clause | dev / tools (transitive) | Protobuf runtime used internally by `wa-crypt-tools`. |
+| `telethon` | 1.45.0 | MIT | dev / tools | Reference TL object serializer/deserializer for Telegram fixtures (B3). Never imported in `backend/` or `forensic/` (R6, R15). |
+| `pyaes` | 1.6.1 | MIT | dev / tools (transitive) | Pure-Python AES implementation required by Telethon. |
+| `rsa` | 4.9.1 | Apache-2.0 | dev / tools (transitive) | Pure-Python RSA implementation required by Telethon. |
+| `pyasn1` | 0.6.4 | BSD-2-Clause | dev / tools (transitive) | ASN.1 parser required by `rsa`. |
 
 ## Licence Policy Notes
 

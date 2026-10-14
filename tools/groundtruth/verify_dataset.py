@@ -159,6 +159,119 @@ def verify_dataset(dataset_dir: Path) -> Tuple[bool, List[str]]:
                 if marker in raw_db or marker in raw_wal:
                     errors.append(f"Control failure: {method} marker {deletion.get('marker')} FOUND in raw bytes (must be absent)")
 
+    # 4. Telegram Plain DB Content Verification (B3)
+    tg_data = manifest_data.get("telegram")
+    if tg_data:
+        tg_db_path = dataset_dir / "cache4.db"
+        tg_wal_path = dataset_dir / "cache4.db-wal"
+
+        if tg_db_path.is_file():
+            try:
+                conn_tg = sqlite3.connect(f"file:{tg_db_path.resolve()}?mode=ro", uri=True)
+                cursor_tg = conn_tg.cursor()
+
+                # Verify expected tables exist
+                cursor_tg.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = {row[0].lower() for row in cursor_tg.fetchall()}
+                expected_tg_tables = {
+                    "messages_v2", "dialogs", "users", "chats", "contacts",
+                    "media_v4", "chat_settings_v2", "user_settings", "enc_chats",
+                    "messages_holes", "scheduled_messages_v2", "params"
+                }
+                missing_tg_tables = expected_tg_tables - tables
+                if missing_tg_tables:
+                    errors.append(f"cache4.db missing expected tables: {missing_tg_tables}")
+
+                # Verify PRAGMA user_version == 155
+                cursor_tg.execute("PRAGMA user_version")
+                db_ver = cursor_tg.fetchone()[0]
+                if db_ver != 155:
+                    errors.append(f"cache4.db user_version mismatch: expected 155, got {db_ver}")
+
+                # Verify total messages
+                manifest_tg_msgs = tg_data.get("messages", [])
+                cursor_tg.execute("SELECT COUNT(*) FROM messages_v2")
+                actual_tg_count = cursor_tg.fetchone()[0]
+                if actual_tg_count < len(manifest_tg_msgs):
+                    errors.append(f"cache4.db message count ({actual_tg_count}) less than manifest messages ({len(manifest_tg_msgs)})")
+
+                # Verify empty chat control (uid 1005 has 0 messages)
+                cursor_tg.execute("SELECT COUNT(*) FROM messages_v2 WHERE uid = 1005")
+                empty_tg_msgs = cursor_tg.fetchone()[0]
+                if empty_tg_msgs != 0:
+                    errors.append(f"Empty dialog control failed: expected 0 messages for uid 1005, got {empty_tg_msgs}")
+
+                # Verify Telethon re-reading 100% of well-formed blobs (B3.4)
+                cursor_tg.execute("SELECT mid, data FROM messages_v2")
+                db_blobs = {row[0]: row[1] for row in cursor_tg.fetchall()}
+
+                from telethon.extensions import BinaryReader
+
+                telethon_read_ok = 0
+                telethon_read_targets = 0
+
+                for m in manifest_tg_msgs:
+                    m_id = m.get("mid")
+                    m_variant = m.get("blob_variant", "exact")
+                    m_text = m.get("text")
+                    blob = db_blobs.get(m_id)
+
+                    if blob is None:
+                        continue
+
+                    reader = BinaryReader(blob)
+                    if m_variant in ("exact", "trailing_bytes"):
+                        telethon_read_targets += 1
+                        try:
+                            parsed_tl = reader.tgread_object()
+                            if parsed_tl.id != m_id:
+                                errors.append(f"Telethon re-read ID mismatch for mid {m_id}: got {parsed_tl.id}")
+                            elif m_text is not None and parsed_tl.message != m_text:
+                                errors.append(f"Telethon re-read text mismatch for mid {m_id}: got '{parsed_tl.message}', expected '{m_text}'")
+                            else:
+                                telethon_read_ok += 1
+                        except Exception as e:
+                            errors.append(f"Telethon failed to re-read well-formed blob mid {m_id} ({m_variant}): {e}")
+                    elif m_variant == "unknown_constructor":
+                        try:
+                            reader.tgread_object()
+                            errors.append(f"Unknown constructor mid {m_id} unexpectedly parsed without error")
+                        except Exception:
+                            pass  # Expected failure
+                    elif m_variant == "older_layer":
+                        try:
+                            reader.tgread_object()
+                            errors.append(f"Older layer constructor mid {m_id} unexpectedly parsed without error")
+                        except Exception:
+                            pass  # Expected failure
+
+                if telethon_read_targets > 0 and telethon_read_ok != telethon_read_targets:
+                    errors.append(f"Telethon re-read accuracy failed: {telethon_read_ok}/{telethon_read_targets} (expected 100%)")
+
+                conn_tg.close()
+            except sqlite3.Error as sqle:
+                errors.append(f"SQLite verification failed on cache4.db: {sqle}")
+
+        # Raw-byte self-verification checks for Telegram
+        raw_tg_db = tg_db_path.read_bytes() if tg_db_path.is_file() else b""
+        raw_tg_wal = tg_wal_path.read_bytes() if tg_wal_path.is_file() else b""
+        tg_deletions = tg_data.get("deletions", [])
+
+        for deletion in tg_deletions:
+            method = deletion.get("method")
+            marker = deletion.get("marker", "").encode("utf-8")
+            expected_rec = deletion.get("expected_recoverable", False)
+
+            if method in ("freelist_deleted", "slack_deleted") and expected_rec:
+                if marker not in raw_tg_db:
+                    errors.append(f"Telegram recoverability check failed: {method} marker {deletion.get('marker')} not in cache4.db raw bytes")
+            elif method == "wal_resident" and expected_rec:
+                if marker not in raw_tg_wal:
+                    errors.append(f"Telegram recoverability check failed: wal_resident marker {deletion.get('marker')} not in cache4.db-wal raw bytes")
+            elif method in ("vacuumed_control", "secure_delete_control"):
+                if marker in raw_tg_db or marker in raw_tg_wal:
+                    errors.append(f"Telegram control failure: {method} marker {deletion.get('marker')} FOUND in raw bytes (must be absent)")
+
     # 5. Encryption & Cryptographic Fixtures Verification (B2)
     enc_data = manifest_data.get("encryption")
     if enc_data:

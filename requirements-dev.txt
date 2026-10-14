@@ -12,3 +12,10 @@ wa-crypt-tools @ git+https://github.com/ElDavoo/wa-crypt-tools.git@b16a805a394b8
 javaobj-py3==0.6.1
 pycryptodomex==3.24.1
 protobuf==7.36.2
+
+# Telegram TL blob generation and verification (dev-only, MIT, B3)
+telethon==1.45.0
+pyaes==1.6.1
+pyasn1==0.6.4
+rsa==4.9.1
+

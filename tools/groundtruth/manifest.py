@@ -76,6 +76,77 @@ class WAChatEntry:
 
 
 @dataclass
+class TGUserEntry:
+    uid: int
+    first_name: str
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    phone: Optional[str] = None
+    is_self: bool = False
+
+
+@dataclass
+class TGChatEntry:
+    did: int
+    title: str
+    is_channel: bool = False
+    is_group: bool = True
+    participants_count: int = 2
+    participant_uids: List[int] = field(default_factory=list)
+
+
+@dataclass
+class TGMessageEntry:
+    mid: int
+    uid: int
+    from_id: int
+    date_raw: int
+    date_utc_ms: int
+    text: Optional[str]
+    media_type: Optional[str] = None
+    media_ref: Optional[str] = None
+    reply_to_mid: Optional[int] = None
+    out: int = 0
+    blob_variant: str = "exact"  # exact, trailing_bytes, unknown_constructor, older_layer
+    flags: List[str] = field(default_factory=list)
+
+
+@dataclass
+class TGDeletionEntry:
+    case_id: str
+    method: str                # freelist_deleted, slack_deleted, wal_resident, vacuumed_control, secure_delete_control, benign_gap
+    expected_recoverable: bool
+    expected_tier: str         # tier_1, tier_2, tier_3, tier_4, unrecoverable
+    marker: str
+    original_mid: Optional[int] = None
+    original_text: Optional[str] = None
+    byte_offsets: List[int] = field(default_factory=list)
+    page_numbers: List[int] = field(default_factory=list)
+    notes: Optional[str] = None
+
+
+@dataclass
+class TGEditEntry:
+    mid: int
+    uid: int
+    original_date: int
+    edited_date: int
+    original_text: str
+    edited_text: str
+
+
+@dataclass
+class TGBlobVariantEntry:
+    mid: int
+    uid: int
+    variant: str               # exact, trailing_bytes, unknown_constructor, older_layer
+    constructor_hex: str
+    expected_outcome: str      # parse_success, unparsed_blob, layer_mismatch
+    notes: str
+
+
+
+@dataclass
 class DatasetManifest:
     dataset_id: str
     variant: str               # dev | holdout

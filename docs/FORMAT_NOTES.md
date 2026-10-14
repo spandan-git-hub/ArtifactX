@@ -218,3 +218,159 @@ Both `crypt14` and `crypt15` backups share a common 5-part stream structure:
     - `PRK = HMAC-SHA256(salt=b"\x00"*32, IKM=root_key)`
     - `AES_Key = HMAC-SHA256(PRK, info=b"backup encryption" || 0x01)[:32]`
   - Passphrase caveat (DEC-002): Passphrases are verified with WhatsApp cloud servers to retrieve the 64-hex root key; crypt15 cannot be decrypted offline from a password alone.
+
+---
+
+## 4. Telegram Android Forensic Artifacts: `cache4.db` (B3, B9)
+
+> Verified against primary source `MessagesStorage.java` (Telegram for Android upstream / `Telegram-FOSS` v5.x-10.x, `createTables()` method) and Telethon TL schema.
+
+### 4.1 Overview & Database Architecture
+- **Primary Database**: `cache4.db` (located at `/data/data/org.telegram.messenger/files/cache4.db`).
+- **Journal Mode**: SQLite WAL mode (`cache4.db-wal`, `cache4.db-shm`).
+- **Database Version**: `PRAGMA user_version = 155` (`MessagesStorage.LAST_DB_VERSION`).
+- **Binary Serialization**: Telegram does NOT store message bodies, sender metadata, or media details in plaintext SQL columns. Instead, message and entity records store binary MTProto Type Language (TL) objects in BLOB columns (`data`).
+
+### 4.2 Verified Table Specifications (`MessagesStorage.java`)
+
+#### Table: `messages_v2`
+Primary message storage table:
+```sql
+CREATE TABLE messages_v2 (
+    mid INTEGER,
+    uid INTEGER,
+    read_state INTEGER,
+    send_state INTEGER,
+    date INTEGER,
+    data BLOB,
+    out INTEGER,
+    ttl INTEGER,
+    media INTEGER,
+    replydata BLOB,
+    imp INTEGER,
+    mention INTEGER,
+    forwards INTEGER,
+    replies_data BLOB,
+    thread_reply_id INTEGER,
+    is_channel INTEGER,
+    reply_to_message_id INTEGER,
+    custom_params BLOB,
+    group_id INTEGER,
+    reply_to_story_id INTEGER,
+    PRIMARY KEY(mid, uid)
+);
+```
+- `mid`: Message ID within the conversation (integer).
+- `uid`: Dialog / Peer ID (negative for groups/channels, positive for private user chats).
+- `read_state`: Read status flag (0 = unread, 1 = read).
+- `send_state`: Send status flag (0 = sent, 1 = sending, 2 = failed).
+- `date`: Unix epoch timestamp in seconds.
+- `data`: Serialized MTProto TL object `TLRPC.Message` (prefixed with 4-byte little-endian constructor ID).
+- `out`: 1 if sent by account owner, 0 if received.
+- `media`: Media type indicator (0 = none, 1 = photo, 2 = video/audio/doc, etc.).
+- `reply_to_message_id`: ID of parent message if this message is a reply.
+
+#### Table: `dialogs`
+Conversation index:
+```sql
+CREATE TABLE dialogs (
+    did INTEGER PRIMARY KEY,
+    date INTEGER,
+    unread_count INTEGER,
+    last_mid INTEGER,
+    inbox_max INTEGER,
+    outbox_max INTEGER,
+    last_mid_i INTEGER,
+    unread_count_i INTEGER,
+    pts INTEGER,
+    date_i INTEGER,
+    pinned INTEGER,
+    flags INTEGER,
+    folder_id INTEGER,
+    data BLOB,
+    unread_reactions INTEGER,
+    last_mid_group INTEGER,
+    ttl_period INTEGER
+);
+```
+
+#### Table: `users`
+Cached user profiles:
+```sql
+CREATE TABLE users (
+    uid INTEGER PRIMARY KEY,
+    name TEXT,
+    status INTEGER,
+    data BLOB
+);
+```
+- `data`: Serialized MTProto `TLRPC.User` object.
+
+#### Table: `chats`
+Cached group / supergroup / channel profiles:
+```sql
+CREATE TABLE chats (
+    uid INTEGER PRIMARY KEY,
+    name TEXT,
+    data BLOB
+);
+```
+- `data`: Serialized MTProto `TLRPC.Chat` or `TLRPC.Channel` object.
+
+#### Table: `contacts` & `user_contacts_v7`
+Synchronized device contacts:
+```sql
+CREATE TABLE contacts (
+    uid INTEGER PRIMARY KEY,
+    mutual INTEGER
+);
+CREATE TABLE user_contacts_v7 (
+    key TEXT PRIMARY KEY,
+    uid INTEGER,
+    fname TEXT,
+    sname TEXT,
+    imported INTEGER
+);
+CREATE TABLE user_phones_v7 (
+    key TEXT,
+    phone TEXT,
+    sphone TEXT,
+    deleted INTEGER,
+    PRIMARY KEY (key, phone)
+);
+```
+
+#### Table: `media_v4`
+Media attachments cache:
+```sql
+CREATE TABLE media_v4 (
+    mid INTEGER,
+    uid INTEGER,
+    date INTEGER,
+    type INTEGER,
+    data BLOB,
+    PRIMARY KEY(mid, uid, type)
+);
+```
+- `data`: Serialized MTProto `TLRPC.MessageMedia` object.
+
+#### Auxiliary Tables:
+- `enc_chats`: Secret chat keys/state (empty in standard captures; DEC-004 notes secret chats out-of-scope).
+- `params`: Synchronization parameters (`seq`, `pts`, `date`, `qts`).
+- `messages_holes`: Message sequence hole tracking (`uid`, `start`, `end`).
+- `scheduled_messages_v2`: Scheduled message queue.
+- `chat_settings_v2`, `user_settings`: Settings blobs and pinned status.
+
+### 4.3 Search Index Remnants: Modelled vs Observed
+- **Observed reality**: Telegram Android does not create SQLite FTS3/FTS4 virtual tables in `cache4.db`. Recent searches are stored in `search_recent(did INTEGER PRIMARY KEY, date INTEGER)`, and message searches query `messages_v2` directly with tag indexes (`tag_message_id`).
+- **Modelled remnant**: Any synthetic FTS table (such as `messages_search`) added to simulate full-text carving remnants is explicitly tagged as `"modelled, not observed"` in `manifest.json`.
+
+### 4.4 TL Binary Serialization & Documented Variants (B3.2, B3.4)
+MTProto TL serialization format:
+1. **Header**: 4-byte little-endian constructor ID (e.g., `0x7600b9d3` for `Message`).
+2. **Payload**: Binary serialized fields per TL schema specification.
+3. **Documented Variants**:
+   - `exact`: Standard Telethon serialized TL bytes (`bytes(msg)`). Telethon re-reads 100% of these.
+   - `trailing_bytes`: Valid TL object followed by extra bookkeeping bytes (e.g., local flags). Telethon parser reads the TL object successfully and reports remaining trailing bytes.
+   - `unknown_constructor`: Unregistered constructor ID (e.g. `0xDEADBEEF`), testing `UNPARSED_BLOB` error handling (`TypeNotFoundError`).
+   - `older_layer`: Message constructor from a legacy layer (e.g., Layer 133 `0x38114ee2`) to test layer migration/detection.
