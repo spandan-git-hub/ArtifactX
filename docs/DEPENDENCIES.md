@@ -31,6 +31,10 @@
 | `httpx` | 0.28.1 | BSD-3-Clause | dev | TestClient ASGI integration testing |
 | `alembic` | 1.20.0 | MIT | dev | Schema migrations engine |
 | `coverage` | 7.16.2 | Apache-2.0 | dev | Coverage tracking |
+| `wa-crypt-tools` | 0.2.0 (git@b16a805) | GPL-3.0-or-later | dev / tools (subprocess) | Reference tool for crypt14/crypt15 fixtures & differential testing. Never imported in `backend/` or `forensic/` (R15, DEC-007). |
+| `javaobj-py3` | 0.6.1 | Apache-2.0 | dev / tools (transitive) | Java serialization reader used by `wa-crypt-tools` for crypt14 key files. |
+| `pycryptodomex` | 3.24.1 | BSD-2-Clause / Public Domain | dev / tools (transitive) | Crypto library used internally by `wa-crypt-tools`. |
+| `protobuf` | 7.36.2 | BSD-3-Clause | dev / tools (transitive) | Protobuf runtime used internally by `wa-crypt-tools`. |
 
 ## Licence Policy Notes
 
