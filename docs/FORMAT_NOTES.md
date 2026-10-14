@@ -170,3 +170,51 @@ Historically stored address book contacts synchronized with WhatsApp.
 - **Vacuumed Control**: Running `VACUUM` defragments the database into a brand new file, leaving 0 freelist pages and zeroing unallocated slack. Records are strictly unrecoverable.
 - **Secure Delete Control**: Running `PRAGMA secure_delete=ON` causes SQLite to overwrite cell payloads with zeros upon `DELETE`. Raw-byte carving yields no plaintext.
 - **Benign Gap Control**: Natural sequence skips in autoincrement primary keys (`_id`) caused by aborted transactions or explicit ID assignment. Must never be classified as forensic deletion above `weak_hint` confidence.
+
+---
+
+## 3. WhatsApp Encrypted Backup Formats: `crypt14` & `crypt15` (B2, B6)
+
+> Verified against primary source `wa-crypt-tools` v0.2.0 (commit `b16a805a394b8e243334f286dcf30f262e60db4f`, ElDavoo) and round-trip differential tests.
+
+### 3.1 Container Layout
+Both `crypt14` and `crypt15` backups share a common 5-part stream structure:
+```
++--------------------+-------------------+--------------------+------------------+------------------+
+| Varint Length (1-4B)| Protobuf Header   | AES-GCM Ciphertext | GCM Auth Tag     | MD5 Trailer      |
+| len(Protobuf)      | BackupPrefix      | (zlib SQLite DB)   | (16 bytes)       | (16 bytes)       |
++--------------------+-------------------+--------------------+------------------+------------------+
+```
+
+1. **Varint Length Prefix**: Protobuf unsigned varint encoding the byte length of the serialized `BackupPrefix` protobuf message.
+2. **Protobuf Header (`BackupPrefix`)**:
+   - `key_type_deprecated`:
+     - Value `1` (`WA_PROVIDED`) for `crypt14`.
+     - Value `2` (`E2EE_DEPRECATED`) for `crypt15`.
+   - In `crypt14`: `wa_provided_key_data` contains:
+     - `backup_cipher_header`: 2-byte big-endian cipher version (typically `0x0001`).
+     - `key_version`: ASCII string version (typically `"2"`).
+     - `server_salt`: 32 bytes binary salt.
+     - `google_id_salt`: 16 bytes binary Google ID salt.
+     - `encryption_iv`: 16 bytes AES-GCM IV.
+   - In `crypt15`: `e2ee_key_data` contains:
+     - `encryption_iv`: 16 bytes AES-GCM IV.
+   - Both contain `backup_metadata` (`Props`) with app version, backup version, and feature list.
+3. **Payload**:
+   - Plaintext SQLite `msgstore.db` is zlib-compressed before encryption.
+   - Encrypted with AES-256-GCM using the 16-byte IV extracted from the header.
+4. **Authentication Tag**:
+   - 16 bytes standard AES-GCM authentication tag appended immediately after the ciphertext.
+5. **Trailer Checksum**:
+   - 16-byte MD5 digest calculated over all preceding bytes: `MD5(varint_len + protobuf_header + ciphertext + tag)`.
+
+### 3.2 Key Derivation & Key Material
+- **crypt14**:
+  - Key material: Traditional `key` file (Java serialized stream, 158 bytes) extracted from rooted device path `/data/data/com.whatsapp/files/key`.
+  - Cipher key: The 32-byte AES key is read directly from the key file (no derivation).
+- **crypt15**:
+  - Key material: Either a 64-character hexadecimal root key or binary `encrypted_backup.key` (59 bytes).
+  - Cipher key derivation: Derived from the 32-byte root key via HKDF-SHA256:
+    - `PRK = HMAC-SHA256(salt=b"\x00"*32, IKM=root_key)`
+    - `AES_Key = HMAC-SHA256(PRK, info=b"backup encryption" || 0x01)[:32]`
+  - Passphrase caveat (DEC-002): Passphrases are verified with WhatsApp cloud servers to retrieve the 64-hex root key; crypt15 cannot be decrypted offline from a password alone.
