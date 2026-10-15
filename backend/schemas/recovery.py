@@ -35,6 +35,20 @@ class RecoveredFindingResponse(BaseModel):
     validation_status: str
     limitations: List[str] = Field(default_factory=list)
     provenance: Dict[str, Any] = Field(default_factory=dict)
+
+    # B10 additive forensic fields
+    finding_id: Optional[str] = None
+    tier: Optional[int] = None
+    kind: Optional[str] = None
+    strength: Optional[str] = None
+    confidence_score: Optional[float] = None
+    table_name: Optional[str] = None
+    frame_index: Optional[int] = None
+    recovered_fields: Dict[str, Any] = Field(default_factory=dict)
+    view: Optional[str] = None
+    evidence_sha256: Optional[str] = None
+    candidate_original_text: Optional[str] = None
+
     created_at: datetime
 
     class Config:

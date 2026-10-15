@@ -613,9 +613,23 @@ class RecoveredFinding(Base):
     body = Column(Text, nullable=True)
     timestamp = Column(BigInteger, nullable=True, index=True)
     media_reference = Column(String(1024), nullable=True)
-    validation_status = Column(String(50), default="CANDIDATE", index=True)  # RECOVERED, PARTIALLY_RECONSTRUCTED, CANDIDATE, UNVALIDATED
+    validation_status = Column(String(50), default="CANDIDATE", index=True)  # FULL_RECORD_VALID, PARTIAL, DUPLICATE_OF_LIVE, DUPLICATE_OF_OTHER_TIER, INVALID_REJECTED
     limitations = Column(JSON, default=list)
     provenance = Column(JSON, default=dict)
+
+    # B10 additive fields (spec 08_DELETED_DATA_RECOVERY.md)
+    finding_id = Column(String(64), nullable=True, index=True)
+    tier = Column(Integer, nullable=True, index=True)  # 1, 2, 3, 4
+    kind = Column(String(50), nullable=True, index=True)  # revocation, edit, wal_resident, freelist, slack, id_gap
+    strength = Column(String(50), nullable=True, index=True)  # deterministic, strong, moderate, weak_hint
+    confidence_score = Column(Float, nullable=True)
+    table_name = Column(String(100), nullable=True, index=True)
+    frame_index = Column(Integer, nullable=True)
+    recovered_fields = Column(JSON, default=dict)
+    view = Column(String(50), nullable=True)  # main_view, post_wal_view, wal_history
+    evidence_sha256 = Column(String(64), nullable=True, index=True)
+    candidate_original_text = Column(Text, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     case = relationship("Case", back_populates="recovered_findings")

@@ -377,3 +377,30 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   - New endpoint returning unparsed TL blobs (`TelegramUnparsedBlobRead`) with container column metadata, maintaining the `parsed + unparsed == rows_seen` invariant:
     - `table`, `row_id`, `mid`, `uid`, `constructor_id_hex`, `length`, `sha256`, `reason`, `container_metadata`, `finding_id`, `provenance`.
 
+## 2026-10-15 B10 — Physical Deleted Data Recovery API (spec: 08_DELETED_DATA_RECOVERY.md)
+- **Endpoint:** `POST /api/cases/{case_id}/recovery/run`
+  - Pure in-memory physical carving and temporal recovery across case evidence (WAL historical versions, SQLite freelist, and intra-page slack spans).
+  - Pre-flight integrity verification (`ensure_integrity()`).
+  - Idempotent re-run: clears previous recovery records for evidence being re-analyzed before persisting.
+  - Audit: appends hash-chained audit log entries `RECOVER_START` and `RECOVER_COMPLETE` (containing execution counts and hashes, zero message content per privacy/integrity rules).
+  - Response: `RecoveryRunResponse`.
+- **Endpoint:** `GET /api/cases/{case_id}/recovery/findings`
+  - Additive query filter parameters:
+    - `tier: Optional[int]` (1, 2, 3, 4)
+    - `strength: Optional[str]` ("deterministic", "strong", "moderate", "weak_hint")
+    - `kind: Optional[str]` ("revocation", "edit", "wal_resident", "freelist", "slack", "id_gap")
+    - `validation_status: Optional[str]` ("FULL_RECORD_VALID", "PARTIAL", "DUPLICATE_OF_LIVE", "DUPLICATE_OF_OTHER_TIER", "INVALID_REJECTED")
+  - Additive fields in `RecoveredFindingResponse`:
+    - `finding_id: Optional[str]`
+    - `tier: Optional[int]`
+    - `kind: Optional[str]`
+    - `strength: Optional[str]`
+    - `confidence_score: Optional[float]`
+    - `table_name: Optional[str]`
+    - `frame_index: Optional[int]`
+    - `recovered_fields: Dict[str, Any]`
+    - `view: Optional[str]`
+    - `evidence_sha256: Optional[str]`
+    - `candidate_original_text: Optional[str]`
+
+

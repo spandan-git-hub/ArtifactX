@@ -196,6 +196,7 @@ def fixed_now():
 @pytest.fixture
 def db_session():
     """Provide a database session with clean tables for tests."""
+    import backend.models.models  # ensure all models are registered in Base.metadata
     from backend.app.database import Base, engine, SessionLocal
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
