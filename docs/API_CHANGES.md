@@ -323,3 +323,57 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   - New endpoint returning Tier-1 explicit message revocation findings (`message_revoked` rows) with deterministic strength, confidence score 1.0, and provenance.
 - **Endpoint:** `GET /api/whatsapp/evidence/{evidence_id}/wa-edits`
   - New endpoint returning message edit history findings (`message_edit_info` rows) with deterministic strength, confidence score 1.0, and provenance.
+
+## 2026-10-15 B9 — Telegram TDS/TL Parsing API & Forensic Endpoints (spec B9.6)
+- **Endpoint:** `POST /api/telegram/parse/{evidence_id}`
+  - **New route:** Primary forensic parsing route for Telegram `cache4.db` plain SQLite databases.
+  - Multi-view extraction: parses both `main_view` and `post_wal_view` in-memory with zero disk writes (R4).
+  - Pre-flight integrity: runs `ensure_integrity` before parsing (R3).
+  - Audit: appends hash-chained audit log entry (`action="STAGE_COMPLETED"`).
+  - Idempotency: replaces existing messages, dialogs, users, chats, and unparsed blobs for the evidence in a single transaction.
+  - Response contract:
+    ```json
+    {
+      "status": "success",
+      "evidence_id": 1,
+      "evidence_sha256": "888bb836...",
+      "schema_family": "android_cache4",
+      "messages_count": 33,
+      "dialogs_count": 2,
+      "users_count": 2,
+      "chats_count": 1,
+      "unparsed_blobs_count": 2,
+      "views_parsed": ["main_view", "post_wal_view"],
+      "limitations": []
+    }
+    ```
+- **Endpoint:** `POST /api/telegram/evidence/{evidence_id}/analyze/telegram`
+  - Backwards-compatible alias for existing frontend workflow, delegates to synchronous parser execution.
+- **Endpoint:** `GET /api/telegram/evidence/{evidence_id}/tg-messages`
+  - Additive fields added to `TelegramMessageRead` response schema:
+    - `mid: Optional[int]`
+    - `date_raw: Optional[int]`
+    - `date_unit: Optional[str] = "seconds"`
+    - `date_utc_ms: Optional[int]`
+    - `view: Optional[str] = "main_view" | "post_wal_view"`
+    - `source_table: Optional[str] = "messages_v2"`
+    - `source_row_id: Optional[int]`
+    - `finding_id: Optional[str]`
+    - `confidence_score: Optional[float] = 1.0`
+    - `strength: Optional[str] = "deterministic"`
+    - `provenance: Optional[dict]`
+    - `limitations: Optional[list]`
+    - `trailing_bytes_info: Optional[dict]`
+- **Endpoint:** `GET /api/telegram/evidence/{evidence_id}/tg-dialogs`
+  - New endpoint returning extracted Telegram dialogs (`TelegramDialogRead`):
+    - `dialog_id`, `peer_kind`, `peer_id`, `title`, `last_mid`, `unread_count`, `pinned`, `finding_id`, `provenance`, `limitations`.
+- **Endpoint:** `GET /api/telegram/evidence/{evidence_id}/tg-users`
+  - New endpoint returning extracted Telegram users (`TelegramUserRead`):
+    - `uid`, `first_name`, `last_name`, `username`, `phone`, `is_self`, `contact`, `deleted`, `bot`, `finding_id`, `provenance`.
+- **Endpoint:** `GET /api/telegram/evidence/{evidence_id}/tg-chats`
+  - New endpoint returning extracted Telegram basic chats and channels (`TelegramChatRead`):
+    - `did`, `chat_id`, `title`, `is_channel`, `is_group`, `participants_count`, `participant_uids`, `finding_id`, `provenance`.
+- **Endpoint:** `GET /api/telegram/evidence/{evidence_id}/tg-unparsed-blobs`
+  - New endpoint returning unparsed TL blobs (`TelegramUnparsedBlobRead`) with container column metadata, maintaining the `parsed + unparsed == rows_seen` invariant:
+    - `table`, `row_id`, `mid`, `uid`, `constructor_id_hex`, `length`, `sha256`, `reason`, `container_metadata`, `finding_id`, `provenance`.
+

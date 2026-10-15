@@ -105,6 +105,10 @@ class Evidence(Base):
     acquisition_hash_algorithm = Column(String(50), nullable=True)
     claimed_vs_computed = Column(String(50), nullable=False, default="NOT_PROVIDED", server_default="NOT_PROVIDED")
 
+    # Evidence set grouping (B9.5)
+    evidence_set_id = Column(String(100), nullable=True, index=True)
+    evidence_role = Column(String(50), nullable=True)
+
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime)
 
@@ -119,6 +123,10 @@ class Evidence(Base):
     wa_chats = relationship("WhatsAppChat", cascade="all, delete-orphan")
     wa_jids = relationship("WhatsAppJid", cascade="all, delete-orphan")
     tg_messages = relationship("TelegramMessage", cascade="all, delete-orphan")
+    tg_dialogs = relationship("TelegramDialog", cascade="all, delete-orphan")
+    tg_users = relationship("TelegramUser", cascade="all, delete-orphan")
+    tg_chats = relationship("TelegramChat", cascade="all, delete-orphan")
+    tg_unparsed_blobs = relationship("TelegramUnparsedBlob", cascade="all, delete-orphan")
     tg_contacts = relationship("TelegramContact", cascade="all, delete-orphan")
     tg_groups = relationship("TelegramGroup", cascade="all, delete-orphan")
     timeline_events = relationship("TimelineEvent", cascade="all, delete-orphan")
@@ -300,15 +308,109 @@ class TelegramMessage(Base):
     __tablename__ = "tg_messages"
 
     id = Column(Integer, primary_key=True)
-    evidence_id = Column(Integer, ForeignKey("evidence.id"))
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    mid = Column(Integer, index=True)
     message_id = Column(Integer, index=True)
     dialog_id = Column(String(255), index=True)
+    from_id = Column(BigInteger, index=True)
     sender_id = Column(Integer, index=True)
+    out = Column(Integer, default=0)
+    text = Column(Text)
     body = Column(Text)
+    date_raw = Column(BigInteger)
+    date_unit = Column(String(20), default="seconds")
+    date_utc_ms = Column(BigInteger, index=True)
     timestamp = Column(BigInteger, index=True)
+    media_kind = Column(String(50))
     media_type = Column(String(50))
+    media_ref = Column(String(1024))
     media_path = Column(String(1024))
-    message_type = Column(String(50))
+    message_type = Column(String(50), default="chat")
+    reply_to_mid = Column(Integer)
+    geo_lat = Column(Float)
+    geo_lon = Column(Float)
+    entities = Column(JSON, default=list)
+    flags = Column(JSON, default=list)
+    read_state = Column(Integer, default=1)
+    send_state = Column(Integer, default=0)
+    view = Column(String(50), default="main_view")
+    source_table = Column(String(100), default="messages_v2")
+    source_row_id = Column(Integer)
+    finding_id = Column(String(64), index=True)
+    confidence_score = Column(Float, default=1.0)
+    strength = Column(String(50), default="deterministic")
+    provenance = Column(JSON, default=dict)
+    limitations = Column(JSON, default=list)
+    trailing_bytes_info = Column(JSON, nullable=True)
+
+
+class TelegramDialog(Base):
+    __tablename__ = "tg_dialogs"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    dialog_id = Column(BigInteger, index=True)
+    peer_kind = Column(String(50), nullable=False)
+    peer_id = Column(BigInteger, nullable=False)
+    title = Column(String(512))
+    last_mid = Column(Integer)
+    unread_count = Column(Integer, default=0)
+    pinned = Column(Boolean, default=False)
+    finding_id = Column(String(64), index=True)
+    provenance = Column(JSON, default=dict)
+    limitations = Column(JSON, default=list)
+
+
+class TelegramUser(Base):
+    __tablename__ = "tg_users"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    uid = Column(BigInteger, index=True)
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    username = Column(String(255))
+    phone = Column(String(50))
+    is_self = Column(Boolean, default=False)
+    contact = Column(Boolean, default=False)
+    deleted = Column(Boolean, default=False)
+    bot = Column(Boolean, default=False)
+    finding_id = Column(String(64), index=True)
+    provenance = Column(JSON, default=dict)
+
+
+class TelegramChat(Base):
+    __tablename__ = "tg_chats"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    did = Column(BigInteger, index=True)
+    chat_id = Column(BigInteger, index=True)
+    title = Column(String(512), nullable=False)
+    is_channel = Column(Boolean, default=False)
+    is_group = Column(Boolean, default=True)
+    participants_count = Column(Integer, default=0)
+    participant_uids = Column(JSON, default=list)
+    finding_id = Column(String(64), index=True)
+    provenance = Column(JSON, default=dict)
+
+
+class TelegramUnparsedBlob(Base):
+    __tablename__ = "tg_unparsed_blobs"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    table = Column(String(100), nullable=False)
+    row_id = Column(Integer, nullable=False)
+    mid = Column(Integer, index=True)
+    uid = Column(BigInteger, index=True)
+    constructor_id_hex = Column(String(20))
+    length = Column(Integer, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    reason = Column(Text, nullable=False)
+    container_metadata = Column(JSON, default=dict)
+    finding_id = Column(String(64), index=True)
+    provenance = Column(JSON, default=dict)
 
 
 class TelegramContact(Base):

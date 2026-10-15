@@ -18,23 +18,30 @@ from forensic.whatsapp import (
     is_whatsapp_database,
 )
 
-from forensic.telegram.detector import is_telegram_database
-from forensic.telegram.message_parser import extract_messages as extract_tg_messages
-from forensic.telegram.contact_parser import extract_contacts as extract_tg_contacts
-from forensic.telegram.group_parser import extract_groups as extract_tg_groups
-from forensic.telegram.media_parser import extract_media_references as extract_tg_media
+from forensic.telegram import (
+    TelegramParser,
+    detect_tg_schema,
+    resolve_peer_from_did,
+    TgChatRecord,
+    TgDialog,
+    TgMessageRecord,
+    TgParseResult,
+    TgPeerKind,
+    TgSchemaInfo,
+    TgUnparsedBlob,
+    TgUserRecord,
+    UnsupportedSchemaError,
+)
 
-from forensic.timeline.builder import TimelineBuilder
-from forensic.timeline.normalizer import normalize_timestamp
 
-from forensic.deleted.detector import DeletedDetector
+def is_telegram_database(conn_or_bytes) -> bool:
+    """Helper to detect if database is Android Telegram cache4."""
+    try:
+        info = detect_tg_schema(conn_or_bytes)
+        return info.family == "android_cache4"
+    except Exception:
+        return False
 
-from forensic.media.detector import detect_media_type
-from forensic.media.metadata import extract_image_metadata, extract_media_metadata
-from forensic.media.orphan import find_orphan_media_items, find_orphan_files, mark_media_orphan_status
-
-from forensic.correlation.matcher import correlate_all
-from forensic.correlation.graph import EvidenceGraph
 
 __all__ = [
     # WhatsApp
@@ -45,10 +52,18 @@ __all__ = [
     "extract_media_references",
     # Telegram
     "is_telegram_database",
-    "extract_tg_messages",
-    "extract_tg_contacts",
-    "extract_tg_groups",
-    "extract_tg_media",
+    "TelegramParser",
+    "detect_tg_schema",
+    "resolve_peer_from_did",
+    "TgChatRecord",
+    "TgDialog",
+    "TgMessageRecord",
+    "TgParseResult",
+    "TgPeerKind",
+    "TgSchemaInfo",
+    "TgUnparsedBlob",
+    "TgUserRecord",
+    "UnsupportedSchemaError",
     # Timeline
     "TimelineBuilder",
     "normalize_timestamp",

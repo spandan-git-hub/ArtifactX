@@ -365,15 +365,42 @@ CREATE TABLE media_v4 (
 - **Observed reality**: Telegram Android does not create SQLite FTS3/FTS4 virtual tables in `cache4.db`. Recent searches are stored in `search_recent(did INTEGER PRIMARY KEY, date INTEGER)`, and message searches query `messages_v2` directly with tag indexes (`tag_message_id`).
 - **Modelled remnant**: Any synthetic FTS table (such as `messages_search`) added to simulate full-text carving remnants is explicitly tagged as `"modelled, not observed"` in `manifest.json`.
 
-### 4.4 TL Binary Serialization & Documented Variants (B3.2, B3.4)
-MTProto TL serialization format:
-1. **Header**: 4-byte little-endian constructor ID (e.g., `0x7600b9d3` for `Message`).
-2. **Payload**: Binary serialized fields per TL schema specification.
-3. **Documented Variants**:
-   - `exact`: Standard Telethon serialized TL bytes (`bytes(msg)`). Telethon re-reads 100% of these.
-   - `trailing_bytes`: Valid TL object followed by extra bookkeeping bytes (e.g., local flags). Telethon parser reads the TL object successfully and reports remaining trailing bytes.
-   - `unknown_constructor`: Unregistered constructor ID (e.g. `0xDEADBEEF`), testing `UNPARSED_BLOB` error handling (`TypeNotFoundError`).
-   - `older_layer`: Message constructor from a legacy layer (e.g., Layer 133 `0x38114ee2`) to test layer migration/detection.
+
+### 4.5 Dialog ID Convention & Peer Mapping (B9.4, R20)
+> Verified against Telegram Android `MessagesStorage.java`, `DialogObject.java`, and Telethon `telethon.utils.resolve_id`.
+- `did >= 0`: User ID (1-on-1 private chat with peer `user_id = did`).
+- `0 > did > -1000000000000`: Basic Group Chat ID (peer `chat_id = -did`).
+- `did <= -1000000000000`: Channel or Supergroup ID (peer `channel_id = -did - 1000000000000`).
+- Secret Chat Marker: In Telegram Android, encrypted dialogs have `(did & 0xffffffff00000000) != 0 && (did & 0xffffffff) == 0`. The encrypted chat ID is `(did >> 32)`. Per DEC-004 and B9.4, secret chat content is stored in `enc_chats` / on-device ephemeral storage and is out of scope; the parser flags the dialog as `secret_chat_marker` with limitation note.
+
+### 4.6 MTProto TL Primitives & Supported Constructor Registry (B9.2, R20)
+> Verified against MTProto schema (core.tl and telegram_api.tl, Telethon Layer 229, and MessagesStorage.java NativeByteBuffer serialization).
+- **Numeric Primitives**:
+  - `int32`: 4 bytes little-endian signed integer (`<i`).
+  - `int64`: 8 bytes little-endian signed integer (`<q`).
+  - `double`: 8 bytes IEEE 754 little-endian double (`<d`).
+  - `date`: 4 bytes little-endian unsigned/signed integer representing Unix epoch in seconds.
+- **Bytes / String Serialization**:
+  - If length $L < 254$: 1 byte length $L$, followed by $L$ data bytes, followed by $P = (4 - ((L + 1) \pmod 4)) \pmod 4$ zero padding bytes.
+  - If length $L \ge 254$: Byte `0xFE`, followed by 3 bytes little-endian length $L$, followed by $L$ data bytes, followed by $P = (4 - (L \pmod 4)) \pmod 4$ zero padding bytes.
+  - Total bytes consumed is strictly aligned to a 4-byte multiple.
+- **Vectors & Booleans**:
+  - `Vector`: Constructor `0x1cb5c415`, followed by `int32` element count, followed by elements.
+  - `boolTrue`: Constructor `0x997275b5`.
+  - `boolFalse`: Constructor `0xbc799737`.
+- **Supported Constructor Registry**:
+  - Messages: `Message` (`0x7600b9d3`), `MessageService` (`0x7a800e0a`), `MessageEmpty` (`0x90a6ca84`).
+  - Peers: `PeerUser` (`0x59511722`), `PeerChat` (`0x36c6019a`), `PeerChannel` (`0xa2a5371e`).
+  - Users: `User` (`0xb1b8cc83`), `UserEmpty` (`0xd3bc4b7a`).
+  - Chats: `Chat` (`0x41cbf256`), `Channel` (`0xd49f34c6`), `ChatEmpty` (`0x29562865`), `ChatForbidden` (`0x6592a1a7`).
+  - Media: `MessageMediaPhoto` (`0xe216eb63`), `MessageMediaDocument` (`0x52d8ccd9`), `MessageMediaGeo` (`0x56e0d474`), `MessageMediaEmpty` (`0x3ded6320`).
+  - Geo: `GeoPoint` (`0xb2a2f663`).
+  - Attachments: `Photo` (`0xfb197a65`), `PhotoSize` (`0x75c78e60`), `ChatPhotoEmpty` (`0x37c1011c`), `Document` (`0x8fd4c4d8`), `DocumentAttributeAudio` (`0x9852f9c6`).
+  - Headers: `MessageReplyHeader` (`0x1b97dd66`), `MessageFwdHeader` (`0x4e4df4bb`).
+  - Entities: `MessageEntityBold` (`0xbd610bc9`), `MessageEntityItalic` (`0x826f8b60`), `MessageEntityCode` (`0x28a20571`), `MessageEntityPre` (`0x73924be0`), `MessageEntityUrl` (`0x6ed02538`), `MessageEntityTextUrl` (`0x76a6d327`), `MessageEntityMention` (`0xfa04579d`), `MessageEntityHashtag` (`0x6f635b0d`), `MessageEntityBotCommand` (`0x6cef8ac7`), `MessageEntityEmail` (`0x64e475c2`), `MessageEntityPhone` (`0x9b69e34b`), `MessageEntitySpoiler` (`0x32ca960f`), `MessageEntityStrike` (`0xbf0693d4`), `MessageEntityUnderline` (`0x9c4e7e8b`), `MessageEntityBlockquote` (`0xf1ccaaac`), `MessageEntityBankCard` (`0x761e6af4`), `MessageEntityUnknown` (`0xbb92ba95`).
+- **Trailing Bytes & Unknown Handling**:
+  - Trailing unparsed region after a successfully deserialized object is captured as `trailing_bytes` (length, sha256, first 32 bytes hex) without error.
+  - Unknown constructor or mid-stream corruption produces an `UnparsedBlob` record with raw hash, preserving container column metadata.
 
 ---
 
