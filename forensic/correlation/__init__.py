@@ -1,5 +1,19 @@
-"""Forensic correlation module."""
+"""Forensic cross-platform correlation module (B12)."""
 
+from forensic.correlation.thresholds import (
+    THRESHOLDS_VERSION,
+    CorrelationThresholds,
+    DEFAULT_THRESHOLDS,
+)
+from forensic.correlation.models import (
+    CorrelationFinding,
+    generate_deterministic_finding_id,
+)
+from forensic.correlation.phone import (
+    NormalizedPhone,
+    normalize_phone,
+)
+from forensic.correlation.keccak import keccak_256
 from forensic.correlation.entities import (
     Person,
     PhoneNumber,
@@ -20,6 +34,7 @@ from forensic.correlation.media_hash import (
     compute_dhash,
     compute_phash,
     hamming_distance,
+    compute_image_entropy,
     PerceptualMediaCorrelator,
 )
 from forensic.correlation.artifacts import (
@@ -33,6 +48,7 @@ from forensic.correlation.artifacts import (
     validate_luhn,
     validate_swift_bic,
     validate_upi_handle,
+    normalize_url,
 )
 from forensic.correlation.rendezvous import (
     LocationObservation,
@@ -50,6 +66,14 @@ from forensic.correlation.matcher import (
 )
 
 __all__ = [
+    "THRESHOLDS_VERSION",
+    "CorrelationThresholds",
+    "DEFAULT_THRESHOLDS",
+    "CorrelationFinding",
+    "generate_deterministic_finding_id",
+    "NormalizedPhone",
+    "normalize_phone",
+    "keccak_256",
     "Person",
     "PhoneNumber",
     "WhatsAppJID",
@@ -65,6 +89,7 @@ __all__ = [
     "compute_dhash",
     "compute_phash",
     "hamming_distance",
+    "compute_image_entropy",
     "PerceptualMediaCorrelator",
     "ExtractedArtifact",
     "ArtifactStitcher",
@@ -76,6 +101,7 @@ __all__ = [
     "validate_luhn",
     "validate_swift_bic",
     "validate_upi_handle",
+    "normalize_url",
     "LocationObservation",
     "RendezvousCandidate",
     "SpatiotemporalRendezvousDetector",

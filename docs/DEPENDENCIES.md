@@ -21,6 +21,7 @@
 | `pillow` | 12.3.0 | MIT-CMU | app | Image processing and metadata inspection |
 | `python-dotenv` | 1.2.4 | BSD-3-Clause | app | Environment variable loading |
 | `pyyaml` | 6.0.3 | MIT | app | Acceptance criteria and config parsing |
+| `phonenumbers` | 8.13.52 | Apache-2.0 | app / forensic | International phone normalization (E.164) and carrier validation (B12.2) |
 
 ## Development and Test Dependencies (`requirements-dev.txt`)
 

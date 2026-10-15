@@ -1,13 +1,21 @@
-"""
-Identity Graph Entity Model and Resolution Engine.
+"""Identity Graph Entity Model and Resolution Engine (B12.2).
+
 Implements multi-entity resolution with evidence-backed provenance and strict judicial constraints:
-Never merges identities solely on display name similarity; records limitations and confidence scores.
+- Deterministic union-find over normalized E.164 phone numbers as the only strong joining key.
+- Same display name with differing phone numbers produces NO link above weak_hint (decoy handling).
+- Ambiguity detection when one phone maps to multiple names or an identity possesses multiple phones.
+- Confidence score strictly < 1.0 for all identity inferences (master.md R8).
 """
 
-from typing import List, Dict, Any, Optional, Set
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-import uuid
-import re
+import hashlib
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from forensic.correlation.models import CorrelationFinding, generate_deterministic_finding_id
+from forensic.correlation.phone import NormalizedPhone, normalize_phone
+from forensic.correlation.thresholds import CorrelationThresholds, DEFAULT_THRESHOLDS
 
 
 @dataclass
@@ -15,6 +23,7 @@ class PhoneNumber:
     e164: str
     raw: str = ""
     country_code: str = ""
+    region_assumed: bool = False
 
 
 @dataclass
@@ -111,12 +120,14 @@ class Person:
     phone_numbers: List[str] = field(default_factory=list)
     handles: List[str] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
-    confidence_score: float = 1.0
+    confidence_score: float = 0.95
+    match_certainty: float = 1.0
     resolution_method: str = "E.164_PHONE_MATCH"
     evidence_links: List[Dict[str, Any]] = field(default_factory=list)
     limitations: List[str] = field(default_factory=list)
     provenance: Dict[str, Any] = field(default_factory=dict)
     is_ambiguous: bool = False
+    ambiguity_reasons: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -127,37 +138,58 @@ class Person:
             "handles": self.handles,
             "aliases": self.aliases,
             "confidence_score": round(self.confidence_score, 4),
+            "match_certainty": round(self.match_certainty, 4),
             "resolution_method": self.resolution_method,
             "evidence_links": self.evidence_links,
             "limitations": self.limitations,
             "provenance": self.provenance,
             "is_ambiguous": self.is_ambiguous,
+            "ambiguity_reasons": self.ambiguity_reasons,
         }
 
 
+# Backwards compatibility helper
 def normalize_e164(raw_phone: str) -> str:
     """Normalize raw phone strings or JIDs into canonical E.164 format."""
-    if not raw_phone:
-        return ""
-    clean = str(raw_phone).split("@")[0].split(":")[0].strip()
-    digits = "".join(ch for ch in clean if ch.isdigit())
-    if not digits:
-        return ""
-    if str(raw_phone).strip().startswith("+"):
-        return f"+{digits}"
-    if len(digits) == 10:
-        return f"+1{digits}"
-    return f"+{digits}"
+    res = normalize_phone(raw_phone)
+    return res.e164 or ""
+
+
+class DisjointSet:
+    """Deterministic Disjoint-Set (Union-Find) for entity clustering."""
+
+    def __init__(self):
+        self.parent: Dict[str, str] = {}
+
+    def find(self, item: str) -> str:
+        if item not in self.parent:
+            self.parent[item] = item
+            return item
+        if self.parent[item] != item:
+            self.parent[item] = self.find(self.parent[item])
+        return self.parent[item]
+
+    def union(self, a: str, b: str) -> None:
+        root_a = self.find(a)
+        root_b = self.find(b)
+        if root_a != root_b:
+            # Deterministic tie-breaking: pick lexicographically smaller root
+            if root_a < root_b:
+                self.parent[root_b] = root_a
+            else:
+                self.parent[root_a] = root_b
 
 
 class IdentityResolutionEngine:
     """
     Engine for multi-modal identity resolution across forensic evidence.
     Follows judicial rule: Never merges identities solely on display name similarity.
+    Deterministic union-find over normalized phone as the only strong joining key.
     """
 
-    def __init__(self):
-        self.version = "1.0.0"
+    def __init__(self, thresholds: CorrelationThresholds = DEFAULT_THRESHOLDS):
+        self.thresholds = thresholds
+        self.version = thresholds.version
 
     def resolve(
         self,
@@ -167,50 +199,78 @@ class IdentityResolutionEngine:
         tg_messages: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Executes identity resolution clustering.
-
-        Returns:
-            {
-                "persons": [Person.to_dict()],
-                "edges": [EvidenceEdge.to_dict()],
-                "ambiguous_candidates": [...]
-            }
+        Executes identity resolution clustering with ambiguity flagging and decoy rejection.
         """
         persons: List[Person] = []
         edges: List[EvidenceEdge] = []
         ambiguous_candidates: List[Dict[str, Any]] = []
 
-        # 1. Map WhatsApp contacts by E.164 phone
-        wa_by_phone: Dict[str, List[Any]] = {}
+        # 1. Normalize and index WhatsApp contacts
+        wa_by_phone: Dict[str, List[Tuple[Any, NormalizedPhone]]] = {}
+        wa_by_name: Dict[str, List[Any]] = {}
+
         for wa in wa_contacts:
-            phone = normalize_e164(getattr(wa, "phone_number", None) or getattr(wa, "jid", ""))
-            if phone:
-                wa_by_phone.setdefault(phone, []).append(wa)
+            raw_phone = getattr(wa, "phone_number", None) or getattr(wa, "jid", "")
+            norm = normalize_phone(raw_phone, default_region=self.thresholds.phone_default_region)
+            if norm.valid and norm.e164:
+                wa_by_phone.setdefault(norm.e164, []).append((wa, norm))
+            name = (getattr(wa, "display_name", "") or "").strip().lower()
+            if name:
+                wa_by_name.setdefault(name, []).append(wa)
 
-        # 2. Map Telegram contacts by E.164 phone
-        tg_by_phone: Dict[str, List[Any]] = {}
+        # 2. Normalize and index Telegram contacts
+        tg_by_phone: Dict[str, List[Tuple[Any, NormalizedPhone]]] = {}
+        tg_by_name: Dict[str, List[Any]] = {}
+
         for tg in tg_contacts:
-            phone = normalize_e164(getattr(tg, "phone", None) or "")
-            if phone:
-                tg_by_phone.setdefault(phone, []).append(tg)
+            raw_phone = getattr(tg, "phone", None) or ""
+            if raw_phone:
+                norm = normalize_phone(raw_phone, default_region=self.thresholds.phone_default_region)
+                if norm.valid and norm.e164:
+                    tg_by_phone.setdefault(norm.e164, []).append((tg, norm))
+            tg_full = f"{getattr(tg, 'first_name', '') or ''} {getattr(tg, 'last_name', '') or ''}".strip().lower()
+            if tg_full:
+                tg_by_name.setdefault(tg_full, []).append(tg)
 
-        matched_phones = set(wa_by_phone.keys()) & set(tg_by_phone.keys())
+        # 3. Deterministic Union-Find over matching normalized phones
+        uf = DisjointSet()
+        common_phones = sorted(set(wa_by_phone.keys()) & set(tg_by_phone.keys()))
+
+        for phone in common_phones:
+            uf.find(phone)
+
+        # Build clusters by root
+        clusters: Dict[str, List[str]] = {}
+        for phone in common_phones:
+            root = uf.find(phone)
+            clusters.setdefault(root, []).append(phone)
+
         processed_wa_jids: Set[str] = set()
         processed_tg_uids: Set[str] = set()
 
-        # Build Person clusters for exact E.164 phone matches (Confidence 1.0)
-        for phone in sorted(matched_phones):
-            wa_list = wa_by_phone[phone]
-            tg_list = tg_by_phone[phone]
+        for root in sorted(clusters.keys()):
+            phone_group = sorted(clusters[root])
+            all_wa = []
+            all_tg = []
+            any_region_assumed = False
 
-            person_id = f"person_{uuid.uuid4().hex[:12]}"
-            label = ""
+            for p in phone_group:
+                for wa, norm in wa_by_phone[p]:
+                    all_wa.append((wa, norm))
+                    if norm.region_assumed:
+                        any_region_assumed = True
+                for tg, norm in tg_by_phone[p]:
+                    all_tg.append((tg, norm))
+                    if norm.region_assumed:
+                        any_region_assumed = True
+
             aliases: Set[str] = set()
             handles: Set[str] = set()
             accounts: List[Dict[str, Any]] = []
             ev_links: List[Dict[str, Any]] = []
+            label = ""
 
-            for wa in wa_list:
+            for wa, norm in all_wa:
                 jid = getattr(wa, "jid", "")
                 display_name = getattr(wa, "display_name", "") or jid
                 processed_wa_jids.add(jid)
@@ -230,7 +290,7 @@ class IdentityResolutionEngine:
                     "identifier": jid,
                 })
 
-            for tg in tg_list:
+            for tg, norm in all_tg:
                 uid = str(getattr(tg, "user_id", ""))
                 tg_name = f"{getattr(tg, 'first_name', '') or ''} {getattr(tg, 'last_name', '') or ''}".strip()
                 username = getattr(tg, "username", "") or ""
@@ -254,167 +314,108 @@ class IdentityResolutionEngine:
                     "identifier": uid,
                 })
 
-            if not label:
-                label = f"Person {phone}"
+            # Check ambiguity flags (10_CORRELATION.md §B12.2)
+            ambiguity_reasons = []
+            is_ambiguous = False
+            distinct_names = {a for a in aliases if a}
+            if len(distinct_names) >= 2:
+                is_ambiguous = True
+                ambiguity_reasons.append(f"Phone maps to multiple distinct names: {sorted(distinct_names)}")
+            if len(phone_group) >= 2:
+                is_ambiguous = True
+                ambiguity_reasons.append(f"Identity cluster merges multiple distinct phones: {phone_group}")
+
+            # Confidence score strictly < 1.0 (master.md R8)
+            match_cert = 0.90 if any_region_assumed else 1.0
+            conf_score = 0.88 if any_region_assumed else 0.95
+            if is_ambiguous:
+                conf_score = min(conf_score, 0.80)
+
+            limitations = [
+                "E.164 phone number equivalence corroborated across platforms.",
+                "SIM ownership or device physical user may change over time.",
+            ]
+            if any_region_assumed:
+                limitations.append(f"Default country region ({self.thresholds.phone_default_region}) assumed for one or more numbers lacking international prefix.")
+            if is_ambiguous:
+                limitations.extend(ambiguity_reasons)
+
+            person_id = f"person_{hashlib.sha256(phone_group[0].encode()).hexdigest()[:12]}"
 
             p = Person(
                 person_id=person_id,
-                label=label,
+                label=label or f"Person {phone_group[0]}",
                 resolved_accounts=accounts,
-                phone_numbers=[phone],
+                phone_numbers=phone_group,
                 handles=sorted(handles),
                 aliases=sorted(aliases),
-                confidence_score=1.0,
+                confidence_score=conf_score,
+                match_certainty=match_cert,
                 resolution_method="EXACT_E164_CORROBORATION",
                 evidence_links=ev_links,
-                limitations=[],
+                limitations=limitations,
                 provenance={
                     "algorithm": "IdentityResolutionEngine",
                     "version": self.version,
-                    "basis": "Cryptographic/telecom E.164 equivalence",
+                    "thresholds_version": self.thresholds.version,
+                    "phones": phone_group,
                 },
-                is_ambiguous=False,
+                is_ambiguous=is_ambiguous,
+                ambiguity_reasons=ambiguity_reasons,
             )
             persons.append(p)
 
-            # Create cross-account evidence edges
-            for wa in wa_list:
-                for tg in tg_list:
+            # Build evidence edges
+            for wa, norm_wa in all_wa:
+                wa_jid_val = str(getattr(wa, "jid", ""))
+                for tg, norm_tg in all_tg:
+                    tg_uid_val = str(getattr(tg, "user_id", ""))
+                    edge_raw = f"{wa_jid_val}_{tg_uid_val}".encode("utf-8")
+                    edge_id = "edge_" + hashlib.sha256(edge_raw).hexdigest()[:12]
                     edge = EvidenceEdge(
-                        edge_id=f"edge_{uuid.uuid4().hex[:12]}",
-                        source_id=getattr(wa, "jid", ""),
+                        edge_id=edge_id,
+                        source_id=wa_jid_val,
                         source_type="whatsapp_jid",
-                        target_id=str(getattr(tg, "user_id", "")),
+                        target_id=tg_uid_val,
                         target_type="telegram_user",
                         relation_type="SAME_ENTITY_CORROBORATED",
-                        strength_score=1.0,
+                        strength_score=conf_score,
                         method="E164_PHONE_MATCH",
                         source_observations=[
-                            {"evidence_id": getattr(wa, "evidence_id", None), "phone": phone, "platform": "whatsapp"},
-                            {"evidence_id": getattr(tg, "evidence_id", None), "phone": phone, "platform": "telegram"},
+                            {"evidence_id": getattr(wa, "evidence_id", None), "phone": norm_wa.e164, "platform": "whatsapp"},
+                            {"evidence_id": getattr(tg, "evidence_id", None), "phone": norm_tg.e164, "platform": "telegram"},
                         ],
-                        limitations=[],
+                        limitations=limitations,
                         provenance={"algorithm": "IdentityResolutionEngine", "version": self.version},
-                        is_ambiguous=False,
+                        is_ambiguous=is_ambiguous,
                     )
                     edges.append(edge)
 
-        # 3. Handle-based matching for unmerged accounts (Confidence 0.85)
-        for wa in wa_contacts:
-            jid = getattr(wa, "jid", "")
-            if jid in processed_wa_jids:
-                continue
-            wa_name = (getattr(wa, "display_name", "") or "").strip().lower()
-            if not wa_name:
-                continue
+        # 4. Decoy & Display-name matching check (10_CORRELATION.md §B12.2)
+        # Same display name with DIFFERENT phone numbers => NO link above weak_hint (decoy!)
+        common_names = set(wa_by_name.keys()) & set(tg_by_name.keys())
+        for name in sorted(common_names):
+            wa_list = wa_by_name[name]
+            tg_list = tg_by_name[name]
+            for wa in wa_list:
+                jid = getattr(wa, "jid", "")
+                norm_wa = normalize_phone(getattr(wa, "phone_number", None) or jid, default_region=self.thresholds.phone_default_region)
+                for tg in tg_list:
+                    uid = str(getattr(tg, "user_id", ""))
+                    norm_tg = normalize_phone(getattr(tg, "phone", None) or "", default_region=self.thresholds.phone_default_region)
 
-            for tg in tg_contacts:
-                uid = str(getattr(tg, "user_id", ""))
-                if uid in processed_tg_uids:
-                    continue
-                username = (getattr(tg, "username", "") or "").strip().lower()
-                if username and (username == wa_name or username in jid.lower()):
-                    processed_wa_jids.add(jid)
-                    processed_tg_uids.add(uid)
-
-                    tg_full = f"{getattr(tg, 'first_name', '') or ''} {getattr(tg, 'last_name', '') or ''}".strip()
-                    phone_wa = normalize_e164(getattr(wa, "phone_number", None) or jid)
-                    phone_tg = normalize_e164(getattr(tg, "phone", None) or "")
-                    phones = [p for p in [phone_wa, phone_tg] if p]
-
-                    person_id = f"person_{uuid.uuid4().hex[:12]}"
-                    p = Person(
-                        person_id=person_id,
-                        label=tg_full or getattr(wa, "display_name", "") or f"@{username}",
-                        resolved_accounts=[
-                            {"platform": "whatsapp", "account_id": jid, "display_name": getattr(wa, "display_name", "")},
-                            {"platform": "telegram", "account_id": uid, "username": username, "display_name": tg_full},
-                        ],
-                        phone_numbers=phones,
-                        handles=[f"@{username}"],
-                        aliases=[getattr(wa, "display_name", ""), tg_full],
-                        confidence_score=0.85,
-                        resolution_method="TELEGRAM_HANDLE_EQUIVALENCE",
-                        evidence_links=[
-                            {"platform": "whatsapp", "evidence_id": getattr(wa, "evidence_id", None), "identifier": jid},
-                            {"platform": "telegram", "evidence_id": getattr(tg, "evidence_id", None), "identifier": uid},
-                        ],
-                        limitations=[
-                            "Linked via public Telegram handle match; telecommunication carrier records not linked."
-                        ],
-                        provenance={"algorithm": "IdentityResolutionEngine", "version": self.version},
-                        is_ambiguous=False,
-                    )
-                    persons.append(p)
-
-                    edges.append(EvidenceEdge(
-                        edge_id=f"edge_{uuid.uuid4().hex[:12]}",
-                        source_id=jid,
-                        source_type="whatsapp_jid",
-                        target_id=uid,
-                        target_type="telegram_user",
-                        relation_type="HANDLE_CORRELATED_CANDIDATE",
-                        strength_score=0.85,
-                        method="TELEGRAM_HANDLE_MATCH",
-                        source_observations=[
-                            {"platform": "whatsapp", "evidence_id": getattr(wa, "evidence_id", None)},
-                            {"platform": "telegram", "evidence_id": getattr(tg, "evidence_id", None), "username": username},
-                        ],
-                        limitations=["Handle match only; requires corroborating ISP/device subscriber records."],
-                        provenance={"algorithm": "IdentityResolutionEngine", "version": self.version},
-                        is_ambiguous=False,
-                    ))
-
-        # 4. Display Name Similarity Check:
-        # STRICT FORENSIC RULE: NEVER merge into a single Person node solely because names look similar!
-        # Instead, record as AMBIGUOUS_CANDIDATE edge with clear judicial disclaimer.
-        for wa in wa_contacts:
-            wa_name = (getattr(wa, "display_name", "") or "").strip().lower()
-            if not wa_name or len(wa_name) < 3:
-                continue
-
-            for tg in tg_contacts:
-                uid = str(getattr(tg, "user_id", ""))
-                tg_name = f"{getattr(tg, 'first_name', '') or ''} {getattr(tg, 'last_name', '') or ''}".strip().lower()
-                if not tg_name or len(tg_name) < 3:
-                    continue
-
-                if wa_name == tg_name:
-                    # Check if already linked via verified Person
-                    already_linked = any(
-                        any(acc.get("account_id") == getattr(wa, "jid", "") for acc in p.resolved_accounts) and
-                        any(acc.get("account_id") == uid for acc in p.resolved_accounts)
-                        for p in persons
-                    )
-                    if not already_linked:
-                        ambiguous_edge = EvidenceEdge(
-                            edge_id=f"edge_ambig_{uuid.uuid4().hex[:12]}",
-                            source_id=getattr(wa, "jid", ""),
-                            source_type="whatsapp_jid",
-                            target_id=uid,
-                            target_type="telegram_user",
-                            relation_type="AMBIGUOUS_NAME_SIMILARITY",
-                            strength_score=0.45,
-                            method="NAME_STRING_EQUALITY",
-                            source_observations=[
-                                {"platform": "whatsapp", "name": getattr(wa, "display_name", "")},
-                                {"platform": "telegram", "name": tg_name},
-                            ],
-                            limitations=[
-                                "JUDICIAL INVARIANT: Name similarity alone without E.164 phone or cryptographic identifier does NOT establish identity.",
-                                "Potential homonym or separate individuals sharing common display name."
-                            ],
-                            provenance={"algorithm": "IdentityResolutionEngine", "version": self.version},
-                            is_ambiguous=True,
-                        )
-                        edges.append(ambiguous_edge)
+                    # If both have phones and phones differ -> planted decoy! Strictly weak_hint below threshold
+                    if norm_wa.valid and norm_tg.valid and norm_wa.e164 != norm_tg.e164:
                         ambiguous_candidates.append({
-                            "wa_jid": getattr(wa, "jid", ""),
-                            "wa_name": getattr(wa, "display_name", ""),
-                            "tg_user_id": uid,
-                            "tg_name": tg_name,
-                            "reason": "Exact display name match without telecom corroboration",
-                            "limitations": ambiguous_edge.limitations,
+                            "type": "DECOY_SAME_NAME_DIFFERENT_PHONE",
+                            "display_name": name,
+                            "whatsapp_jid": jid,
+                            "whatsapp_phone": norm_wa.e164,
+                            "telegram_user_id": uid,
+                            "telegram_phone": norm_tg.e164,
+                            "strength": "weak_hint",
+                            "confidence_score": 0.20,
+                            "note": "Planted decoy: identical contact name with differing phone numbers; excluded from strong link.",
                         })
 
         return {
@@ -422,3 +423,97 @@ class IdentityResolutionEngine:
             "edges": [e.to_dict() for e in edges],
             "ambiguous_candidates": ambiguous_candidates,
         }
+
+    def resolve_findings(
+        self,
+        wa_contacts: List[Any],
+        tg_contacts: List[Any],
+    ) -> List[CorrelationFinding]:
+        """Generate CorrelationFinding instances for cross-platform identity matches."""
+        res = self.resolve(wa_contacts, tg_contacts)
+        findings: List[CorrelationFinding] = []
+
+        for p in res.get("persons", []):
+            accounts = p.get("resolved_accounts", [])
+            wa_acc = next((a for a in accounts if a.get("platform") == "whatsapp"), None)
+            tg_acc = next((a for a in accounts if a.get("platform") == "telegram"), None)
+
+            if wa_acc and tg_acc:
+                phones = p.get("phone_numbers", [])
+                norm_val = phones[0] if phones else p.get("label", "")
+                f_id = generate_deterministic_finding_id(
+                    "phone_identity",
+                    norm_val,
+                    f"whatsapp:{wa_acc.get('account_id')}",
+                    f"telegram:{tg_acc.get('account_id')}",
+                    self.thresholds.version,
+                )
+
+                findings.append(CorrelationFinding(
+                    finding_id=f_id,
+                    kind="phone_identity",
+                    strength="strong",
+                    match_certainty=p.get("match_certainty", 1.0),
+                    confidence_score=p.get("confidence_score", 0.95),
+                    normalized_value=norm_val,
+                    left_ref={
+                        "platform": "whatsapp",
+                        "account_id": wa_acc.get("account_id"),
+                        "display_name": wa_acc.get("display_name"),
+                        "evidence_id": wa_acc.get("evidence_id"),
+                    },
+                    right_ref={
+                        "platform": "telegram",
+                        "account_id": tg_acc.get("account_id"),
+                        "display_name": tg_acc.get("display_name"),
+                        "username": tg_acc.get("username"),
+                        "evidence_id": tg_acc.get("evidence_id"),
+                    },
+                    limitations=tuple(p.get("limitations", [])),
+                    provenance=p.get("provenance", {}),
+                    ambiguity=tuple(p.get("ambiguity_reasons", [])),
+                    thresholds_version=self.thresholds.version,
+                    below_threshold=p.get("confidence_score", 0.95) < self.thresholds.report_threshold_confidence,
+                ))
+
+        # Add ambiguous candidates as weak_hint below threshold
+        for cand in res.get("ambiguous_candidates", []):
+            f_id = generate_deterministic_finding_id(
+                "display_name_decoy",
+                cand.get("display_name", ""),
+                f"whatsapp:{cand.get('whatsapp_jid')}",
+                f"telegram:{cand.get('telegram_user_id')}",
+                self.thresholds.version,
+            )
+            findings.append(CorrelationFinding(
+                finding_id=f_id,
+                kind="display_name_decoy",
+                strength="weak_hint",
+                match_certainty=0.20,
+                confidence_score=cand.get("confidence_score", 0.20),
+                normalized_value=cand.get("display_name", ""),
+                left_ref={
+                    "platform": "whatsapp",
+                    "account_id": cand.get("whatsapp_jid"),
+                    "phone": cand.get("whatsapp_phone"),
+                },
+                right_ref={
+                    "platform": "telegram",
+                    "account_id": cand.get("telegram_user_id"),
+                    "phone": cand.get("telegram_phone"),
+                },
+                limitations=(
+                    "Identical display name but disparate phone numbers (planted decoy).",
+                    "Names alone do not establish identity across platforms.",
+                ),
+                provenance={
+                    "algorithm": "IdentityResolutionEngine",
+                    "reason": cand.get("type"),
+                },
+                ambiguity=("Disparate phone numbers with identical display name",),
+                thresholds_version=self.thresholds.version,
+                below_threshold=True,  # Strictly below reporting threshold!
+            ))
+
+        findings.sort(key=lambda f: f.sort_key())
+        return findings

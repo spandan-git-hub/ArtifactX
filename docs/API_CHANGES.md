@@ -418,7 +418,7 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
       "status": "success",
       "case_id": 1,
       "events_created": 385,
-      "timeline_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeline_hash": "<64-hex-sha256-hash>",
       "unplaced_indicators_count": 0
     }
     ```
@@ -437,7 +437,45 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
     - `source_refs: Optional[List[Dict[str, Any]]]`
     - `confidence_score: Optional[float]`
     - `strength: Optional[str]`
-    - `limitations: Optional[List[str]]`
-
-
-
+### Section B12 — Cross-Platform Correlation Engine (10_CORRELATION.md)
+- **Endpoint:** `POST /api/cases/{case_id}/correlation/deep`
+  - Pre-stage integrity verification: calls `ensure_integrity(db, evidence)` on all case exhibits before executing correlation algorithms; raises HTTP 409 if tampering detected (R3).
+  - Idempotent execution: Re-running correlation cleanly updates findings with deterministic IDs and identical counts.
+  - Audit logging: Records hash-chained `CORRELATE` audit entry containing exhibit counts, finding counts by strength, and `thresholds_version` (R7, R10).
+  - Request body `DeepCorrelationRequest`:
+    - `case_id: Optional[int] = None` (inferred from path)
+    - `time_threshold_seconds: Optional[int] = 7200`
+    - `distance_threshold_meters: Optional[float] = 250.0`
+    - `media_hamming_threshold: Optional[int] = 4`
+    - `include_below_threshold: Optional[bool] = False`
+  - Response contract:
+    ```json
+    {
+      "status": "success",
+      "case_id": 1,
+      "findings_count": 6,
+      "strong_links_count": 5,
+      "weak_hints_count": 1,
+      "below_threshold_count": 0,
+      "thresholds_version": "1.0.0"
+    }
+    ```
+- **Endpoint:** `GET /api/cases/{case_id}/correlation/findings`
+  - Deterministic total ordering: Ordered by `(strength_priority, match_certainty.desc(), finding_id.asc())`.
+  - Filter parameters:
+    - `kind: Optional[str] = None`
+    - `strength: Optional[str] = None`
+    - `include_below_threshold: bool = False`
+    - `limit: int = 100` (capped at 1000)
+    - `offset: int = 0`
+- **Schema Additions:** Additive fields on `CorrelationFindingRead` (Alembic revision `b12c77f022ef`):
+  - `finding_id: Optional[str]` (Deterministic identifier generated from sorted payload attributes)
+  - `kind: Optional[str]` (`crypto_address`, `phone_identity`, `media_similarity`, `spatiotemporal_rendezvous`, `platform_handover`, `url_reference`)
+  - `strength: Optional[str]` (`strong_link`, `moderate_corroboration`, `weak_hint`)
+  - `match_certainty: Optional[float]` (Certainty score in `[0.0, 1.0]`)
+  - `thresholds_version: Optional[str]` (Frozen version string `"1.0.0"`)
+  - `normalized_value: Optional[str]`
+  - `left_ref: Optional[Dict[str, Any]]`
+  - `right_ref: Optional[Dict[str, Any]]`
+  - `ambiguity: Optional[Dict[str, Any]]`
+  - `below_threshold: Optional[bool]`

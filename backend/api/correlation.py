@@ -15,8 +15,10 @@ router = APIRouter()
 class DeepCorrelationRequest(BaseModel):
     handover_threshold_seconds: Optional[int] = Field(180, description="Max seconds between messages to qualify as platform handover candidate")
     media_hamming_distance: Optional[int] = Field(4, description="Max bitwise Hamming distance for perceptual media link")
-    rendezvous_distance_meters: Optional[float] = Field(50.0, description="Max distance in meters between location coordinates")
-    rendezvous_time_seconds: Optional[int] = Field(1800, description="Max seconds between timestamped location events")
+    rendezvous_distance_meters: Optional[float] = Field(250.0, description="Max distance in meters between location coordinates")
+    rendezvous_time_seconds: Optional[int] = Field(7200, description="Max seconds between timestamped location events")
+    phone_default_region: Optional[str] = Field("IN", description="Default ISO 3166-1 region for phone numbers lacking international prefix")
+    report_threshold_confidence: Optional[float] = Field(0.50, description="Headline reporting confidence threshold")
     custom_keywords: Optional[List[str]] = Field(default_factory=list, description="Analyst-configured codewords or keywords to scan")
 
 
@@ -226,3 +228,23 @@ def get_correlation_status(
         )
 
     return correlation_service.check_case_evidence_platforms(db, case_id)
+
+
+@router.get("/cases/{case_id}/correlation/findings", response_model=List[Dict[str, Any]])
+def get_correlation_findings(
+    case_id: int,
+    include_below_threshold: bool = Query(True, description="Whether to include findings below reporting threshold"),
+    kind: Optional[str] = Query(None, description="Filter findings by kind (e.g. phone_identity, crypto_btc, media_dhash, spatiotemporal_rendezvous)"),
+    db: Session = Depends(get_db)
+):
+    """Get forensic correlation findings with dual scores, limitations, and both-side provenance (B12.6, B12.7)."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+
+    return correlation_service.get_findings_for_case(
+        db, case_id, include_below_threshold=include_below_threshold, kind=kind
+    )

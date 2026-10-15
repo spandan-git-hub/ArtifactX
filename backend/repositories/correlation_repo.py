@@ -1,4 +1,4 @@
-"""Repository for correlation edge, entity resolution, and deep finding data."""
+"""Repository for correlation edge, entity resolution, and deep finding data (B12.7)."""
 
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ class CorrelationRepository:
                 entity_uuid=p.get("person_id") or p.get("entity_uuid"),
                 label=p.get("label", ""),
                 entity_type="PERSON",
-                confidence_score=p.get("confidence_score", 1.0),
+                confidence_score=p.get("confidence_score", 0.95),
                 resolution_method=p.get("resolution_method", ""),
                 attributes={
                     "phone_numbers": p.get("phone_numbers", []),
@@ -77,18 +77,30 @@ class CorrelationRepository:
     # --- Correlation Findings ---
 
     def save_correlation_findings(self, db: Session, case_id: int, findings: List[dict]):
-        """Save specialized correlation findings."""
+        """Save specialized correlation findings with forensic attributes (B12.6, B12.7)."""
         if not findings:
             return
         objs = []
         for f in findings:
+            f_id = f.get("finding_id") or f.get("finding_uuid", "")
+            k = f.get("kind") or f.get("finding_type", "unknown")
             obj = CorrelationFinding(
                 case_id=case_id,
-                finding_uuid=f.get("finding_uuid") or f.get("finding_id", ""),
-                finding_type=f.get("finding_type", "unknown"),
+                finding_uuid=f_id,
+                finding_id=f_id,
+                finding_type=k,
+                kind=k,
                 sub_type=f.get("sub_type"),
-                confidence_score=f.get("confidence_score", 1.0),
-                details=f.get("details", {}),
+                strength=f.get("strength"),
+                match_certainty=f.get("match_certainty"),
+                confidence_score=f.get("confidence_score", 0.85),
+                thresholds_version=f.get("thresholds_version"),
+                normalized_value=f.get("normalized_value"),
+                left_ref=f.get("left_ref", {}),
+                right_ref=f.get("right_ref", {}),
+                ambiguity=f.get("ambiguity", []),
+                below_threshold=f.get("below_threshold", False),
+                details=f.get("details", f),
                 evidence_ids=f.get("evidence_ids", []),
                 limitations=f.get("limitations", []),
                 provenance=f.get("provenance", {}),
@@ -97,14 +109,36 @@ class CorrelationRepository:
         db.add_all(objs)
         db.commit()
 
-    def get_findings_by_type(self, db: Session, case_id: int, finding_type: Optional[str] = None) -> List[CorrelationFinding]:
+    def get_findings_by_case_id(
+        self,
+        db: Session,
+        case_id: int,
+        include_below_threshold: bool = True,
+    ) -> List[CorrelationFinding]:
+        """Get correlation findings by case ID."""
+        query = db.query(CorrelationFinding).filter(CorrelationFinding.case_id == case_id)
+        if not include_below_threshold:
+            query = query.filter(CorrelationFinding.below_threshold == False)
+        return query.order_by(CorrelationFinding.id.asc()).all()
+
+    def get_findings_by_type(
+        self,
+        db: Session,
+        case_id: int,
+        finding_type: Optional[str] = None,
+    ) -> List[CorrelationFinding]:
         """Get correlation findings by case ID and optional type."""
         query = db.query(CorrelationFinding).filter(CorrelationFinding.case_id == case_id)
         if finding_type:
-            query = query.filter(CorrelationFinding.finding_type == finding_type)
+            query = query.filter(
+                (CorrelationFinding.finding_type == finding_type) |
+                (CorrelationFinding.kind == finding_type)
+            )
         return query.all()
 
     def delete_findings_by_case_id(self, db: Session, case_id: int) -> None:
         """Delete correlation findings for a case."""
-        db.query(CorrelationFinding).filter(CorrelationFinding.case_id == case_id).delete()
+        db.query(CorrelationFinding).filter(
+            CorrelationFinding.case_id == case_id
+        ).delete()
         db.commit()

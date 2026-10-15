@@ -751,6 +751,19 @@ class CorrelationFinding(Base):
     evidence_ids = Column(JSON, default=list)
     limitations = Column(JSON, default=list)
     provenance = Column(JSON, default=dict)
+
+    # B12 additive fields (spec 10_CORRELATION.md §B12.6, §B12.7)
+    finding_id = Column(String(64), nullable=True, index=True)
+    kind = Column(String(50), nullable=True, index=True)
+    strength = Column(String(50), nullable=True, index=True)
+    match_certainty = Column(Float, nullable=True)
+    thresholds_version = Column(String(50), nullable=True)
+    normalized_value = Column(String(1024), nullable=True, index=True)
+    left_ref = Column(JSON, default=dict)
+    right_ref = Column(JSON, default=dict)
+    ambiguity = Column(JSON, default=list)
+    below_threshold = Column(Boolean, default=False, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     case = relationship("Case", back_populates="correlation_findings")

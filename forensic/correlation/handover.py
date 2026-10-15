@@ -1,14 +1,22 @@
-"""
-Cross-Platform Handover Detection Engine.
+"""Cross-Platform Handover Detection Engine (B12.5).
+
 Detects platform handovers based on temporal proximity and explicit transition phrases.
-Uses neutral forensic wording (PLATFORM_HANDOVER_CANDIDATE) to maintain judicial admissibility.
+Uses neutral forensic wording (PLATFORM_HANDOVER_CANDIDATE) to maintain objectivity.
+
+Follows master.md R8, R10, R11 and 10_CORRELATION.md §B12.5:
+- Uses normalized UTC timestamps (refuses events with unknown time).
+- Strength is strictly <= moderate (users routinely use multiple apps concurrently).
+- Confidence score is strictly < 1.0.
 """
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
-import uuid
-import re
+from __future__ import annotations
 
+from dataclasses import dataclass, field
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+from forensic.correlation.models import CorrelationFinding, generate_deterministic_finding_id
+from forensic.correlation.thresholds import CorrelationThresholds, DEFAULT_THRESHOLDS
 
 HANDOVER_PHRASES = [
     r"\b(switch|move|head|go|hop|shift)\s+(to|over\s+to|on)\s+(telegram|tg|whatsapp|wa|signal|wire|session|wickr)\b",
@@ -19,7 +27,7 @@ HANDOVER_PHRASES = [
     r"\bwa\.me\/[0-9]+\b",
 ]
 
-COMPILED_HANDOVER_REGEXES = [re.compile(pattern, re.IGNORECASE) for pattern in HANDOVER_PHRASES]
+COMPILED_HANDOVER_REGEXES = [re.compile(p, re.IGNORECASE) for p in HANDOVER_PHRASES]
 
 
 @dataclass
@@ -40,6 +48,7 @@ class PlatformHandoverCandidate:
     to_body: str
     transition_keywords: List[str] = field(default_factory=list)
     confidence_score: float = 0.85
+    match_certainty: float = 0.80
     classification: str = "PLATFORM_HANDOVER_CANDIDATE"
     limitations: List[str] = field(default_factory=list)
     provenance: Dict[str, Any] = field(default_factory=dict)
@@ -61,6 +70,7 @@ class PlatformHandoverCandidate:
             "to_body": self.to_body,
             "transition_keywords": self.transition_keywords,
             "confidence_score": round(self.confidence_score, 4),
+            "match_certainty": round(self.match_certainty, 4),
             "classification": self.classification,
             "limitations": self.limitations,
             "provenance": self.provenance,
@@ -68,17 +78,14 @@ class PlatformHandoverCandidate:
 
 
 class PlatformHandoverDetector:
-    """
-    Detector for cross-platform message sequence transitions.
-    Thresholds are fully configurable per run and recorded in output provenance.
-    """
+    """Detector for cross-platform message sequence transitions."""
 
-    def __init__(self, default_threshold_seconds: int = 180):
-        self.default_threshold_seconds = default_threshold_seconds
-        self.version = "1.0.0"
+    def __init__(self, thresholds: CorrelationThresholds = DEFAULT_THRESHOLDS):
+        self.thresholds = thresholds
+        self.default_threshold_seconds = thresholds.handover_max_time_seconds
+        self.version = thresholds.version
 
     def detect_keywords(self, text: str) -> List[str]:
-        """Detect explicit transition phrases in a message body."""
         if not text:
             return []
         matches = []
@@ -98,126 +105,126 @@ class PlatformHandoverDetector:
         tg_messages: List[Any],
         threshold_seconds: Optional[int] = None,
     ) -> List[PlatformHandoverCandidate]:
-        """
-        Scan messages from WhatsApp and Telegram to identify sequence handovers.
-        Checks both directions: WhatsApp -> Telegram and Telegram -> WhatsApp.
-        """
+        """Detect temporal and keyword-based transition sequences between WA and TG."""
         threshold = threshold_seconds if threshold_seconds is not None else self.default_threshold_seconds
         candidates: List[PlatformHandoverCandidate] = []
 
-        # Normalize timestamps to seconds
-        def get_ts_sec(msg) -> int:
-            ts = getattr(msg, "timestamp", 0) or 0
-            return ts // 1000 if ts > 10_000_000_000 else ts
+        # Convert to standardized tuples: (platform, msg_id, sender, body, ts_sec, raw_msg)
+        all_events = []
+        for m in wa_messages:
+            ts = getattr(m, "timestamp", None)
+            if ts is not None and ts > 0:
+                ts_sec = ts // 1000 if ts > 10_000_000_000 else ts
+                all_events.append(("whatsapp", str(getattr(m, "message_id", "")), str(getattr(m, "sender_jid", "")), getattr(m, "body", "") or "", ts_sec))
 
-        # 1. WhatsApp -> Telegram transitions
-        for wa in wa_messages:
-            wa_sec = get_ts_sec(wa)
-            if not wa_sec:
+        for m in tg_messages:
+            ts = getattr(m, "timestamp", None)
+            if ts is not None and ts > 0:
+                ts_sec = ts // 1000 if ts > 10_000_000_000 else ts
+                all_events.append(("telegram", str(getattr(m, "message_id", "")), str(getattr(m, "sender_id", "")), getattr(m, "body", "") or "", ts_sec))
+
+        # Sort chronologically
+        all_events.sort(key=lambda x: x[4])
+
+        for i in range(len(all_events) - 1):
+            curr = all_events[i]
+            nxt = all_events[i + 1]
+
+            # Cross-platform only
+            if curr[0] == nxt[0]:
                 continue
-            wa_body = getattr(wa, "body", "") or ""
-            wa_kw = self.detect_keywords(wa_body)
 
-            for tg in tg_messages:
-                tg_sec = get_ts_sec(tg)
-                if not tg_sec:
-                    continue
+            delta = nxt[4] - curr[4]
+            if 0 <= delta <= threshold:
+                keywords = self.detect_keywords(curr[3])
+                has_keywords = len(keywords) > 0
 
-                # Transition: WhatsApp message precedes Telegram message
-                if 0 <= (tg_sec - wa_sec) <= threshold:
-                    delta = tg_sec - wa_sec
-                    tg_body = getattr(tg, "body", "") or ""
-                    tg_kw = self.detect_keywords(tg_body)
-                    all_kw = list(dict.fromkeys(wa_kw + tg_kw))
+                # Confidence strictly < 1.0; elevated if explicit keyword present
+                conf = 0.85 if has_keywords else 0.65
+                match_cert = 0.80 if has_keywords else 0.50
 
-                    # Calculate confidence based on temporal proximity and explicit phrasing
-                    base_confidence = max(0.65, 0.95 - (delta / threshold) * 0.30)
-                    if all_kw:
-                        base_confidence = min(0.99, base_confidence + 0.15)
+                norm_val = f"{curr[0]}->{nxt[0]}_delta_{delta}s"
+                h_id = generate_deterministic_finding_id(
+                    "platform_handover",
+                    norm_val,
+                    f"{curr[0]}:{curr[1]}",
+                    f"{nxt[0]}:{nxt[1]}",
+                    self.thresholds.version,
+                )
 
-                    candidate = PlatformHandoverCandidate(
-                        handover_id=f"handover_{uuid.uuid4().hex[:12]}",
-                        from_platform="whatsapp",
-                        to_platform="telegram",
-                        time_delta_seconds=delta,
-                        threshold_seconds=threshold,
-                        from_message_id=str(getattr(wa, "message_id", "")),
-                        to_message_id=str(getattr(tg, "message_id", "")),
-                        from_timestamp=wa_sec,
-                        to_timestamp=tg_sec,
-                        from_sender=str(getattr(wa, "sender_jid", "")),
-                        to_sender=str(getattr(tg, "sender_id", "")),
-                        from_body=wa_body,
-                        to_body=tg_body,
-                        transition_keywords=all_kw,
-                        confidence_score=base_confidence,
-                        classification="PLATFORM_HANDOVER_CANDIDATE",
-                        limitations=[
-                            f"Identified based on temporal delta ({delta}s <= {threshold}s).",
-                            "Neutral candidate finding; does not infer motive, intent, or evasion."
-                        ],
-                        provenance={
-                            "detector": "PlatformHandoverDetector",
-                            "version": self.version,
-                            "threshold_seconds": threshold,
-                            "method": "TEMPORAL_AND_LEXICAL_CROSS_ANALYSIS",
-                        },
-                    )
-                    candidates.append(candidate)
+                candidates.append(PlatformHandoverCandidate(
+                    handover_id=h_id,
+                    from_platform=curr[0],
+                    to_platform=nxt[0],
+                    time_delta_seconds=delta,
+                    threshold_seconds=threshold,
+                    from_message_id=curr[1],
+                    to_message_id=nxt[1],
+                    from_timestamp=curr[4],
+                    to_timestamp=nxt[4],
+                    from_sender=curr[2],
+                    to_sender=nxt[2],
+                    from_body=curr[3][:120],
+                    to_body=nxt[3][:120],
+                    transition_keywords=keywords,
+                    confidence_score=conf,
+                    match_certainty=match_cert,
+                    classification="PLATFORM_HANDOVER_CANDIDATE",
+                    limitations=[
+                        f"Temporal sequence gap: {delta}s (threshold <= {threshold}s).",
+                        "Users routinely maintain concurrent sessions on multiple messaging platforms.",
+                        "Transition keyword detection is heuristic." if has_keywords else "No explicit handover phrase found.",
+                    ],
+                    provenance={
+                        "algorithm": "CrossPlatformHandover",
+                        "time_delta_seconds": delta,
+                        "threshold_seconds": threshold,
+                        "transition_keywords": keywords,
+                        "thresholds_version": self.thresholds.version,
+                    },
+                ))
 
-        # 2. Telegram -> WhatsApp transitions
-        for tg in tg_messages:
-            tg_sec = get_ts_sec(tg)
-            if not tg_sec:
-                continue
-            tg_body = getattr(tg, "body", "") or ""
-            tg_kw = self.detect_keywords(tg_body)
-
-            for wa in wa_messages:
-                wa_sec = get_ts_sec(wa)
-                if not wa_sec:
-                    continue
-
-                if 0 <= (wa_sec - tg_sec) <= threshold:
-                    delta = wa_sec - tg_sec
-                    wa_body = getattr(wa, "body", "") or ""
-                    wa_kw = self.detect_keywords(wa_body)
-                    all_kw = list(dict.fromkeys(tg_kw + wa_kw))
-
-                    base_confidence = max(0.65, 0.95 - (delta / threshold) * 0.30)
-                    if all_kw:
-                        base_confidence = min(0.99, base_confidence + 0.15)
-
-                    candidate = PlatformHandoverCandidate(
-                        handover_id=f"handover_{uuid.uuid4().hex[:12]}",
-                        from_platform="telegram",
-                        to_platform="whatsapp",
-                        time_delta_seconds=delta,
-                        threshold_seconds=threshold,
-                        from_message_id=str(getattr(tg, "message_id", "")),
-                        to_message_id=str(getattr(wa, "message_id", "")),
-                        from_timestamp=tg_sec,
-                        to_timestamp=wa_sec,
-                        from_sender=str(getattr(tg, "sender_id", "")),
-                        to_sender=str(getattr(wa, "sender_jid", "")),
-                        from_body=tg_body,
-                        to_body=wa_body,
-                        transition_keywords=all_kw,
-                        confidence_score=base_confidence,
-                        classification="PLATFORM_HANDOVER_CANDIDATE",
-                        limitations=[
-                            f"Identified based on temporal delta ({delta}s <= {threshold}s).",
-                            "Neutral candidate finding; does not infer motive, intent, or evasion."
-                        ],
-                        provenance={
-                            "detector": "PlatformHandoverDetector",
-                            "version": self.version,
-                            "threshold_seconds": threshold,
-                            "method": "TEMPORAL_AND_LEXICAL_CROSS_ANALYSIS",
-                        },
-                    )
-                    candidates.append(candidate)
-
-        # Sort by smallest time delta, then highest confidence
         candidates.sort(key=lambda c: (c.time_delta_seconds, -c.confidence_score))
         return candidates
+
+    def detect_handover_findings(
+        self,
+        wa_messages: List[Any],
+        tg_messages: List[Any],
+        threshold_seconds: Optional[int] = None,
+    ) -> List[CorrelationFinding]:
+        """Returns CorrelationFinding instances from handover candidates."""
+        candidates = self.detect_handovers(wa_messages, tg_messages, threshold_seconds)
+        findings = []
+
+        for cand in candidates:
+            norm_val = f"{cand.from_platform}->{cand.to_platform}_delta_{cand.time_delta_seconds}s"
+            findings.append(CorrelationFinding(
+                finding_id=cand.handover_id,
+                kind="platform_handover",
+                strength="moderate" if cand.transition_keywords else "weak_hint",
+                match_certainty=cand.match_certainty,
+                confidence_score=cand.confidence_score,
+                normalized_value=norm_val,
+                left_ref={
+                    "platform": cand.from_platform,
+                    "message_id": cand.from_message_id,
+                    "timestamp": cand.from_timestamp,
+                    "sender": cand.from_sender,
+                    "body_snippet": cand.from_body,
+                },
+                right_ref={
+                    "platform": cand.to_platform,
+                    "message_id": cand.to_message_id,
+                    "timestamp": cand.to_timestamp,
+                    "sender": cand.to_sender,
+                    "body_snippet": cand.to_body,
+                },
+                limitations=tuple(cand.limitations),
+                provenance=cand.provenance,
+                thresholds_version=self.thresholds.version,
+                below_threshold=cand.confidence_score < self.thresholds.report_threshold_confidence,
+            ))
+
+        findings.sort(key=lambda f: f.sort_key())
+        return findings

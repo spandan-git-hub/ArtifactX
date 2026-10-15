@@ -1,16 +1,24 @@
-"""Correlation service for forensic evidence and deep cross-platform correlation."""
+"""Correlation service for forensic evidence and deep cross-platform correlation (B12)."""
+
+from __future__ import annotations
 
 import re
 import traceback
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 import uuid
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from backend.repositories.correlation_repo import CorrelationRepository
 from backend.repositories.whatsapp_repo import WhatsAppRepository
 from backend.repositories.telegram_repo import TelegramRepository
 from backend.repositories.media_repo import MediaRepository
-from backend.models.models import Evidence, EvidenceFile, MediaItem as ORMMediaItem, PersonEntity, CorrelationFinding
+from backend.models.models import Evidence, EvidenceFile, MediaItem as ORMMediaItem, PersonEntity, CorrelationFinding as ORMCorrelationFinding
+from backend.services.integrity_service import ensure_integrity
+from backend.services.audit_service import AuditService
+from backend.services.log_service import get_log_service
+
+from forensic.correlation.thresholds import CorrelationThresholds, DEFAULT_THRESHOLDS
+from forensic.correlation.models import CorrelationFinding
 from forensic.correlation.matcher import (
     correlate_message_to_contact_whatsapp,
     correlate_message_to_media_whatsapp,
@@ -25,11 +33,10 @@ from forensic.correlation.matcher import (
     MediaItem,
 )
 from forensic.correlation.entities import IdentityResolutionEngine, EvidenceEdge, Person, normalize_e164
-from forensic.correlation.handover import PlatformHandoverDetector
+from forensic.correlation.handover import PlatformHandoverDetector, PlatformHandoverCandidate
 from forensic.correlation.media_hash import PerceptualMediaCorrelator, compute_dhash, compute_phash
 from forensic.correlation.artifacts import ArtifactStitcher, ExtractedArtifact
-from forensic.correlation.rendezvous import SpatiotemporalRendezvousDetector, LocationObservation
-from backend.services.log_service import get_log_service
+from forensic.correlation.rendezvous import SpatiotemporalRendezvousDetector, LocationObservation, RendezvousCandidate
 
 
 class CorrelationService:
@@ -46,6 +53,10 @@ class CorrelationService:
         evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
         if not evidences:
             return [], [], [], [], []
+
+        # Rule R3: Pre-stage integrity verification on all exhibits
+        for ev in evidences:
+            ensure_integrity(ev.id, db, action_context="correlation_stage")
 
         all_wa_messages: List[WhatsAppMessage] = []
         all_wa_contacts: List[WhatsAppContact] = []
@@ -180,90 +191,94 @@ class CorrelationService:
             )
             return 0
 
-    def run_deep_correlation(self, db: Session, case_id: int, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run_deep_correlation(
+        self,
+        db: Session,
+        case_id: int,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
-        Execute full R4 Deep Cross-Platform Correlation Engine:
-        1. Multi-modal entity resolution (Person clusters, Phone, Handles).
-        2. Cross-platform sequence handovers (configurable threshold).
-        3. Perceptual media correlation (dHash / pHash, configurable Hamming threshold).
-        4. Deterministic artifact stitching (Crypto, Banking, Logistics, Custom Codewords).
-        5. Spatiotemporal rendezvous detection (EXIF GPS & shared location events).
+        Execute full R4 Deep Cross-Platform Correlation Engine (B12):
+        1. Pre-stage evidence integrity verification (R3).
+        2. Configurable thresholds from single thresholds file (B12.1).
+        3. E.164 phone normalization & identity resolution (B12.2).
+        4. Checksum-validated artifact stitching: BTC, EVM, IBAN, Canonical URL (B12.3).
+        5. Perceptual media correlation from in-memory bytes (B12.4).
+        6. Platform handover and spatiotemporal rendezvous co-occurrence detection (B12.5).
+        7. Deterministic sorting and append-only hash-chained audit logging (B12.6, B12.7).
         """
         params = parameters or {}
-        handover_threshold = int(params.get("handover_threshold_seconds", 180))
-        media_hamming_thresh = int(params.get("media_hamming_distance", 4))
-        rendezvous_dist_meters = float(params.get("rendezvous_distance_meters", 50.0))
-        rendezvous_time_sec = int(params.get("rendezvous_time_seconds", 1800))
-        custom_keywords = params.get("custom_keywords", [])
-
-        log_service = get_log_service(db)
-        log_service.log_analysis(
-            evidence_id=None,
-            log_type="deep_correlation_start",
-            message="Starting R4 Deep Correlation Engine",
-            details={"case_id": case_id, "parameters": params}
+        thresholds = CorrelationThresholds(
+            version=DEFAULT_THRESHOLDS.version,
+            phone_default_region=str(params.get("phone_default_region", DEFAULT_THRESHOLDS.phone_default_region)),
+            dhash_max_hamming_distance=int(params.get("media_hamming_distance", DEFAULT_THRESHOLDS.dhash_max_hamming_distance)),
+            phash_max_hamming_distance=int(params.get("phash_hamming_distance", DEFAULT_THRESHOLDS.phash_max_hamming_distance)),
+            rendezvous_max_distance_meters=float(params.get("rendezvous_distance_meters", DEFAULT_THRESHOLDS.rendezvous_max_distance_meters)),
+            rendezvous_max_time_seconds=int(params.get("rendezvous_time_seconds", DEFAULT_THRESHOLDS.rendezvous_max_time_seconds)),
+            handover_max_time_seconds=int(params.get("handover_threshold_seconds", DEFAULT_THRESHOLDS.handover_max_time_seconds)),
+            min_image_dimension=int(params.get("min_image_dimension", DEFAULT_THRESHOLDS.min_image_dimension)),
+            min_image_entropy=float(params.get("min_image_entropy", DEFAULT_THRESHOLDS.min_image_entropy)),
+            report_threshold_confidence=float(params.get("report_threshold_confidence", DEFAULT_THRESHOLDS.report_threshold_confidence)),
         )
 
-        # Clear prior findings and person entities for this case
+        custom_keywords = params.get("custom_keywords", [])
+
+        # 1. Collect case data with pre-stage ensure_integrity() (R3)
+        wa_msgs, wa_cnts, tg_msgs, tg_cnts, media_items = self._collect_case_data(db, case_id)
+
+        # Clear prior findings, persons, and edges idempotently for this case
         self.correlation_repo.delete_findings_by_case_id(db, case_id)
         self.correlation_repo.delete_person_entities_by_case_id(db, case_id)
         self.correlation_repo.delete_edges_by_case_id(db, case_id)
 
-        wa_msgs, wa_cnts, tg_msgs, tg_cnts, media_items = self._collect_case_data(db, case_id)
+        all_findings: List[CorrelationFinding] = []
 
-        # 1. Identity Resolution Engine
-        identity_engine = IdentityResolutionEngine()
+        # 2. Identity Resolution Engine (B12.2)
+        identity_engine = IdentityResolutionEngine(thresholds=thresholds)
         resolution_result = identity_engine.resolve(wa_cnts, tg_cnts, wa_msgs, tg_msgs)
         resolved_persons = resolution_result.get("persons", [])
         resolved_edges = resolution_result.get("edges", [])
         ambiguous_candidates = resolution_result.get("ambiguous_candidates", [])
 
-        # Persist Person Entities
         self.correlation_repo.save_person_entities(db, case_id, resolved_persons)
+        identity_findings = identity_engine.resolve_findings(wa_cnts, tg_cnts)
+        all_findings.extend(identity_findings)
 
-        # 2. Platform Handover Detector
-        handover_detector = PlatformHandoverDetector(default_threshold_seconds=handover_threshold)
-        handover_candidates = handover_detector.detect_handovers(
-            wa_msgs, tg_msgs, threshold_seconds=handover_threshold
-        )
-        handover_findings = []
-        for cand in handover_candidates:
-            handover_findings.append({
-                "finding_uuid": cand.handover_id,
-                "finding_type": "handover",
-                "sub_type": f"{cand.from_platform}->{cand.to_platform}",
-                "confidence_score": cand.confidence_score,
-                "details": cand.to_dict(),
-                "evidence_ids": [cand.from_platform, cand.to_platform],
-                "limitations": cand.limitations,
-                "provenance": cand.provenance,
-            })
-        self.correlation_repo.save_correlation_findings(db, case_id, handover_findings)
+        # 3. Platform Handover Detector (B12.5)
+        handover_detector = PlatformHandoverDetector(thresholds=thresholds)
+        handover_findings = handover_detector.detect_handover_findings(wa_msgs, tg_msgs)
+        all_findings.extend(handover_findings)
 
-        # 3. Perceptual Media Hashing
-        # Retrieve media records from ORM
+        # 4. Perceptual Media Correlation (B12.4)
         orm_media = db.query(ORMMediaItem).filter(ORMMediaItem.case_id == case_id).all()
         case_ev_ids = [e.id for e in db.query(Evidence).filter(Evidence.case_id == case_id).all()]
-        orm_files = db.query(EvidenceFile).filter(
-            EvidenceFile.evidence_id.in_(case_ev_ids),
-            EvidenceFile.is_media == True
-        ).all() if case_ev_ids else []
-
+        
+        # Load content_bytes only when necessary using load_only (R19)
         media_records = []
         for m in orm_media:
             exif = m.exif_data or {}
-            dhash = exif.get("dhash")
-            phash = exif.get("phash")
-            # If dhash or phash not stored, check if content_bytes available
-            if not dhash or not phash:
-                # check file
-                ef = db.query(EvidenceFile).filter(EvidenceFile.sha256 == m.sha256).first()
+            dhash_val = exif.get("dhash")
+            phash_val = exif.get("phash")
+
+            if not dhash_val:
+                ef = db.query(EvidenceFile).options(
+                    load_only(EvidenceFile.id, EvidenceFile.content_bytes, EvidenceFile.sha256)
+                ).filter(EvidenceFile.sha256 == m.sha256).first()
+
                 if ef and ef.content_bytes:
                     try:
-                        dhash = compute_dhash(ef.content_bytes)
-                        phash = compute_phash(ef.content_bytes)
-                        exif["dhash"] = dhash
-                        exif["phash"] = phash
+                        dhash_val = compute_dhash(
+                            ef.content_bytes,
+                            min_dimension=thresholds.min_image_dimension,
+                            min_entropy=thresholds.min_image_entropy,
+                        )
+                        phash_val = compute_phash(
+                            ef.content_bytes,
+                            min_dimension=thresholds.min_image_dimension,
+                            min_entropy=thresholds.min_image_entropy,
+                        )
+                        exif["dhash"] = dhash_val
+                        exif["phash"] = phash_val
                         m.exif_data = exif
                     except Exception:
                         pass
@@ -272,31 +287,18 @@ class CorrelationService:
                 "id": m.id,
                 "file_name": m.file_path.split("/")[-1].split("\\")[-1] if m.file_path else f"media_{m.id}",
                 "sha256": m.sha256 or "",
-                "dhash": dhash or exif.get("dhash"),
-                "phash": phash or exif.get("phash"),
-                "exif_data": exif,
+                "dhash": dhash_val,
+                "phash": phash_val,
+                "platform": "whatsapp" if "whatsapp" in (m.file_path or "").lower() else "telegram",
+                "evidence_id": m.evidence_id,
             })
 
-        # Pairwise perceptual comparison
-        media_correlator = PerceptualMediaCorrelator(default_threshold=media_hamming_thresh)
-        media_matches = media_correlator.correlate_items(media_records, threshold=media_hamming_thresh)
+        media_correlator = PerceptualMediaCorrelator(thresholds=thresholds)
+        media_findings = media_correlator.correlate_media_findings(media_records)
+        all_findings.extend(media_findings)
 
-        media_findings = []
-        for match in media_matches:
-            media_findings.append({
-                "finding_uuid": match["match_id"],
-                "finding_type": "media_match",
-                "sub_type": "perceptual_hash",
-                "confidence_score": match["confidence_score"],
-                "details": match,
-                "evidence_ids": [match.get("source_media_id"), match.get("target_media_id")],
-                "limitations": match["limitations"],
-                "provenance": match["provenance"],
-            })
-        self.correlation_repo.save_correlation_findings(db, case_id, media_findings)
-
-        # 4. Deterministic Artifact Stitching
-        artifact_stitcher = ArtifactStitcher(custom_keywords=custom_keywords)
+        # 5. Deterministic Artifact Stitcher (B12.3)
+        artifact_stitcher = ArtifactStitcher(custom_keywords=custom_keywords, thresholds=thresholds)
         extracted_artifacts: List[ExtractedArtifact] = []
 
         for msg in wa_msgs:
@@ -310,6 +312,7 @@ class CorrelationService:
                         timestamp=msg.timestamp,
                     )
                 )
+
         for msg in tg_msgs:
             if msg.body:
                 extracted_artifacts.extend(
@@ -322,23 +325,12 @@ class CorrelationService:
                     )
                 )
 
-        artifact_findings = []
-        for art in extracted_artifacts:
-            artifact_findings.append({
-                "finding_uuid": art.artifact_id,
-                "finding_type": "shared_artifact",
-                "sub_type": art.artifact_type,
-                "confidence_score": art.confidence_score,
-                "details": art.to_dict(),
-                "evidence_ids": [art.evidence_id] if art.evidence_id else [],
-                "limitations": art.limitations,
-                "provenance": art.provenance,
-            })
-        self.correlation_repo.save_correlation_findings(db, case_id, artifact_findings)
+        artifact_findings = artifact_stitcher.correlate_artifacts(extracted_artifacts)
+        all_findings.extend(artifact_findings)
 
-        # 5. Spatiotemporal Rendezvous
+        # 6. Spatiotemporal Rendezvous Detector (B12.5)
         location_obs: List[LocationObservation] = []
-        # Extract from Media EXIF
+        # Media EXIF GPS
         for m in orm_media:
             exif = m.exif_data or {}
             lat = exif.get("GPSLatitude") or exif.get("latitude")
@@ -348,30 +340,32 @@ class CorrelationService:
                     f_lat = float(lat)
                     f_lon = float(lon)
                     ts = exif.get("timestamp") or exif.get("DateTimeOriginal")
-                    ts_val = None
-                    if isinstance(ts, (int, float)):
-                        ts_val = int(ts)
-                    location_obs.append(LocationObservation(
-                        observation_id=f"loc_media_{m.id}",
-                        source_type="media_exif",
-                        source_id=str(m.id),
-                        platform="media",
-                        latitude=f_lat,
-                        longitude=f_lon,
-                        timestamp=ts_val,
-                        evidence_id=m.evidence_id,
-                        label=m.file_path,
-                    ))
+                    ts_val = int(ts) if isinstance(ts, (int, float)) else None
+                    if ts_val is not None:
+                        # Normalize to utc_ms
+                        ts_ms = ts_val if ts_val > 10_000_000_000 else ts_val * 1000
+                        location_obs.append(LocationObservation(
+                            observation_id=f"loc_media_{m.id}",
+                            source_type="media_exif",
+                            source_id=str(m.id),
+                            platform="media",
+                            latitude=f_lat,
+                            longitude=f_lon,
+                            utc_ms=ts_ms,
+                            evidence_id=m.evidence_id,
+                            label=m.file_path,
+                        ))
                 except (ValueError, TypeError):
                     pass
 
-        # Extract from messages with coordinates
+        # Message body coordinates with explicit timestamps
         coord_pattern = r"([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)"
         for msg in wa_msgs:
-            if msg.body:
+            if msg.body and msg.timestamp is not None:
                 m_coord = re.search(coord_pattern, msg.body)
                 if m_coord:
                     try:
+                        ts_ms = msg.timestamp if msg.timestamp > 10_000_000_000 else msg.timestamp * 1000
                         location_obs.append(LocationObservation(
                             observation_id=f"loc_wa_{msg.message_id}",
                             source_type="wa_location",
@@ -379,7 +373,7 @@ class CorrelationService:
                             platform="whatsapp",
                             latitude=float(m_coord.group(1)),
                             longitude=float(m_coord.group(2)),
-                            timestamp=msg.timestamp // 1000 if msg.timestamp and msg.timestamp > 10_000_000_000 else msg.timestamp,
+                            utc_ms=ts_ms,
                             evidence_id=msg.evidence_id,
                             sender_id=msg.sender_jid,
                             label="Shared WhatsApp Coordinate",
@@ -388,10 +382,11 @@ class CorrelationService:
                         pass
 
         for msg in tg_msgs:
-            if msg.body:
+            if msg.body and msg.timestamp is not None:
                 m_coord = re.search(coord_pattern, msg.body)
                 if m_coord:
                     try:
+                        ts_ms = msg.timestamp if msg.timestamp > 10_000_000_000 else msg.timestamp * 1000
                         location_obs.append(LocationObservation(
                             observation_id=f"loc_tg_{msg.message_id}",
                             source_type="tg_location",
@@ -399,7 +394,7 @@ class CorrelationService:
                             platform="telegram",
                             latitude=float(m_coord.group(1)),
                             longitude=float(m_coord.group(2)),
-                            timestamp=msg.timestamp // 1000 if msg.timestamp and msg.timestamp > 10_000_000_000 else msg.timestamp,
+                            utc_ms=ts_ms,
                             evidence_id=msg.evidence_id,
                             sender_id=str(msg.sender_id),
                             label="Shared Telegram Coordinate",
@@ -407,31 +402,19 @@ class CorrelationService:
                     except (ValueError, TypeError):
                         pass
 
-        rendezvous_detector = SpatiotemporalRendezvousDetector(
-            default_distance_threshold_meters=rendezvous_dist_meters,
-            default_time_threshold_seconds=rendezvous_time_sec,
-        )
-        rendezvous_candidates = rendezvous_detector.detect_rendezvous(
-            location_obs,
-            distance_threshold_meters=rendezvous_dist_meters,
-            time_threshold_seconds=rendezvous_time_sec,
+        rendezvous_detector = SpatiotemporalRendezvousDetector(thresholds=thresholds)
+        rendezvous_findings = rendezvous_detector.detect_rendezvous_findings(location_obs)
+        all_findings.extend(rendezvous_findings)
+
+        # 7. Total deterministic sorting of findings (B12.6, R11)
+        all_findings.sort(key=lambda f: f.sort_key())
+
+        # Save findings to repository
+        self.correlation_repo.save_correlation_findings(
+            db, case_id, [f.to_dict() for f in all_findings]
         )
 
-        rendezvous_findings = []
-        for rc in rendezvous_candidates:
-            rendezvous_findings.append({
-                "finding_uuid": rc.rendezvous_id,
-                "finding_type": "rendezvous",
-                "sub_type": "spatiotemporal_cooccurrence",
-                "confidence_score": rc.confidence_score,
-                "details": rc.to_dict(),
-                "evidence_ids": [rc.observation_a.evidence_id, rc.observation_b.evidence_id],
-                "limitations": rc.limitations,
-                "provenance": rc.provenance,
-            })
-        self.correlation_repo.save_correlation_findings(db, case_id, rendezvous_findings)
-
-        # 6. Save combined edges into correlation_edges
+        # 8. Save combined edges for graph compatibility
         all_db_edges = []
         for e in resolved_edges:
             all_db_edges.append({
@@ -451,64 +434,103 @@ class CorrelationService:
                 }
             })
 
-        # Also add baseline cross-app message / contact edges
         baseline_edges = correlate_all(wa_msgs, wa_cnts, tg_msgs, tg_cnts, media_items, time_window_seconds=300)
         for be in baseline_edges:
             be["case_id"] = case_id
             all_db_edges.append(be)
 
         self.correlation_repo.save_edges(db, all_db_edges)
-        db.commit()
 
-        log_service.log_analysis(
-            evidence_id=None,
-            log_type="deep_correlation_completed",
-            message="R4 Deep Correlation Engine completed successfully",
+        # 9. Append-only cryptographic hash-chained audit log entry (B12.7, B5.5)
+        above_threshold_count = sum(1 for f in all_findings if not f.below_threshold)
+        below_threshold_count = len(all_findings) - above_threshold_count
+        counts_by_kind: Dict[str, int] = {}
+        for f in all_findings:
+            counts_by_kind[f.kind] = counts_by_kind.get(f.kind, 0) + 1
+
+        AuditService.append(
+            db=db,
+            action="CORRELATE",
+            case_id=case_id,
             details={
-                "case_id": case_id,
+                "thresholds_version": thresholds.version,
+                "total_findings": len(all_findings),
+                "above_threshold_count": above_threshold_count,
+                "below_threshold_count": below_threshold_count,
+                "counts_by_kind": counts_by_kind,
                 "persons_resolved": len(resolved_persons),
-                "handovers_detected": len(handover_candidates),
-                "media_matches": len(media_matches),
-                "artifacts_extracted": len(extracted_artifacts),
-                "rendezvous_detected": len(rendezvous_candidates),
             }
         )
 
         return {
             "status": "SUCCEEDED",
             "case_id": case_id,
+            "thresholds_version": thresholds.version,
+            "total_findings": len(all_findings),
+            "above_threshold_count": above_threshold_count,
+            "below_threshold_count": below_threshold_count,
+            "counts_by_kind": counts_by_kind,
             "persons_count": len(resolved_persons),
             "edges_count": len(all_db_edges),
-            "handovers_count": len(handover_candidates),
-            "media_matches_count": len(media_matches),
-            "artifacts_count": len(extracted_artifacts),
-            "rendezvous_count": len(rendezvous_candidates),
+            "handovers_count": len(handover_findings),
+            "media_matches_count": len(media_findings),
+            "artifacts_count": len(artifact_findings),
+            "rendezvous_count": len(rendezvous_findings),
             "ambiguous_candidates_count": len(ambiguous_candidates),
+            "findings": [f.to_dict() for f in all_findings],
             "parameters": {
-                "handover_threshold_seconds": handover_threshold,
-                "media_hamming_distance": media_hamming_thresh,
-                "rendezvous_distance_meters": rendezvous_dist_meters,
-                "rendezvous_time_seconds": rendezvous_time_sec,
+                "thresholds_version": thresholds.version,
+                "phone_default_region": thresholds.phone_default_region,
+                "media_hamming_distance": thresholds.dhash_max_hamming_distance,
+                "rendezvous_distance_meters": thresholds.rendezvous_max_distance_meters,
+                "rendezvous_time_seconds": thresholds.rendezvous_max_time_seconds,
+                "handover_threshold_seconds": thresholds.handover_max_time_seconds,
                 "custom_keywords": custom_keywords,
+                "report_threshold_confidence": thresholds.report_threshold_confidence,
             }
         }
 
+    def get_findings_for_case(
+        self,
+        db: Session,
+        case_id: int,
+        include_below_threshold: bool = True,
+        kind: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get forensic correlation findings for a case."""
+        findings = self.correlation_repo.get_findings_by_case_id(
+            db, case_id, include_below_threshold=include_below_threshold
+        )
+        if kind:
+            findings = [f for f in findings if f.kind == kind or f.finding_type == kind]
+        res = []
+        for f in findings:
+            details = f.details or {}
+            res.append({
+                "finding_id": f.finding_id or f.finding_uuid,
+                "kind": f.kind or f.finding_type,
+                "strength": f.strength or details.get("strength", "moderate"),
+                "match_certainty": f.match_certainty or details.get("match_certainty", 1.0),
+                "confidence_score": f.confidence_score,
+                "normalized_value": f.normalized_value or details.get("normalized_value", ""),
+                "left_ref": f.left_ref or details.get("left_ref", {}),
+                "right_ref": f.right_ref or details.get("right_ref", {}),
+                "limitations": f.limitations or details.get("limitations", []),
+                "provenance": f.provenance or details.get("provenance", {}),
+                "ambiguity": f.ambiguity or details.get("ambiguity", []),
+                "thresholds_version": f.thresholds_version or details.get("thresholds_version", "1.0.0"),
+                "below_threshold": f.below_threshold if f.below_threshold is not None else False,
+            })
+        return res
+
     def get_deep_graph(self, db: Session, case_id: int) -> Dict[str, Any]:
-        """
-        Generate a stable forensic JSON graph of nodes and edges for visual forensic analysis:
-        {
-          "nodes": [...],
-          "edges": [...],
-          "metadata": {...}
-        }
-        """
+        """Generate a stable forensic JSON graph of nodes and edges."""
         persons = self.correlation_repo.get_person_entities_by_case_id(db, case_id)
         edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
         findings = self.correlation_repo.get_findings_by_type(db, case_id)
 
         nodes_dict: Dict[str, Dict[str, Any]] = {}
 
-        # 1. Person nodes
         for p in persons:
             nodes_dict[p.entity_uuid] = {
                 "id": p.entity_uuid,
@@ -526,7 +548,6 @@ class CorrelationService:
                 "limitations": p.limitations or [],
             }
 
-            # Account sub-nodes
             for acc in p.attributes.get("resolved_accounts", []):
                 acc_id = f"acc_{acc.get('platform')}_{acc.get('account_id')}"
                 if acc_id not in nodes_dict:
@@ -537,11 +558,9 @@ class CorrelationService:
                         "properties": acc,
                     }
 
-        # 2. Add edges
         graph_edges = []
         for e in edges:
             meta = e.metadata_ or {}
-            # Ensure source and target nodes exist in graph
             if e.source_id not in nodes_dict:
                 nodes_dict[e.source_id] = {
                     "id": e.source_id,
@@ -574,7 +593,7 @@ class CorrelationService:
             "nodes": list(nodes_dict.values()),
             "edges": graph_edges,
             "metadata": {
-                "algorithm_version": "1.0.0",
+                "algorithm_version": DEFAULT_THRESHOLDS.version,
                 "case_id": case_id,
                 "node_count": len(nodes_dict),
                 "edge_count": len(graph_edges),
@@ -583,27 +602,22 @@ class CorrelationService:
         }
 
     def get_platform_handovers(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        """Get detected cross-platform handovers."""
         findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="handover")
         return [f.details for f in findings if f.details]
 
     def get_media_correlations(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        """Get perceptual media matches."""
         findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="media_match")
         return [f.details for f in findings if f.details]
 
     def get_shared_artifacts(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        """Get extracted and shared deterministic artifacts."""
         findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="shared_artifact")
         return [f.details for f in findings if f.details]
 
     def get_rendezvous_events(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        """Get spatiotemporal rendezvous candidates."""
         findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="rendezvous")
         return [f.details for f in findings if f.details]
 
     def get_resolved_persons(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        """Get resolved person entity clusters."""
         persons = self.correlation_repo.get_person_entities_by_case_id(db, case_id)
         res = []
         for p in persons:
@@ -623,7 +637,6 @@ class CorrelationService:
         return res
 
     def get_edges_for_case(self, db: Session, case_id: int) -> List[dict]:
-        """Get correlation edges for a case as dictionaries."""
         edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
         return [
             {
@@ -640,13 +653,11 @@ class CorrelationService:
         ]
 
     def get_entity_resolutions(self, db: Session, case_id: int) -> List[dict]:
-        """Get resolved cross-app entity contact mappings for a case (backwards compatible)."""
         edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
         contact_edges = [
             e for e in edges
             if e.relation_type in ("matches_contact", "SAME_ENTITY_CORROBORATED", "HANDLE_CORRELATED_CANDIDATE")
         ]
-
         resolutions = []
         for edge in contact_edges:
             meta = edge.metadata_ or {}
@@ -655,26 +666,23 @@ class CorrelationService:
                 "wa_jid": edge.source_id,
                 "tg_user_id": edge.target_id,
                 "phone_number": meta.get("phone_number", ""),
-                "confidence_score": meta.get("confidence_score", meta.get("strength_score", 1.0)),
+                "confidence_score": meta.get("confidence_score", meta.get("strength_score", 0.95)),
                 "match_reason": meta.get("match_reason", meta.get("method", "Contact Match")),
                 "wa_name": meta.get("wa_name", edge.source_id),
                 "tg_name": meta.get("tg_name", edge.target_id),
                 "tg_username": meta.get("tg_username", ""),
                 "is_ambiguous": meta.get("is_ambiguous", False),
             })
-
         resolutions.sort(key=lambda x: x["confidence_score"], reverse=True)
         return resolutions
 
     def get_cross_app_message_matrix(self, db: Session, case_id: int, window_seconds: int = 300) -> List[dict]:
-        """Get correlated cross-app message exchanges within the specified time window threshold."""
         edges = self.correlation_repo.get_edges_by_case_id(db, case_id)
         matrix_edges = [
             e for e in edges
             if e.relation_type == "time_window_correlated"
             and (e.metadata_ or {}).get("time_delta_seconds", 999999) <= window_seconds
         ]
-
         matrix = []
         for edge in matrix_edges:
             meta = edge.metadata_ or {}
@@ -692,12 +700,10 @@ class CorrelationService:
                 "same_entity_pair": meta.get("same_entity_pair", False),
                 "confidence_score": meta.get("confidence_score", 0.75),
             })
-
         matrix.sort(key=lambda x: (x["time_delta_seconds"], -x["confidence_score"]))
         return matrix
 
     def check_case_evidence_platforms(self, db: Session, case_id: int) -> dict:
-        """Accurately inspect evidence records, files, and parsed tables to determine WhatsApp and Telegram presence."""
         from backend.models.models import Evidence, EvidenceFile, WhatsAppMessage as ORM_WAMsg, WhatsAppContact as ORM_WACnt, TelegramMessage as ORM_TGMsg, TelegramContact as ORM_TGCnt
 
         evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
@@ -705,7 +711,6 @@ class CorrelationService:
             return {"has_whatsapp": False, "has_telegram": False, "evidence_count": 0}
 
         ev_ids = [e.id for e in evidences]
-
         wa_msgs = db.query(ORM_WAMsg.id).filter(ORM_WAMsg.evidence_id.in_(ev_ids)).first()
         wa_cnts = db.query(ORM_WACnt.id).filter(ORM_WACnt.evidence_id.in_(ev_ids)).first()
         tg_msgs = db.query(ORM_TGMsg.id).filter(ORM_TGMsg.evidence_id.in_(ev_ids)).first()
