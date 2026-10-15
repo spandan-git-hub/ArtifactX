@@ -440,3 +440,118 @@ MTProto TL serialization format:
   - Same place at delta > 2 hours -> rejected (decoy reason `rendezvous_time_exceeded`).
   - Different place at exact same time -> rejected (decoy reason `rendezvous_different_place`).
 
+
+---
+
+## 6. SQLite Low-Level File Format, B-Tree, and WAL Specifications (B8, R20)
+
+> Verified against primary sources: SQLite File Format documentation (sqlite.org/fileformat2.html) and SQLite Write-Ahead Log documentation (sqlite.org/wal.html). Cross-verified with empirical tests on DS-01 and DS-05 fixtures.
+
+### 6.1 Database Header Offsets (100 Bytes)
+- **Offset 0..15**: Magic string `b"SQLite format 3\x00"` (16 bytes).
+- **Offset 16..17**: Database page size (2 bytes, big-endian `>H`). Valid powers of 2 from 512 to 32768, or value `1` representing `65536`.
+- **Offset 18**: File format write version (1 = legacy journal, 2 = WAL mode).
+- **Offset 19**: File format read version (1 = legacy journal, 2 = WAL mode).
+- **Offset 20**: Reserved space at end of each page in bytes (typically 0).
+- **Offset 21**: Maximum embedded payload fraction (must be 64).
+- **Offset 22**: Minimum embedded payload fraction (must be 32).
+- **Offset 23**: Leaf payload fraction (must be 32).
+- **Offset 24..27**: File change counter (4 bytes big-endian `>I`).
+- **Offset 28..31**: Database size in pages (4 bytes big-endian `>I`). Valid if change counter == version-valid-for.
+- **Offset 32..35**: Page number of first freelist trunk page (4 bytes big-endian `>I`, 0 if none).
+- **Offset 36..39**: Total number of freelist pages (4 bytes big-endian `>I`).
+- **Offset 40..43**: Schema cookie (4 bytes big-endian).
+- **Offset 44..47**: Schema format number (1, 2, 3, or 4).
+- **Offset 48..51**: Suggested page cache size.
+- **Offset 52..55**: Largest root b-tree page for auto-vacuum mode (0 if inactive).
+- **Offset 56..59**: Database text encoding:
+  - `1`: UTF-8
+  - `2`: UTF-16LE
+  - `3`: UTF-16BE
+- **Offset 60..63**: User version (`PRAGMA user_version`).
+- **Offset 64..67**: Incremental vacuum mode flag.
+- **Offset 68..71**: Application ID (`PRAGMA application_id`).
+- **Offset 72..91**: Reserved for expansion (must be zero).
+- **Offset 92..95**: Version-valid-for number.
+- **Offset 96..99**: SQLite version number.
+
+### 6.2 B-Tree Page Header
+- Page 1 b-tree header begins at byte offset 100 (immediately following the 100-byte database header).
+- For all other pages (page_num >= 2), the b-tree header begins at byte offset 0.
+- **Header Fields**:
+  - Byte 0: Page type flag:
+    - `0x02`: Interior index page (header length 12 bytes).
+    - `0x05`: Interior table page (header length 12 bytes).
+    - `0x0A`: Leaf index page (header length 8 bytes).
+    - `0x0D`: Leaf table page (header length 8 bytes).
+  - Bytes 1..2: Byte offset of first freeblock (2 bytes big-endian, 0 if none).
+  - Bytes 3..4: Number of cells stored on this page (2 bytes big-endian).
+  - Bytes 5..6: Byte offset of the start of cell content area (2 bytes big-endian, value 0 means 65536).
+  - Byte 7: Number of fragmented free bytes within the cell content area.
+  - Bytes 8..11 (interior pages only): Page number of right-most child page (4 bytes big-endian).
+- **Cell Pointer Array**: Follows immediately after the page header (`hdr_offset + hdr_size`), containing `2 * cell_count` bytes of 2-byte big-endian cell start offsets.
+
+### 6.3 Leaf Table Cell & Spill Thresholds (§1.6)
+- **Cell Layout**:
+  - Varint: Payload length `P`.
+  - Varint: Rowid (signed 64-bit integer; negative values converted from two's complement).
+  - Local payload bytes: `local_len` bytes.
+  - Optional 4-byte big-endian pointer to first overflow page if `has_overflow`.
+- **Spill Formulas**:
+  Let usable page size `U = page_size - reserved`.
+  - `X = U - 35` (maximum payload before spill).
+  - `M = ((U - 12) * 32 // 255) - 23` (minimum local payload).
+  - If `P <= X`: all `P` bytes local, no overflow pointer.
+  - If `P > X`:
+    - `K = M + ((P - M) % (U - 4))`
+    - `local_len = K if K <= X else M`
+    - Remaining `P - local_len` bytes stored in linked overflow pages.
+- **Overflow Page Structure**:
+  - Bytes 0..3: Next overflow page number (4 bytes big-endian, 0 if last).
+  - Bytes 4..`U`: Up to `U - 4` bytes of payload slice.
+
+### 6.4 Record Decoding & Serial Types (§2.1)
+- **Record Header**: Varint `H` (header size including `H` itself), followed by column serial type varints.
+- **Serial Types**:
+  - `0`: NULL (`None`, 0 bytes)
+  - `1`: 8-bit signed int (1 byte)
+  - `2`: 16-bit signed big-endian int (2 bytes)
+  - `3`: 24-bit signed big-endian int with sign extension (3 bytes)
+  - `4`: 32-bit signed big-endian int (4 bytes)
+  - `5`: 48-bit signed big-endian int with sign extension (6 bytes)
+  - `6`: 64-bit signed big-endian int (8 bytes)
+  - `7`: 64-bit IEEE 754 float (8 bytes)
+  - `8`: Constant integer 0 (0 bytes)
+  - `9`: Constant integer 1 (0 bytes)
+  - `>= 12` and even: BLOB of length `(N - 12) // 2` bytes.
+  - `>= 13` and odd: TEXT of length `(N - 13) // 2` bytes, decoded per database text encoding (UTF-8, UTF-16LE, UTF-16BE); invalid bytes replaced with `\ufffd` and `has_encoding_errors=True`.
+
+### 6.5 Freelist Traversal & Freeblocks
+- **Trunk Page**:
+  - Bytes 0..3: Next trunk page (4 bytes big-endian, 0 if last).
+  - Bytes 4..7: Number of leaf pointers on this trunk page `L` (4 bytes big-endian).
+  - Bytes 8..`8 + 4*L`: Array of 4-byte big-endian leaf page numbers.
+- **Freeblock**:
+  - Bytes 0..1: Next freeblock offset (2 bytes big-endian, 0 if last).
+  - Bytes 2..3: Size of freeblock (2 bytes big-endian, >= 4).
+
+### 6.6 Write-Ahead Log (WAL) Format & Views
+- **WAL Header (32 bytes)**:
+  - Magic: `0x377F0682` (little-endian checksums) or `0x377F0683` (big-endian checksums).
+  - Version: 3007000 (`WAL_VERSION`).
+  - Page size, sequence number, salt-1, salt-2 (big-endian 32-bit integers).
+  - Checksum-1, Checksum-2 (stored in byte order matching magic).
+- **Frame Header (24 bytes)**:
+  - Page number (4 bytes big-endian).
+  - Commit size (4 bytes big-endian; non-zero indicates a commit frame).
+  - Salt-1, Salt-2 (must match header; mismatch indicates stale generation from earlier WAL cycle).
+  - Checksum-1, Checksum-2 (cumulative running checksum).
+- **Checksum Algorithm**:
+  - Evaluated in 8-byte steps (`>II` if big-endian magic, `<II` if little-endian magic).
+  - `s1 = (s1 + v0 + s2) & 0xFFFFFFFF`, `s2 = (s2 + v1 + s1) & 0xFFFFFFFF`.
+  - Frame input: First 8 bytes of frame header (`page_number` + `commit_size`) concatenated with all `page_size` bytes of page payload.
+- **Views**:
+  - `main_view`: Main database file bytes alone.
+  - `post_wal_view`: Main database with latest committed valid WAL frames applied in-memory, updating database size in pages if commits grew the table.
+
+
