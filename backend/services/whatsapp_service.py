@@ -1,292 +1,292 @@
-"""WhatsApp analysis service."""
+"""
+WhatsApp analysis service (spec B7.5, master.md R3, R4, R12, R18).
+Integrates integrity verification (ensure_integrity), pure in-memory parsing,
+hash-chained audit logging, and idempotent atomic database persistence.
+"""
 
-import asyncio
+from __future__ import annotations
+
 import traceback
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 from sqlalchemy.orm import Session
 
-from backend.app.database import SessionLocal
-from forensic.whatsapp.detector import is_whatsapp_database
-from forensic.whatsapp.message_parser import extract_messages
-from forensic.whatsapp.contact_parser import extract_contacts
-from forensic.whatsapp.group_parser import extract_groups
-from forensic.whatsapp.media_parser import extract_media_references
-from forensic.media.detector import detect_media_type
-from forensic.media.metadata import extract_media_metadata
+from backend.models.models import (
+    DerivedArtifact,
+    Evidence,
+    EvidenceFile,
+    WhatsAppChat,
+    WhatsAppContact,
+    WhatsAppEdit,
+    WhatsAppGroup,
+    WhatsAppMessage,
+    WhatsAppRevocation,
+)
 from backend.repositories.whatsapp_repo import WhatsAppRepository
-from backend.models.models import Evidence, WhatsAppMessage, WhatsAppContact, WhatsAppGroup, EvidenceFile, MediaItem
+from backend.services.audit_service import AuditService
+from backend.services.integrity_service import LegacyUnverifiableError, ensure_integrity
 from backend.services.log_service import get_log_service
-from datetime import datetime
+from forensic.whatsapp.parser import WAParseResult, WhatsAppParser
 
 
 class WhatsAppService:
-    """Service for WhatsApp analysis operations."""
+    """Service for WhatsApp analysis and forensic parsing operations."""
 
     def __init__(self):
         self.repository = WhatsAppRepository()
 
-    def _get_whatsapp_db_source(self, evidence: Evidence, db: Session):
-        """Retrieve database source (bytes or Path) prioritizing in-memory zero-disk storage."""
+    def _extract_db_sources(
+        self,
+        evidence: Evidence,
+        db: Session,
+        derived_artifact_id: Optional[str] = None,
+    ) -> Tuple[Optional[bytes], Optional[bytes], Optional[str]]:
+        """
+        Locate msgstore.db bytes and optional wa.db bytes prioritizing pure in-memory storage (R4).
+        Returns: (msgstore_bytes, wa_db_bytes, sha256_of_msgstore).
+        """
+        # 1. If derived_artifact_id is specified, fetch from DerivedArtifact table
+        if derived_artifact_id:
+            artifact = None
+            try:
+                art_id_int = int(derived_artifact_id)
+                artifact = db.query(DerivedArtifact).filter(
+                    DerivedArtifact.id == art_id_int
+                ).first()
+            except ValueError:
+                pass
+            if not artifact:
+                artifact = db.query(DerivedArtifact).filter(
+                    (DerivedArtifact.sha256 == derived_artifact_id)
+                    | (DerivedArtifact.original_filename == derived_artifact_id)
+                ).first()
+            if artifact and artifact.content_bytes:
+                return artifact.content_bytes, None, artifact.sha256
+
+        # 2. Check extracted files from ZIP package in EvidenceFile
         ef_list = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence.id).all()
-        for ef in ef_list:
-            if ef.content_bytes and (ef.relative_path.endswith(".db") or ef.relative_path.endswith(".sqlite") or "msgstore" in ef.relative_path.lower()):
-                if is_whatsapp_database(ef.content_bytes):
-                    return ef.content_bytes
-
-        if evidence.content_bytes and is_whatsapp_database(evidence.content_bytes):
-            return evidence.content_bytes
+        msgstore_bytes: Optional[bytes] = None
+        wa_db_bytes: Optional[bytes] = None
+        msgstore_sha256: Optional[str] = None
 
         for ef in ef_list:
-            if ef.content_bytes and is_whatsapp_database(ef.content_bytes):
-                return ef.content_bytes
+            name_lower = ef.relative_path.lower()
+            if "msgstore" in name_lower and (name_lower.endswith(".db") or name_lower.endswith(".sqlite")):
+                if ef.content_bytes:
+                    msgstore_bytes = ef.content_bytes
+                    msgstore_sha256 = ef.sha256
+            elif "wa.db" in name_lower and ef.content_bytes:
+                wa_db_bytes = ef.content_bytes
 
+        if msgstore_bytes:
+            return msgstore_bytes, wa_db_bytes, msgstore_sha256 or evidence.sha256
+
+        # 3. Direct evidence content bytes
+        if evidence.content_bytes:
+            # Check if it starts with SQLite header
+            if evidence.content_bytes.startswith(b"SQLite format 3\x00"):
+                return evidence.content_bytes, wa_db_bytes, evidence.sha256
+
+        # 4. Check filesystem fallback for local test fixtures
         if evidence.extracted_path:
-            extracted_dir = Path(evidence.extracted_path)
-            if extracted_dir.exists():
-                for db_file in extracted_dir.rglob("*.db"):
-                    if is_whatsapp_database(db_file):
-                        return db_file
-                db_files = list(extracted_dir.rglob("*.db"))
-                if db_files:
-                    return db_files[0]
+            p = Path(evidence.extracted_path)
+            if p.exists():
+                for f in p.rglob("*.db"):
+                    if "msgstore" in f.name.lower() and f.is_file():
+                        msgstore_bytes = f.read_bytes()
+                        break
+                wa_file = p / "wa.db"
+                if wa_file.exists() and wa_file.is_file():
+                    wa_db_bytes = wa_file.read_bytes()
+                if msgstore_bytes:
+                    return msgstore_bytes, wa_db_bytes, evidence.sha256
 
         if evidence.storage_path:
             p = Path(evidence.storage_path)
-            if p.exists() and is_whatsapp_database(p):
-                return p
+            if p.exists() and p.is_file() and p.name.endswith(".db"):
+                return p.read_bytes(), wa_db_bytes, evidence.sha256
 
-        return None
+        return None, None, None
 
-    def analyze_evidence_sync(self, evidence_id: int, db: Session) -> bool:
-        """Synchronously trigger WhatsApp analysis on evidence."""
+    def parse_evidence_sync(
+        self,
+        evidence_id: int,
+        db: Session,
+        derived_artifact_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Synchronously parse WhatsApp evidence with integrity enforcement and audit chaining (B7.5).
+        """
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
-            return False
+            raise FileNotFoundError(f"Evidence {evidence_id} not found")
 
         log_service = get_log_service(db)
         log_service.log_analysis(
             evidence_id=evidence_id,
-            log_type="whatsapp_analysis_start",
-            message="Starting WhatsApp analysis",
-            details={"evidence_id": evidence_id}
+            log_type="whatsapp_parse_start",
+            message="Starting WhatsApp forensic parsing",
+            details={"evidence_id": evidence_id, "derived_artifact_id": derived_artifact_id},
         )
 
-        try:
-            db_source = self._get_whatsapp_db_source(evidence, db)
-            if db_source is None:
-                log_service.log_analysis(
-                    evidence_id=evidence_id,
-                    log_type="whatsapp_analysis_failed",
-                    message="WhatsApp analysis failed: No valid WhatsApp database found",
-                    details={"evidence_id": evidence_id}
-                )
-                return False
+        # 1. Enforce evidence cryptographic integrity check (B5.3, master.md R3)
+        if not derived_artifact_id:
+            ensure_integrity(evidence_id, db, action_context="whatsapp_parse")
 
-            self._perform_analysis(evidence_id, db_source, evidence, db)
-            evidence.analyzed_at = datetime.utcnow()
-            db.commit()
-
+        # 2. Extract database bytes
+        msgstore_bytes, wa_db_bytes, db_sha256 = self._extract_db_sources(evidence, db, derived_artifact_id)
+        if not msgstore_bytes:
+            err_msg = "No valid WhatsApp database found in evidence content"
             log_service.log_analysis(
                 evidence_id=evidence_id,
-                log_type="whatsapp_analysis_completed",
-                message="WhatsApp analysis completed successfully",
-                details={"evidence_id": evidence_id}
+                log_type="whatsapp_parse_failed",
+                message=err_msg,
+                details={"evidence_id": evidence_id},
             )
-            return True
-        except Exception as e:
-            log_service.log_error(
-                error_type="whatsapp_analysis_error",
-                message=f"Error during WhatsApp analysis: {str(e)}",
-                case_id=evidence.case_id if evidence else None,
-                evidence_id=evidence_id,
-                stack_trace=traceback.format_exc(),
-                endpoint=f"/api/evidence/{evidence_id}/analyze/whatsapp",
-                method="POST"
-            )
-            return False
+            raise ValueError(err_msg)
 
-    async def analyze_evidence(self, evidence_id: int, db: Session) -> bool:
-        """Trigger WhatsApp analysis on evidence."""
-        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
-        if not evidence:
-            return False
+        # 3. Execute pure forensic parser (B7.0-B7.4)
+        parser = WhatsAppParser(
+            msgstore_source=msgstore_bytes,
+            evidence_id=str(evidence_id),
+            evidence_sha256=db_sha256 or evidence.sha256,
+            wa_db_source=wa_db_bytes,
+            derived_from_artifact_id=derived_artifact_id,
+        )
+        parse_result = parser.parse()
 
-        log_service = get_log_service(db)
-        log_service.log_analysis(
+        # 4. Save to database atomically and idempotently (B7.5)
+        self.repository.save_parse_result(
+            db=db,
             evidence_id=evidence_id,
-            log_type="whatsapp_analysis_start",
-            message="Starting WhatsApp analysis",
-            details={"evidence_id": evidence_id}
+            parse_result=parse_result,
+            derived_artifact_id=derived_artifact_id,
         )
 
-        try:
-            db_source = self._get_whatsapp_db_source(evidence, db)
-            if db_source is None:
-                log_service.log_analysis(
-                    evidence_id=evidence_id,
-                    log_type="whatsapp_analysis_failed",
-                    message="WhatsApp analysis failed: No valid WhatsApp database found",
-                    details={"evidence_id": evidence_id, "reason": "no_db_file"}
-                )
-                return False
-
-            self._perform_analysis(evidence_id, db_source, evidence, db)
-            evidence.analyzed_at = datetime.utcnow()
-            db.commit()
-
-            # Log analysis success
-            log_service.log_analysis(
-                evidence_id=evidence_id,
-                log_type="whatsapp_analysis_completed",
-                message="WhatsApp analysis completed successfully",
-                details={"evidence_id": evidence_id}
-            )
-            log_service.log_activity(
-                case_id=evidence.case_id,
-                action="analyze_whatsapp",
-                description=f"WhatsApp forensic parser completed for evidence: {evidence.original_filename}"
-            )
-
-            return True
-        except Exception as e:
-            # Log error
-            log_service.log_error(
-                error_type="whatsapp_analysis_error",
-                message=f"Error during WhatsApp analysis: {str(e)}",
-                case_id=evidence.case_id if evidence else None,
-                evidence_id=evidence_id,
-                stack_trace=traceback.format_exc(),
-                endpoint="/api/evidence/{evidence_id}/analyze/whatsapp",
-                method="POST"
-            )
-            return False
-
-    def _perform_analysis(self, evidence_id: int, db_path: Path, evidence: Evidence, db: Session):
-        """
-        Perform the actual WhatsApp analysis.
-
-        Args:
-            evidence_id: ID of evidence
-            db_path: Path to WhatsApp database
-            evidence: Evidence object
-            db: Database session
-        """
-        # Extract data using parsers
-        messages = extract_messages(db_path, evidence_id)
-        contacts = extract_contacts(db_path, evidence_id)
-        groups = extract_groups(db_path, evidence_id)
-        media_refs = extract_media_references(db_path, evidence_id)
-
-        # Save to database using repository
-        if messages:
-            self.repository.save_messages(db, messages)
-        if contacts:
-            self.repository.save_contacts(db, contacts)
-        if groups:
-            self.repository.save_groups(db, groups)
-        if media_refs:
-            self._save_media_items(evidence_id, media_refs, evidence, db)
-
-    def _find_evidence_file_by_filename(self, evidence_id: int, filename: str, db: Session) -> Optional[EvidenceFile]:
-        """Find an EvidenceFile by evidence_id and filename (basename match)."""
-        if not filename:
-            return None
-        # Get all files for this evidence
-        files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == evidence_id).all()
-        for ef in files:
-            # Check if the relative_path ends with '/' + filename or equals filename
-            if ef.relative_path == filename or ef.relative_path.endswith('/' + filename):
-                return ef
-        return None
-
-    def _save_media_items(self, evidence_id: int, media_refs: List[dict], evidence: Evidence, db: Session):
-        """Save media items from media references."""
-        from backend.models.models import MediaItem
-
-        for ref in media_refs:
-            # Try to find the actual file in the extracted evidence
-            ef = self._find_evidence_file_by_filename(evidence_id, Path(ref["media_path"]).name, db)
-            if not ef:
-                # If not found, we can still create a MediaItem with placeholder? But we should skip.
-                continue
-
-            # Determine media type from mime type or from ref
-            media_type = ref.get("message_type")
-            if not media_type:
-                mime = ef.mime_type or ""
-                if mime.startswith("image/"):
-                    media_type = "image"
-                elif mime.startswith("video/"):
-                    media_type = "video"
-                elif mime.startswith("audio/"):
-                    media_type = "audio"
-                else:
-                    media_type = "other"
-
-            # Build MediaItem record
-            media_item = MediaItem(
-                case_id=evidence.case_id,
-                evidence_id=evidence_id,
-                file_path=str(Path(evidence.extracted_path or evidence.storage_path) / ef.relative_path),
-                sha256=ef.sha256,
-                mime_type=ef.mime_type,
-                media_type=media_type,
-                file_size=ef.file_size,
-                width=None,  # To be filled by media analysis phase
-                height=None,
-                duration=None,
-                exif_data={},  # To be filled by media analysis phase
-                is_orphan=False,  # Will be determined by correlation phase
-                linked_message_id=ref["message_id"],
-            )
-            db.add(media_item)
+        evidence.analyzed_at = datetime.utcnow()
         db.commit()
 
-    def get_messages(self, evidence_id: int, db: Session) -> Optional[List]:
-        """Get WhatsApp messages for evidence."""
+        # 5. Append to cryptographic hash-chained audit log (B5.5, R3, R11)
+        audit_details = {
+            "evidence_id": evidence_id,
+            "evidence_sha256": db_sha256 or evidence.sha256,
+            "schema_family": parse_result.schema_family.family,
+            "messages_count": len(parse_result.messages),
+            "chats_count": len(parse_result.chats),
+            "contacts_count": len(parse_result.contacts),
+            "revocations_count": len(parse_result.revocations),
+            "edits_count": len(parse_result.edits),
+            "limitations": list(parse_result.limitations),
+            "derived_artifact_id": derived_artifact_id,
+        }
+        AuditService.append(
+            db=db,
+            action="whatsapp_parse",
+            actor="system",
+            case_id=evidence.case_id,
+            evidence_id=evidence_id,
+            details=audit_details,
+        )
+
+        # 6. Activity & analysis logs
+        log_service.log_analysis(
+            evidence_id=evidence_id,
+            log_type="whatsapp_parse_completed",
+            message="WhatsApp forensic parsing completed successfully",
+            details=audit_details,
+        )
+        log_service.log_activity(
+            case_id=evidence.case_id,
+            action="parse_whatsapp",
+            description=f"WhatsApp parsing completed: {len(parse_result.messages)} messages, {len(parse_result.chats)} chats, {len(parse_result.revocations)} revocations.",
+        )
+
+        return {
+            "status": "success",
+            "evidence_id": evidence_id,
+            "schema_family": parse_result.schema_family.family,
+            "messages_count": len(parse_result.messages),
+            "chats_count": len(parse_result.chats),
+            "contacts_count": len(parse_result.contacts),
+            "revocations_count": len(parse_result.revocations),
+            "edits_count": len(parse_result.edits),
+            "limitations": list(parse_result.limitations),
+        }
+
+    async def analyze_evidence(self, evidence_id: int, db: Session) -> bool:
+        """Async wrapper for compatibility with existing routers."""
+        try:
+            self.parse_evidence_sync(evidence_id, db)
+            return True
+        except Exception as e:
+            get_log_service(db).log_error(
+                error_type="whatsapp_parse_error",
+                message=f"Error during WhatsApp parsing: {str(e)}",
+                evidence_id=evidence_id,
+                stack_trace=traceback.format_exc(),
+                endpoint=f"/api/whatsapp/parse/{evidence_id}",
+                method="POST",
+            )
+            return False
+
+    def get_messages(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppMessage]]:
+        """Get parsed WhatsApp messages for evidence."""
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
             return None
         return self.repository.get_messages_by_evidence_id(db, evidence_id)
 
-    def get_contacts(self, evidence_id: int, db: Session) -> Optional[List]:
-        """Get WhatsApp contacts for evidence."""
+    def get_chats(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppChat]]:
+        """Get parsed WhatsApp chats for evidence."""
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            return None
+        return self.repository.get_chats_by_evidence_id(db, evidence_id)
+
+    def get_contacts(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppContact]]:
+        """Get parsed WhatsApp contacts for evidence."""
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
             return None
         return self.repository.get_contacts_by_evidence_id(db, evidence_id)
 
-    def get_groups(self, evidence_id: int, db: Session) -> Optional[List]:
-        """Get WhatsApp groups for evidence."""
+    def get_groups(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppGroup]]:
+        """Get parsed WhatsApp groups for evidence."""
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
             return None
         return self.repository.get_groups_by_evidence_id(db, evidence_id)
 
-    def get_media_references(self, evidence_id: int, db: Session) -> List[dict]:
-        """Get media references from WhatsApp messages for evidence."""
+    def get_revocations(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppRevocation]]:
+        """Get parsed WhatsApp revocation records for evidence."""
         evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
         if not evidence:
             return None
+        return self.repository.get_revocations_by_evidence_id(db, evidence_id)
 
-        messages = self.repository.get_messages_by_evidence_id(db, evidence_id)
-        media_refs = []
+    def get_edits(self, evidence_id: int, db: Session) -> Optional[List[WhatsAppEdit]]:
+        """Get parsed WhatsApp edit records for evidence."""
+        evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+        if not evidence:
+            return None
+        return self.repository.get_edits_by_evidence_id(db, evidence_id)
 
-        for msg in messages:
-            if msg.media_path and msg.media_type:
-                media_refs.append({
-                    "message_id": msg.message_id,
-                    "media_path": msg.media_path,
-                    "media_type": msg.media_type,
-                    "file_size": getattr(msg, 'file_size', None),
-                    "width": getattr(msg, 'width', None),
-                    "height": getattr(msg, 'height', None),
-                    "duration": getattr(msg, 'duration', None)
-                })
+    def get_media_references(self, evidence_id: int, db: Session) -> Optional[List[Dict[str, Any]]]:
+        """Get media references from WhatsApp messages."""
+        msgs = self.get_messages(evidence_id, db)
+        if msgs is None:
+            return None
+        return [
+            {
+                "message_id": m.message_id,
+                "media_path": m.media_path,
+                "media_type": m.media_type,
+                "timestamp": m.timestamp,
+            }
+            for m in msgs
+            if m.media_path
+        ]
 
-        return media_refs
 
-
-# Singleton instance
 whatsapp_service = WhatsAppService()

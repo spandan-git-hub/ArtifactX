@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from forensic.whatsapp.detector import is_whatsapp_database
+from forensic.whatsapp import is_whatsapp_database
 from tools.groundtruth.rng import DeterministicRNG
 from tools.groundtruth.verify_dataset import verify_dataset
 from tools.groundtruth.wa.generator import generate_whatsapp_plain_dataset

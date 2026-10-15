@@ -274,9 +274,52 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
       "error_message": "Authentication tag mismatch: wrong key OR modified/corrupted data",
       "created_at": "2026-10-15T10:00:01.000000",
       "completed_at": "2026-10-15T10:00:01.050000"
+## 2026-10-15 B7 — WhatsApp Parsing API & Forensic Endpoints (spec B7.5)
+- **Endpoint:** `POST /api/whatsapp/parse/{evidence_id}`
+  - **New route:** Primary forensic parsing route for WhatsApp plaintext `msgstore.db` evidence or decrypted SQLite artifacts.
+  - Query parameter: `derived_artifact_id: Optional[str]` — when parsing from a decrypted derived artifact (B6).
+  - Pre-flight integrity: runs `ensure_integrity` before parsing (R3).
+  - Audit: appends hash-chained audit log entry (`action="whatsapp_parse"`).
+  - Idempotency: replaces existing messages, chats, revocations, and edits for the evidence in a single transaction.
+  - Response contract:
+    ```json
+    {
+      "status": "success",
+      "evidence_id": 1,
+      "schema_family": "modern",
+      "messages_count": 381,
+      "chats_count": 5,
+      "contacts_count": 5,
+      "revocations_count": 1,
+      "edits_count": 1,
+      "limitations": []
     }
     ```
-
-
-
-
+- **Endpoint:** `POST /api/whatsapp/evidence/{evidence_id}/analyze/whatsapp`
+  - Backwards-compatible alias for existing frontend workflow, delegates to `parse_evidence_sync`.
+- **Endpoint:** `GET /api/whatsapp/evidence/{evidence_id}/wa-messages`
+  - Additive fields added to `MessageRead` response schema:
+    - `key_id: Optional[str]`
+    - `chat_row_id: Optional[int]`
+    - `message_type_code: Optional[int]`
+    - `message_type_name: Optional[str]`
+    - `ts_raw: Optional[int]`
+    - `ts_unit: Optional[str] = "ms"`
+    - `ts_utc_ms: Optional[int]`
+    - `received_ts_raw: Optional[int]`
+    - `source_table: Optional[str] = "message"`
+    - `source_row_id: Optional[int]`
+    - `derived_artifact_id: Optional[str]`
+    - `evidence_sha256: Optional[str]`
+    - `quoted_row_id: Optional[int]`
+    - `location_lat: Optional[float]`
+    - `location_lon: Optional[float]`
+    - `is_revoked: Optional[bool]`
+    - `is_edited: Optional[bool]`
+    - `flags: Optional[List[str]]`
+- **Endpoint:** `GET /api/whatsapp/evidence/{evidence_id}/wa-chats`
+  - New endpoint returning extracted chat threads, subject, participant JIDs, and provenance.
+- **Endpoint:** `GET /api/whatsapp/evidence/{evidence_id}/wa-revocations`
+  - New endpoint returning Tier-1 explicit message revocation findings (`message_revoked` rows) with deterministic strength, confidence score 1.0, and provenance.
+- **Endpoint:** `GET /api/whatsapp/evidence/{evidence_id}/wa-edits`
+  - New endpoint returning message edit history findings (`message_edit_info` rows) with deterministic strength, confidence score 1.0, and provenance.

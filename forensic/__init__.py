@@ -1,10 +1,22 @@
 """Forensic analysis engine for ArtifactX."""
 
-from forensic.whatsapp.detector import is_whatsapp_database
-from forensic.whatsapp.message_parser import extract_messages
-from forensic.whatsapp.contact_parser import extract_contacts
-from forensic.whatsapp.group_parser import extract_groups
-from forensic.whatsapp.media_parser import extract_media_references
+from forensic.whatsapp import (
+    SchemaFamily,
+    UnsupportedSchemaError,
+    WAChat,
+    WAContact,
+    WAEdit,
+    WAGroupParticipant,
+    WALocationRef,
+    WAMediaRef,
+    WAMessage,
+    WAQuotedRef,
+    WARevocation,
+    WAParseResult,
+    WhatsAppParser,
+    detect_wa_schema,
+    is_whatsapp_database,
+)
 
 from forensic.telegram.detector import is_telegram_database
 from forensic.telegram.message_parser import extract_messages as extract_tg_messages

@@ -114,6 +114,10 @@ class Evidence(Base):
     wa_messages = relationship("WhatsAppMessage", cascade="all, delete-orphan")
     wa_contacts = relationship("WhatsAppContact", cascade="all, delete-orphan")
     wa_groups = relationship("WhatsAppGroup", cascade="all, delete-orphan")
+    wa_revocations = relationship("WhatsAppRevocation", cascade="all, delete-orphan")
+    wa_edits = relationship("WhatsAppEdit", cascade="all, delete-orphan")
+    wa_chats = relationship("WhatsAppChat", cascade="all, delete-orphan")
+    wa_jids = relationship("WhatsAppJid", cascade="all, delete-orphan")
     tg_messages = relationship("TelegramMessage", cascade="all, delete-orphan")
     tg_contacts = relationship("TelegramContact", cascade="all, delete-orphan")
     tg_groups = relationship("TelegramGroup", cascade="all, delete-orphan")
@@ -179,6 +183,95 @@ class WhatsAppMessage(Base):
     media_path = Column(String(1024))
     message_type = Column(String(50))
     status = Column(String(50))
+
+    # Forensic schema fields (spec B7.5)
+    key_id = Column(String(255), index=True, nullable=True)
+    chat_row_id = Column(Integer, nullable=True, index=True)
+    message_type_code = Column(Integer, nullable=True)
+    message_type_name = Column(String(50), nullable=True)
+    ts_raw = Column(BigInteger, nullable=True)
+    ts_unit = Column(String(20), nullable=True, default="ms")
+    ts_utc_ms = Column(BigInteger, nullable=True, index=True)
+    received_ts_raw = Column(BigInteger, nullable=True)
+    source_table = Column(String(100), nullable=True, default="message")
+    source_row_id = Column(Integer, nullable=True)
+    derived_artifact_id = Column(String(255), nullable=True)
+    evidence_sha256 = Column(String(64), nullable=True)
+    quoted_row_id = Column(Integer, nullable=True)
+    location_lat = Column(Float, nullable=True)
+    location_lon = Column(Float, nullable=True)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    is_edited = Column(Boolean, default=False, nullable=False)
+    flags = Column(JSON, default=list)
+
+
+class WhatsAppRevocation(Base):
+    __tablename__ = "wa_revocations"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
+    derived_artifact_id = Column(String(255), nullable=True)
+    message_row_id = Column(Integer, nullable=True)
+    revoked_key_id = Column(String(255), nullable=False, index=True)
+    revoke_ts = Column(BigInteger, nullable=True)
+    admin_jid = Column(String(255), nullable=True)
+    original_sender = Column(String(255), nullable=True)
+    original_ts = Column(BigInteger, nullable=True)
+    finding_id = Column(String(64), nullable=True, index=True)
+    confidence_score = Column(Float, default=1.0)
+    strength = Column(String(50), default="deterministic")
+    limitations = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+
+
+class WhatsAppEdit(Base):
+    __tablename__ = "wa_edits"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
+    derived_artifact_id = Column(String(255), nullable=True)
+    message_row_id = Column(Integer, nullable=True)
+    original_key_id = Column(String(255), nullable=False, index=True)
+    edited_ts = Column(BigInteger, nullable=True)
+    sender_ts = Column(BigInteger, nullable=True)
+    prior_text_not_present = Column(Boolean, default=True)
+    edited_text = Column(Text, nullable=True)
+    finding_id = Column(String(64), nullable=True, index=True)
+    confidence_score = Column(Float, default=1.0)
+    strength = Column(String(50), default="deterministic")
+    limitations = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+
+
+class WhatsAppChat(Base):
+    __tablename__ = "wa_chats"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
+    chat_row_id = Column(Integer, nullable=True, index=True)
+    jid = Column(String(255), nullable=False, index=True)
+    subject = Column(String(512), nullable=True)
+    is_group = Column(Boolean, default=False)
+    hidden = Column(Integer, default=0)
+    archived = Column(Integer, default=0)
+    last_message_row_id = Column(Integer, nullable=True)
+    participant_jids = Column(JSON, default=list)
+    provenance = Column(JSON, default=dict)
+
+
+class WhatsAppJid(Base):
+    __tablename__ = "wa_jids"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
+    jid_row_id = Column(Integer, nullable=True, index=True)
+    raw_string = Column(String(255), nullable=False, index=True)
+    user = Column(String(255), nullable=True)
+    server = Column(String(255), nullable=True)
+    jid_type = Column(Integer, default=0)
+    phone_number = Column(String(50), nullable=True)
+    is_group = Column(Boolean, default=False)
+    provenance = Column(JSON, default=dict)
 
 
 class WhatsAppContact(Base):
