@@ -1,16 +1,19 @@
 """
 Pydantic schemas for the Cryptographic Decryption Subsystem.
-Strictly adheres to 09_API_DATA_CONTRACTS.md.
-Never exposes raw cryptographic keys or secrets in responses.
+Strictly adheres to master.md R5:
+- Key fields use SecretStr and repr=False.
+- Secrets are never echoed in serialization or string representations.
 """
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class FormatDetectionResponse(BaseModel):
     """Result of format and entropy inspection."""
+    model_config = ConfigDict(from_attributes=True)
+
     is_encrypted: bool
     format: Optional[str] = None
     confidence: float = 0.0
@@ -22,17 +25,42 @@ class FormatDetectionResponse(BaseModel):
 class DecryptionRunRequest(BaseModel):
     """
     Investigator request to decrypt an encrypted evidence container.
-    Key material is processed in ephemeral memory and never logged or stored.
-    Passcodes (Telegram PIN) removed per Section A6 / DEC-004.
+    Key material is processed in ephemeral memory and never logged, echoed, or stored (master.md R5).
     """
-    key_material: Optional[str] = Field(None, description="WhatsApp key file (base64 or hex) or raw 32-byte key")
-    format_override: Optional[str] = Field(None, description="Explicit format override (e.g. crypt12, crypt14, crypt15)")
-    candidate_file_id: Optional[int] = Field(None, description="EvidenceFile ID if targeting an extracted archive member")
-    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Algorithm options (iterations, etc.)")
+    model_config = ConfigDict(extra="ignore")
+
+    key_type: Optional[str] = Field(
+        None,
+        description="crypt14_keyfile | crypt15_hex | crypt15_keyfile",
+    )
+    key_data: Optional[SecretStr] = Field(
+        None,
+        repr=False,
+        description="Key hex string or base64-encoded key file (redacted from repr/logs)",
+    )
+    key_material: Optional[SecretStr] = Field(
+        None,
+        repr=False,
+        description="Legacy field for key hex or base64 key file (redacted from repr/logs)",
+    )
+    format_override: Optional[str] = Field(
+        None,
+        description="Explicit format override (e.g. crypt14, crypt15)",
+    )
+    candidate_file_id: Optional[int] = Field(
+        None,
+        description="EvidenceFile ID if targeting an extracted archive member",
+    )
+    parameters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Algorithm options (iterations, etc.)",
+    )
 
 
 class DecryptionOperationResponse(BaseModel):
     """Status and judicial provenance of a decryption operation."""
+    model_config = ConfigDict(from_attributes=True)
+
     operation_id: int
     case_id: int
     evidence_id: int
@@ -48,12 +76,11 @@ class DecryptionOperationResponse(BaseModel):
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class DerivedArtifactResponse(BaseModel):
     """Forensic catalog entry for a verified derived exhibit stored in PostgreSQL."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     case_id: int
     parent_evidence_id: int
@@ -65,6 +92,3 @@ class DerivedArtifactResponse(BaseModel):
     mime_type: Optional[str] = None
     provenance: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

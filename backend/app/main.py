@@ -25,11 +25,32 @@ async def lifespan(app: FastAPI):
     yield
 
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
+
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Handle request validation errors without echoing raw inputs.
+    Strictly prevents leaking secret keys in 422 responses (master.md R5).
+    """
+    clean_errors = []
+    for err in exc.errors():
+        err_dict = dict(err)
+        err_dict.pop("input", None)
+        clean_errors.append(err_dict)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": clean_errors},
+    )
 
 # CORS for frontend
 app.add_middleware(

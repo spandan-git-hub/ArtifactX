@@ -38,12 +38,14 @@ def test_api_decryption_run_returns_decryptor_not_available(client_and_db):
     db.flush()
     case_id = case.id
 
-    encrypted_payload = b"msgstore.db.crypt14_fake_data_" + bytes(256)
+    encrypted_payload = b"msgstore.db.crypt12_fake_data_" + bytes(256)
+    import hashlib
+    actual_sha = hashlib.sha256(encrypted_payload).hexdigest()
     evidence = Evidence(
         case_id=case_id,
-        original_filename="msgstore.db.crypt14",
-        storage_path="in-memory/msgstore.db.crypt14",
-        sha256="aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+        original_filename="msgstore.db.crypt12",
+        storage_path="in-memory/msgstore.db.crypt12",
+        sha256=actual_sha,
         content_type="application/octet-stream",
         evidence_type="file",
         content_bytes=encrypted_payload,
@@ -54,10 +56,10 @@ def test_api_decryption_run_returns_decryptor_not_available(client_and_db):
     evidence_id = evidence.id
     db.commit()
 
-    # Call /evidence/{id}/decryption/run
+    # Call /evidence/{id}/decryption/run with unvalidated format
     req_body = {
         "key_material": "0123456789abcdef" * 4,
-        "format_override": "crypt14",
+        "format_override": "crypt12",
     }
     resp = client.post(f"/api/evidence/{evidence_id}/decryption/run", json=req_body)
     assert resp.status_code == 200, resp.text

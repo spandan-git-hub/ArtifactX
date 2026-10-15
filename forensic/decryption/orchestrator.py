@@ -1,37 +1,24 @@
 """
 Unified Forensic Decryption Orchestrator with plugin interface.
-Legacy unvalidated decryptors have been unregistered per Section A6 / DEC-006.
-Phase B6 will introduce independently validated decryptors adhering to Decryptor Protocol.
+Registers validated independent decryptors (Crypt14, Crypt15) per Section B6.
+Strictly adheres to master.md R4, R5, R7, R12, R15.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
 from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from forensic.decryption.detector import EncryptionDetector, FormatDetectionResult
-
-
-@dataclass
-class KeyMaterial:
-    """Container for cryptographic key inputs without logging secrets."""
-    raw_key: Optional[bytes] = None
-    key_hex: Optional[str] = None
-    key_file_bytes: Optional[bytes] = None
-    key_type: str = "raw"
-
-
-@dataclass
-class DecryptionResult:
-    """Result of a successful in-memory decryption operation."""
-    plaintext: bytes
-    format_id: str
-    output_sha256: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+from forensic.decryption.whatsapp.crypt14 import Crypt14Decryptor
+from forensic.decryption.whatsapp.crypt15 import Crypt15Decryptor
+from forensic.decryption.whatsapp.types import DecryptionResult, KeyMaterial
 
 
 @runtime_checkable
 class Decryptor(Protocol):
-    """Clean plugin interface for forensic decryption engines (A6.4)."""
+    """Clean plugin interface for forensic decryption engines (A6.4 / B6)."""
     format_id: str
 
     def can_handle(self, header: bytes, filename: Optional[str] = None) -> bool:
@@ -51,7 +38,7 @@ class DecryptorNotAvailableError(Exception):
         super().__init__(
             message
             or f"Decryptor for format '{format_name}' is not available. "
-            "Unvalidated decryptors were demoted pending Phase B6."
+            "Only independently validated engines (Crypt14, Crypt15) are registered."
         )
 
 
@@ -142,3 +129,8 @@ class DecryptionOrchestrator:
         }
 
         return result.plaintext, provenance
+
+
+# Register validated Crypt14 and Crypt15 decryptors by default
+DecryptionOrchestrator.register(Crypt14Decryptor())
+DecryptionOrchestrator.register(Crypt15Decryptor())

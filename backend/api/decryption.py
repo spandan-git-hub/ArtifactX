@@ -1,12 +1,17 @@
 """
-Cryptographic Decryption API.
+Cryptographic Decryption API (B6).
 Provides endpoints for detecting encryption formats, executing in-memory decryption,
 recording judicial operation provenance, and streaming derived artifacts from PostgreSQL BYTEA.
+Strictly adheres to master.md R3, R4, R5, R7, R12, R15, R19.
 """
 
-from datetime import datetime
+from __future__ import annotations
+
+import base64
+from datetime import datetime, timezone
+import hashlib
 import io
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -27,8 +32,11 @@ from backend.schemas.decryption import (
     DerivedArtifactResponse,
     FormatDetectionResponse,
 )
+from backend.services.audit_service import AuditService
+from backend.services.integrity_service import ensure_integrity
 from forensic.decryption.orchestrator import DecryptionOrchestrator, DecryptorNotAvailableError
-
+from forensic.decryption.whatsapp.errors import WhatsAppDecryptionError
+from forensic.decryption.whatsapp.types import KeyMaterial
 
 router = APIRouter(tags=["decryption"])
 
@@ -116,30 +124,57 @@ def run_decryption(
 ):
     """
     Execute controlled, auditable cryptographic decryption.
-    Plaintext output is stored directly in PostgreSQL BYTEA as a DerivedArtifact.
-    Secrets and passcodes are never stored or exposed.
+    Plaintext output is stored directly in PostgreSQL BYTEA as a DerivedArtifact (R4).
+    Keys are radioactive: secrets are never stored, logged, or exposed (R5).
     """
     evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence item not found.")
 
+    # 1. Pre-stage integrity verification (R3)
+    from backend.services.integrity_service import EvidenceIntegrityError, LegacyUnverifiableError
+    try:
+        ensure_integrity(evidence_id=evidence.id, db=db, action_context="decryption_prestage")
+    except (EvidenceIntegrityError, LegacyUnverifiableError) as ie:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Evidence integrity verification failed: {str(ie)}",
+        )
+
     target_bytes, filename, resolved_file_id = _get_target_bytes_and_name(
         db, evidence_id, req.candidate_file_id
     )
 
-    import hashlib
     input_sha256 = hashlib.sha256(target_bytes).hexdigest()
 
-    # Determine secret input (key_material)
-    secret_input = req.key_material
-    if not secret_input:
+    # 2. Extract secret input (R5: SecretStr prevents leaking in repr/logs)
+    secret_obj = req.key_data or req.key_material
+    if not secret_obj:
         raise HTTPException(
             status_code=400,
-            detail="key_material (WhatsApp key file or passkey hex) must be provided.",
+            detail="key_data or key_material must be provided.",
         )
 
-    # Create audit operation record
+    raw_secret_str = secret_obj.get_secret_value()
+    if not raw_secret_str.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Key material cannot be empty.",
+        )
+
+    # Normalize key material if base64 encoded
+    secret_input: Union[str, bytes] = raw_secret_str
+    if req.key_type in ("crypt14_keyfile", "crypt15_keyfile"):
+        try:
+            decoded = base64.b64decode(raw_secret_str)
+            if decoded.startswith(b"\xac\xed\x00\x05") or len(decoded) in (158, 131, 59, 32):
+                secret_input = decoded
+        except Exception:
+            pass
+
+    # 3. Create initial operation audit record (status=RUNNING, no secret logged)
     fmt_hint = req.format_override or ""
+    now_utc = datetime.now(timezone.utc)
     op = DecryptionOperation(
         case_id=evidence.case_id,
         evidence_id=evidence.id,
@@ -148,7 +183,7 @@ def run_decryption(
         status="RUNNING",
         input_sha256=input_sha256,
         parameters=_clean_pg_text(req.parameters or {}),
-        created_at=datetime.utcnow(),
+        created_at=now_utc,
     )
     db.add(op)
     db.commit()
@@ -176,7 +211,8 @@ def run_decryption(
         else:
             derived_filename = f"{base_name}_decrypted"
 
-        # Persist derived artifact to PostgreSQL BYTEA (Zero disk writes)
+        # 4. Persist derived artifact to PostgreSQL BYTEA (Zero disk writes, R4)
+        comp_utc = datetime.now(timezone.utc)
         derived = DerivedArtifact(
             case_id=evidence.case_id,
             parent_evidence_id=evidence.id,
@@ -189,32 +225,50 @@ def run_decryption(
             content_bytes=decrypted_bytes,
             provenance=_clean_pg_text({
                 "operation_id": op.id,
-                "parent_sha256": input_sha256,
+                "source_evidence_id": evidence.id,
+                "source_sha256": input_sha256,
                 "format": meta.get("format"),
-                "method": f"{meta.get('format').upper()}_DECRYPT",
-                "validation": meta.get("operation_details", {}).get("validation", {}),
-                "decrypted_at": datetime.utcnow().isoformat(),
+                "method": f"{meta.get('format', '').upper()}_DECRYPT",
+                "tool_version": "ArtifactX-1.0.0",
+                "output_sha256": output_sha256,
+                "validation_report": meta.get("operation_details", {}).get("validation", {}),
+                "decrypted_at": comp_utc.isoformat(),
             }),
-            created_at=datetime.utcnow(),
+            created_at=comp_utc,
         )
         db.add(derived)
         db.commit()
         db.refresh(derived)
 
-        # Update operation audit record
+        # 5. Update operation audit record
         op.status = "SUCCEEDED"
         op.format = meta.get("format", op.format)
         op.output_sha256 = output_sha256
         op.derived_artifact_id = derived.id
         op.validation = _clean_pg_text(meta.get("operation_details", {}).get("validation", {}))
-        op.completed_at = datetime.utcnow()
+        op.completed_at = comp_utc
 
-        # Log to ActivityLog
+        # 6. Log to hash-chained audit ledger (no secrets logged, R5)
+        AuditService.append(
+            db=db,
+            action="DECRYPTION_SUCCESS",
+            actor="system",
+            case_id=evidence.case_id,
+            evidence_id=evidence.id,
+            details={
+                "operation_id": op.id,
+                "format": op.format,
+                "derived_artifact_id": derived.id,
+                "output_sha256": output_sha256,
+                "key_fingerprint": meta.get("operation_details", {}).get("key_fingerprint"),
+            },
+        )
+
         act_log = ActivityLog(
             case_id=evidence.case_id,
             action="DECRYPTION_SUCCESS",
             description=f"Decryption succeeded: {op.format.upper()} on evidence #{evidence.id} -> derived artifact #{derived.id} (SHA-256: {output_sha256[:16]}...)",
-            timestamp=datetime.utcnow(),
+            timestamp=comp_utc,
         )
         db.add(act_log)
         db.commit()
@@ -239,20 +293,33 @@ def run_decryption(
 
     except DecryptorNotAvailableError as dne:
         db.rollback()
+        fail_utc = datetime.now(timezone.utc)
         op_demoted = db.query(DecryptionOperation).filter(DecryptionOperation.id == op.id).first()
         if op_demoted:
             op_demoted.status = "DECRYPTOR_NOT_AVAILABLE"
             op_demoted.error_message = _clean_pg_text(str(dne))
-            op_demoted.completed_at = datetime.utcnow()
+            op_demoted.completed_at = fail_utc
             db.commit()
             db.refresh(op_demoted)
 
-        # Log to ActivityLog
+        AuditService.append(
+            db=db,
+            action="DECRYPTION_UNAVAILABLE",
+            actor="system",
+            case_id=evidence.case_id,
+            evidence_id=evidence.id,
+            details={
+                "operation_id": op.id,
+                "format": op.format,
+                "reason": str(dne),
+            },
+        )
+
         act_log = ActivityLog(
             case_id=evidence.case_id,
             action="DECRYPTION_UNAVAILABLE",
             description=f"Decryption unavailable for format {op.format}: {str(dne)}",
-            timestamp=datetime.utcnow(),
+            timestamp=fail_utc,
         )
         db.add(act_log)
         db.commit()
@@ -271,16 +338,68 @@ def run_decryption(
             parameters=op.parameters or {},
             error_message=_clean_pg_text(str(dne)),
             created_at=op.created_at,
-            completed_at=datetime.utcnow(),
+            completed_at=fail_utc,
+        )
+
+    except WhatsAppDecryptionError as wde:
+        db.rollback()
+        fail_utc = datetime.now(timezone.utc)
+        op_fail = db.query(DecryptionOperation).filter(DecryptionOperation.id == op.id).first()
+        if op_fail:
+            op_fail.status = "FAILED"
+            op_fail.error_message = _clean_pg_text(f"[{wde.code}] {wde.message}")
+            op_fail.completed_at = fail_utc
+            db.commit()
+            db.refresh(op_fail)
+
+        AuditService.append(
+            db=db,
+            action="DECRYPTION_FAILED",
+            actor="system",
+            case_id=evidence.case_id,
+            evidence_id=evidence.id,
+            details={
+                "operation_id": op.id,
+                "format": op.format,
+                "error_code": wde.code,
+                "error_message": wde.message,
+            },
+        )
+
+        act_log = ActivityLog(
+            case_id=evidence.case_id,
+            action="DECRYPTION_FAILED",
+            description=f"Decryption failed: [{wde.code}] {wde.message}",
+            timestamp=fail_utc,
+        )
+        db.add(act_log)
+        db.commit()
+
+        return DecryptionOperationResponse(
+            operation_id=op.id,
+            case_id=op.case_id,
+            evidence_id=op.evidence_id,
+            file_id=op.file_id,
+            format=op.format,
+            status="FAILED",
+            input_sha256=op.input_sha256,
+            output_sha256=None,
+            derived_artifact_id=None,
+            validation={},
+            parameters=op.parameters or {},
+            error_message=_clean_pg_text(f"[{wde.code}] {wde.message}"),
+            created_at=op.created_at,
+            completed_at=fail_utc,
         )
 
     except Exception as e:
         db.rollback()
+        fail_utc = datetime.now(timezone.utc)
         op_fail = db.query(DecryptionOperation).filter(DecryptionOperation.id == op.id).first()
         if op_fail:
             op_fail.status = "FAILED"
             op_fail.error_message = _clean_pg_text(str(e))
-            op_fail.completed_at = datetime.utcnow()
+            op_fail.completed_at = fail_utc
             db.commit()
 
         raise HTTPException(
@@ -340,7 +459,7 @@ def list_evidence_derived_artifacts(
         .order_by(DerivedArtifact.created_at.desc())
         .all()
     )
-    return [DerivedArtifactResponse.from_orm(a) for a in artifacts]
+    return [DerivedArtifactResponse.model_validate(a) for a in artifacts]
 
 
 @router.get(
@@ -351,46 +470,39 @@ def list_case_derived_artifacts(
     case_id: int,
     db: Session = Depends(get_db),
 ):
-    """List all derived forensic exhibits belonging to a case."""
+    """List all derived exhibits generated across all evidence containers for a case."""
     artifacts = (
         db.query(DerivedArtifact)
         .filter(DerivedArtifact.case_id == case_id)
         .order_by(DerivedArtifact.created_at.desc())
         .all()
     )
-    return [DerivedArtifactResponse.from_orm(a) for a in artifacts]
+    return [DerivedArtifactResponse.model_validate(a) for a in artifacts]
 
 
-@router.get("/cases/{case_id}/derived-artifacts/{artifact_id}/stream")
+@router.get(
+    "/derived-artifacts/{artifact_id}/stream",
+    response_class=StreamingResponse,
+)
 def stream_derived_artifact(
-    case_id: int,
     artifact_id: int,
     db: Session = Depends(get_db),
 ):
-    """
-    Stream derived artifact binary content directly from PostgreSQL BYTEA.
-    Zero disk storage: streams directly to the requesting client.
-    """
-    artifact = (
-        db.query(DerivedArtifact)
-        .filter(
-            DerivedArtifact.id == artifact_id,
-            DerivedArtifact.case_id == case_id,
-        )
-        .first()
-    )
+    """Stream verified derived exhibit binary content directly from PostgreSQL BYTEA (Zero disk writes)."""
+    artifact = db.query(DerivedArtifact).filter(DerivedArtifact.id == artifact_id).first()
     if not artifact or not artifact.content_bytes:
-        raise HTTPException(status_code=404, detail="Derived artifact or binary bytes not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Derived exhibit binary content not found in storage.",
+        )
 
     stream = io.BytesIO(artifact.content_bytes)
-    media_type = artifact.mime_type or "application/octet-stream"
-
     return StreamingResponse(
         stream,
-        media_type=media_type,
+        media_type=artifact.mime_type or "application/octet-stream",
         headers={
-            "Content-Disposition": f'inline; filename="{artifact.original_filename}"',
+            "Content-Disposition": f'attachment; filename="{artifact.original_filename}"',
+            "Content-Length": str(len(artifact.content_bytes)),
             "X-Artifact-SHA256": artifact.sha256,
-            "Content-Length": str(artifact.size_bytes),
         },
     )

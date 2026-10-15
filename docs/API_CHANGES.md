@@ -174,7 +174,7 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
     {
       "ok": true,
       "checked": 128,
-      "head_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "head_hash": "e3b0c44298fc...7852b855",
       "first_bad_seq": null,
       "error_detail": null
     }
@@ -198,6 +198,85 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
     - `acquisition_time_utc`, `acquired_by`, `acquisition_hash_claimed`, `acquisition_hash_algorithm`
     - `claimed_vs_computed` (`"MATCH"` | `"MISMATCH"` | `"NOT_PROVIDED"`)
   - **Deferred BYTEA Query Optimization (R19):** `GET /api/evidence` strictly excludes `content_bytes` from the SQL column list via `load_only`, preventing memory spikes during exhibit listing.
+
+## 2026-10-15 B6 — WhatsApp Decryption & Key Security (spec: 04_WHATSAPP_DECRYPTION.md)
+
+- **Updated Endpoint:** `POST /api/evidence/{id}/decryption/run` (B6.1, B6.2, B6.6, DEC-028)
+  - **Purpose:** Decrypts WhatsApp Crypt14 or Crypt15 encrypted SQLite containers (`msgstore.db.crypt14`, `msgstore.db.crypt15`) using verified, independent decryptors with 100% byte-identical parity to reference tools.
+  - **Pre-Stage Verification:** Invokes `ensure_integrity()` before reading ciphertext to cryptographically verify exhibit hash.
+  - **Request Body (`DecryptionRunRequest`):**
+    - `key_type`: Optional enum string:
+      - `"crypt14_keyfile"`: Base64-encoded or raw Java-serialized 158-byte `key` file.
+      - `"crypt15_hex"`: 64-character hexadecimal root encryption key.
+      - `"crypt15_keyfile"`: Base64-encoded or raw Java-serialized 59-byte `encrypted_backup.key` file.
+    - `key_data`: Optional `SecretStr` containing the key string/base64 payload.
+    - Legacy `key_material`: Optional `SecretStr` accepted for backward compatibility.
+    - Note: Passphrases for `.crypt15` are rejected with HTTP 200 `status="FAILED"` and typed error code `PASSPHRASE_NOT_SUPPORTED` (DEC-002).
+  - **R5 Key Security (Radioactive Key Handling):**
+    - Request models use Pydantic `SecretStr` and `repr=False`.
+    - `ErrorLoggingMiddleware` strictly excludes path `/decryption/run` from logging request bodies or queries.
+    - Custom FastAPI `RequestValidationError` handler strips the raw `input` field to ensure key material is never echoed back in HTTP 422 responses.
+    - Keys are never persisted to the database, never written to disk, and never recorded in the audit log.
+  - **Provenance & Persistence:**
+    - On success, decrypted plaintext is validated across 5 verification tiers (GCM auth, zlib safety cap, SQLite header magic, in-memory `PRAGMA integrity_check`, WhatsApp schema family check).
+    - Persisted as a separate `DerivedArtifact` row with `BYTEA` content (never overwrites evidence, R3).
+    - Immutable audit event `DECRYPTION_SUCCESS` appended with provenance metadata (source evidence ID, source SHA-256, method, tool version, output SHA-256, and validation report).
+  - **Sample Success Response (200 OK):**
+    ```json
+    {
+      "operation_id": 1,
+      "case_id": 1,
+      "evidence_id": 2,
+      "file_id": null,
+      "format": "crypt14",
+      "status": "SUCCESS",
+      "input_sha256": "47a3...",
+      "output_sha256": "81c3...",
+      "derived_artifact_id": 1,
+      "validation": {
+        "gcm_auth_ok": true,
+        "zlib_ok": true,
+        "sqlite_header_ok": true,
+        "integrity_check_ok": true,
+        "whatsapp_schema_ok": true,
+        "schema_family": "modern",
+        "checksum_ok": true,
+        "table_count": 28,
+        "message_count": 380,
+        "error_message": null
+      },
+      "parameters": {
+        "key_type": "crypt14_keyfile",
+        "key_fingerprint": "82a88463"
+      },
+      "error_message": null,
+      "created_at": "2026-10-15T10:00:00.000000",
+      "completed_at": "2026-10-15T10:00:00.250000"
+    }
+    ```
+  - **Sample Failure Response (200 OK with typed status):**
+    ```json
+    {
+      "operation_id": 2,
+      "case_id": 1,
+      "evidence_id": 2,
+      "file_id": null,
+      "format": "crypt14",
+      "status": "FAILED",
+      "input_sha256": "47a3...",
+      "output_sha256": null,
+      "derived_artifact_id": null,
+      "validation": {},
+      "parameters": {
+        "key_type": "crypt14_keyfile",
+        "error_code": "AUTH_FAILED"
+      },
+      "error_message": "Authentication tag mismatch: wrong key OR modified/corrupted data",
+      "created_at": "2026-10-15T10:00:01.000000",
+      "completed_at": "2026-10-15T10:00:01.050000"
+    }
+    ```
+
 
 
 

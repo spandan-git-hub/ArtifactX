@@ -29,6 +29,11 @@ Offline decryption of WhatsApp `.crypt15` backup databases requires:
 - **Secret Chats:** Telegram End-to-End Encrypted (E2EE) "Secret Chats" are ephemeral, stored separately with ephemeral keys, and are not parsed from the standard Android `cache4.db` database.
 - **MTProto Protocol:** MTProto network packet decryption requires the ephemeral session `auth_key` held in transient memory or captured network traffic. ArtifactX parses at-rest database extractions and does not perform network packet MTProto decryption.
 
+### 2.4 WhatsApp Crypt12 Unsupported / Untested Format Status (DEC-027, B6.7)
+- **Status:** WhatsApp `.crypt12` legacy backup containers are detected by magic headers during format detection (`msgstore.db.crypt12`), but runtime decryption is classified as unsupported and untested (`UNTESTED_FORMAT`).
+- **Rationale:** No reproducible ground-truth fixture or differential verification baseline exists in dev tooling for `.crypt12` containers. In accordance with Rule R7 (no fake capability without verified tests) and DEC-006 / DEC-027, unvalidated legacy decryptor code has been removed. Calling decryption on a `.crypt12` exhibit returns `DECRYPTOR_NOT_AVAILABLE` with code `UNTESTED_FORMAT` and honest remediation guidance.
+
+
 ---
 
 ## 3. Data Recovery & Deletion Indicators

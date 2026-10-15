@@ -127,17 +127,17 @@ def test_orchestrator_plugin_interface():
 
 @pytest.mark.unit
 def test_orchestrator_raises_decryptor_not_available():
-    """A6.4: Demoted/unregistered decryptors raise DecryptorNotAvailableError."""
-    fake_crypt_data = b"crypt15_header_bytes_" + bytes(200)
+    """A6.4 / B6.7: Demoted/unregistered decryptors raise DecryptorNotAvailableError."""
+    fake_crypt_data = b"crypt12_header_bytes_" + bytes(200)
 
     with pytest.raises(DecryptorNotAvailableError) as exc_info:
         DecryptionOrchestrator.decrypt(
             data=fake_crypt_data,
             key_or_passcode="0123456789abcdef" * 4,
-            format_hint="crypt15",
+            format_hint="crypt12",
         )
 
-    assert "crypt15" in str(exc_info.value).lower()
+    assert "crypt12" in str(exc_info.value).lower()
     assert "not available" in str(exc_info.value).lower()
 
 
