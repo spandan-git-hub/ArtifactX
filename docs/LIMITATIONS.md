@@ -60,11 +60,21 @@ Offline decryption of WhatsApp `.crypt15` backup databases requires:
 
 ---
 
-## 5. Temporal & Environmental Limitations
+## 5. Temporal & Environmental Limitations (Section B11, Rule R10)
 
-### 5.1 Device Clock Skew and Timezone Anomalies
+### 5.1 Device Clock Skew, Backwards Jumps, and Timezone Anomalies
 - Timestamps extracted from SQLite records and EXIF metadata originate from the subject device's local system clock or the remote messaging server clock.
-- If the device clock was misconfigured, drifted, or intentionally altered, extracted timestamps will reflect that anomaly. ArtifactX preserves original raw timestamps alongside normalized UTC timestamps and flags temporal anomalies, but cannot independently verify physical ground-truth time without external reference logs.
+- If the device clock was misconfigured, drifted, or intentionally altered, extracted timestamps will reflect that anomaly. ArtifactX preserves original raw timestamps alongside normalized UTC timestamps and flags temporal anomalies (`PRE_2009`, `FUTURE`, `UNIT_SUSPECT`, `NON_MONOTONIC_WITH_ROWID`, `CLOCK_ANOMALY`), but cannot independently verify physical ground-truth time without external reference logs.
+- **Within-Chat Backward Jumps:** When message row IDs grow while timestamps jump backward by > 60 seconds within a conversation, ArtifactX flags `NON_MONOTONIC_WITH_ROWID` and emits a `CLOCK_ANOMALY` indicator (`weak_hint`, confidence <= 0.30). Manual clock adjustments, timezone shifts, or backup restores are possible causes.
+
+### 5.2 EXIF Naive Timestamps and Clock Policies
+- Standard EXIF `DateTimeOriginal` contains no timezone offset. In accordance with Rule R10, ArtifactX strictly assigns `tz_basis="naive_unknown_tz"` with `utc_ms=None` by default, never silently assuming UTC or local time.
+- If an examiner explicitly configures an assumed offset in `TimelineConfig` (e.g. +330 for IST), `utc_ms` is calculated, `NAIVE_LOCAL` is flagged, and the assumption is explicitly documented in findings limitations.
+- When an image contains both EXIF camera time and GPS satellite time that disagree by > 2 minutes, a `CLOCK_ANOMALY` finding is generated highlighting clock discrepancy between device RTC and GPS UTC time.
+
+### 5.3 Timeline Exclusion of ID Gaps and Live Duplicates
+- Primary key ID gaps (Tier 4) have no determinable timestamp and are strictly excluded from the chronological timeline. They are captured only in unplaced indicators.
+- Recovered records proven to be byte/content duplicates of live records (`DUPLICATE_OF_LIVE`) are excluded from the main timeline to prevent double-counting.
 
 ---
 

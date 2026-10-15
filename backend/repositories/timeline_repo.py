@@ -1,7 +1,7 @@
-"""Repository for Timeline Event data."""
+"""Repository for Timeline Event data (Rule R10, R11, R19)."""
 
-from typing import List, Optional
-from datetime import datetime
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -40,12 +40,15 @@ class TimelineRepository:
                     except Exception:
                         db.rollback()
 
-
     def get_events_by_case_id(self, db: Session, case_id: int) -> List[TimelineEvent]:
-        """Get timeline events by case ID."""
+        """Get timeline events by case ID ordered deterministically."""
         return db.query(TimelineEvent).filter(
             TimelineEvent.case_id == case_id
-        ).order_by(TimelineEvent.normalized_timestamp).all()
+        ).order_by(
+            TimelineEvent.utc_ms.is_(None),
+            TimelineEvent.utc_ms.asc(),
+            TimelineEvent.id.asc()
+        ).all()
 
     def delete_events_by_case_id(self, db: Session, case_id: int):
         """Delete all timeline events for a case."""
@@ -80,7 +83,11 @@ class TimelineRepository:
             search_term = f"%{search}%"
             query = query.filter(TimelineEvent.description.ilike(search_term))
 
-        return query.order_by(TimelineEvent.normalized_timestamp).all()
+        return query.order_by(
+            TimelineEvent.utc_ms.is_(None),
+            TimelineEvent.utc_ms.asc(),
+            TimelineEvent.id.asc()
+        ).all()
 
     def get_histogram_data(
         self,
@@ -104,9 +111,18 @@ class TimelineRepository:
             search=search,
         )
 
-        bins_map = {}
-        apps_breakdown = {"whatsapp": 0, "telegram": 0, "system": 0, "other": 0}
-        types_breakdown = {"message": 0, "deleted_gap": 0, "evidence_ingest": 0, "other": 0}
+        bins_map: Dict[str, Dict[str, Any]] = {}
+        apps_breakdown = {"whatsapp": 0, "telegram": 0, "media": 0, "system": 0, "other": 0}
+        types_breakdown = {
+            "message": 0,
+            "revocation": 0,
+            "edit": 0,
+            "recovered_record": 0,
+            "media_exif": 0,
+            "location": 0,
+            "evidence_ingest": 0,
+            "other": 0,
+        }
 
         for ev in events:
             # Breakdown counts
@@ -118,7 +134,12 @@ class TimelineRepository:
 
             # Binning key with timestamp fallback
             ts = ev.normalized_timestamp
-            if not ts and ev.timestamp:
+            if not ts and ev.utc_ms is not None:
+                try:
+                    ts = datetime.fromtimestamp(ev.utc_ms / 1000.0, tz=timezone.utc)
+                except Exception:
+                    ts = None
+            elif not ts and ev.timestamp:
                 try:
                     ts_val = ev.timestamp / 1000.0 if ev.timestamp > 1e11 else float(ev.timestamp)
                     ts = datetime.fromtimestamp(ts_val, tz=timezone.utc)
@@ -126,7 +147,7 @@ class TimelineRepository:
                     ts = None
 
             if not ts:
-                ts = datetime.utcnow()
+                ts = datetime.now(timezone.utc)
 
             if interval == "hour":
                 date_key = ts.strftime("%Y-%m-%d %H:00")
@@ -141,20 +162,14 @@ class TimelineRepository:
                     "total": 0,
                     "whatsapp": 0,
                     "telegram": 0,
-                    "deleted_gap": 0,
-                    "evidence_ingest": 0,
+                    "media": 0,
+                    "system": 0,
                     "other": 0,
                 }
 
             bins_map[date_key]["total"] += 1
-            if ev.event_type == "deleted_gap":
-                bins_map[date_key]["deleted_gap"] += 1
-            elif ev.event_type == "evidence_ingest":
-                bins_map[date_key]["evidence_ingest"] += 1
-            elif ev.source_app == "whatsapp":
-                bins_map[date_key]["whatsapp"] += 1
-            elif ev.source_app == "telegram":
-                bins_map[date_key]["telegram"] += 1
+            if ev.source_app in bins_map[date_key]:
+                bins_map[date_key][ev.source_app] += 1
             else:
                 bins_map[date_key]["other"] += 1
 

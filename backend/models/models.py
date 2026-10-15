@@ -452,6 +452,21 @@ class TimelineEvent(Base):
     description = Column(Text)
     metadata_ = Column("metadata_", JSON, default=dict)
 
+    # Additive forensic fields (B11 Timeline & Time Handling, Rules R8, R10, R11)
+    event_id = Column(String(64), index=True, nullable=True)
+    utc_ms = Column(BigInteger, index=True, nullable=True)
+    time_unit = Column(String(32), default="unknown")
+    tz_basis = Column(String(32), default="utc_source")
+    time_flags = Column(JSON, default=list)
+    raw_timestamp = Column(Text, nullable=True)
+    actor_ref = Column(String(255), nullable=True)
+    chat_ref = Column(String(255), nullable=True)
+    summary = Column(Text, nullable=True)
+    source_refs = Column(JSON, default=list)
+    confidence_score = Column(Float, default=1.0)
+    strength = Column(String(32), default="deterministic")
+    limitations = Column(JSON, default=list)
+
     case = relationship("Case", back_populates="timeline_events")
 
 

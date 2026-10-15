@@ -403,4 +403,41 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
     - `evidence_sha256: Optional[str]`
     - `candidate_original_text: Optional[str]`
 
+## 2026-10-15 B11 — Timeline & Time Handling API (spec: 09_TIMELINE_AND_TIME.md)
+- **Endpoint:** `POST /api/cases/{case_id}/timeline/build`
+  - Rebuilds case timeline deterministically from all evidence sources (WhatsApp messages, Telegram messages, Recovered records, Media EXIF, Ingest events).
+  - Pre-flight integrity verification: runs `ensure_integrity()` across all case evidence before reading (R3).
+  - Deferred BYTEA query optimization: uses `load_only` across all queried models to prevent memory spikes (R19).
+  - Deterministic total ordering: Sorts by `(has_no_time, utc_ms, priority, table, row_num, row_str, event_id)` with zero floating point arithmetic.
+  - Recovery filtering: Includes Tiers 1-3 recovered records; excludes Tier 4 ID gaps and records flagged as `DUPLICATE_OF_LIVE` / `INVALID_REJECTED`.
+  - Quality and anomaly flags: Computes `ZERO`, `NEGATIVE`, `PRE_2009`, `FUTURE`, `UNIT_SUSPECT`, `NAIVE_LOCAL`, `DUPLICATE_TS`, `NON_MONOTONIC_WITH_ROWID`, and `CLOCK_ANOMALY`.
+  - Audit logging: Records hash-chained `TIMELINE_BUILD` audit entry with `timeline_hash`, `event_count`, and exhibit counts.
+  - Response contract:
+    ```json
+    {
+      "status": "success",
+      "case_id": 1,
+      "events_created": 385,
+      "timeline_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "unplaced_indicators_count": 0
+    }
+    ```
+- **Endpoint:** `GET /api/cases/{case_id}/timeline`
+  - Total ordering: Always returns events ordered by `(utc_ms.is_(None), utc_ms.asc(), id.asc())`.
+  - Additive fields added to `TimelineEventRead`:
+    - `event_id: Optional[str]`
+    - `utc_ms: Optional[int]`
+    - `time_unit: Optional[str]`
+    - `tz_basis: Optional[str]`
+    - `time_flags: Optional[List[str]]`
+    - `raw_timestamp: Optional[int]`
+    - `actor_ref: Optional[str]`
+    - `chat_ref: Optional[str]`
+    - `summary: Optional[str]`
+    - `source_refs: Optional[List[Dict[str, Any]]]`
+    - `confidence_score: Optional[float]`
+    - `strength: Optional[str]`
+    - `limitations: Optional[List[str]]`
+
+
 

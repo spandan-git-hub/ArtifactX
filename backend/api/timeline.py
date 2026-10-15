@@ -13,13 +13,19 @@ router = APIRouter()
 
 
 @router.post("/cases/{case_id}/timeline/build", status_code=status.HTTP_202_ACCEPTED)
-async def build_timeline(
+def build_timeline(
     case_id: int,
     db: Session = Depends(get_db)
 ):
-    """Build timeline for a case from WhatsApp, Telegram, deleted gaps, and evidence files."""
-    count = timeline_service.build_timeline_for_case(db, case_id)
-    return {"message": "Timeline built", "case_id": case_id, "events_created": count}
+    """Build timeline for a case from WhatsApp, Telegram, recovered records, and evidence files."""
+    result = timeline_service.build_timeline_for_case(db, case_id)
+    return {
+        "message": "Timeline built",
+        "case_id": case_id,
+        "events_created": result["events_created"],
+        "timeline_hash": result["timeline_hash"],
+        "unplaced_indicators_count": len(result.get("unplaced_indicators", [])),
+    }
 
 
 @router.get("/cases/{case_id}/timeline", response_model=List[TimelineEventRead])

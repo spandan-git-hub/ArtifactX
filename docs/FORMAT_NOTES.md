@@ -582,3 +582,40 @@ CREATE TABLE media_v4 (
   - `post_wal_view`: Main database with latest committed valid WAL frames applied in-memory, updating database size in pages if commits grew the table.
 
 
+---
+
+## 7. Timeline & Time Handling Specifications (Section B11, R10, R20)
+
+### 7.1 Source Timestamp Units & Epoch Bases
+- **WhatsApp**:
+  - Primary unit: **Milliseconds since Unix epoch (UTC)**.
+  - Columns: `message.timestamp`, `message.received_timestamp`, `message.receipt_server_timestamp`, `chat.created_timestamp`, `chat.sort_timestamp`.
+  - Typical magnitude: 13 digits (e.g. `1726000000000` for 2024–2026).
+  - Verified primary source: WhatsApp modern SQLite schema (`msgstore.db`) and Android APK decompression.
+- **Telegram**:
+  - Primary unit: **Seconds since Unix epoch (UTC)**.
+  - Fields: `date: int` in MTProto TL schema (`message#761450da`, `user#22e492ced`, `channel#...`, `chat#...`).
+  - Typical magnitude: 10 digits (e.g. `1726000000` for 2024–2026).
+  - Verified primary source: Telegram-FOSS `MessagesStorage.java` and MTProto TL Layer 229 schema.
+- **EXIF Image Metadata**:
+  - `DateTimeOriginal` (tag `0x9003` / `36867`): String formatted as `"YYYY:MM:DD HH:MM:SS"`. **Contains NO timezone offset**. Represents local wall-clock time of the capturing device (`tz_basis="naive_unknown_tz"`).
+  - `OffsetTimeOriginal` (tag `0x9011` / `36881`, EXIF 2.31+): String formatted as `"[+-]HH:MM"`. When present, explicitly defines the UTC offset (`tz_basis="offset_given"`).
+  - `GPSInfo` / `GPSDateStamp` (tag `0x001D` / `29`) + `GPSTimeStamp` (tag `0x0007` / `7`): GPS timestamps are **strictly UTC** per the GPS navigation message specification (`tz_basis="utc_source"`).
+- **MP4 / QuickTime Video (`mvhd` Atom)**:
+  - Epoch base: **Midnight, January 1, 1904 UTC**.
+  - Offset to Unix epoch (1970-01-01): 2,082,844,800 seconds (`Unix_ts = QuickTime_ts - 2082844800`).
+
+### 7.2 Quality Flags and Thresholds
+All quality flags are evaluated deterministically and output in sorted order:
+- `ZERO`: Raw source timestamp is 0 or `"0"`.
+- `NEGATIVE`: Raw source timestamp is negative.
+- `PRE_2009`: Timestamp resolves to before January 1, 2009 00:00:00 UTC (`1230768000000` ms), prior to the release of WhatsApp and Telegram.
+- `FUTURE`: Timestamp exceeds the evidence file's acquisition/ingest timestamp by more than `future_tolerance_ms` (default: 300,000 ms / 5 minutes). Deterministic across runs by anchoring against evidence metadata rather than runtime wall-clock.
+- `UNIT_SUSPECT`: Magnitude implies a different unit than the source's verified unit (e.g. Telegram value `> 1e11` or WhatsApp value `< 1e11` and `> 1e8`). Flagged without silent conversion (R10).
+- `NAIVE_LOCAL`: Naive local timestamp where an analyst-configured assumed offset was applied.
+- `DUPLICATE_TS`: Two or more events within the same chat share the exact same `utc_ms`.
+- `NON_MONOTONIC_WITH_ROWID`: Within a chat, primary key / message sequence grows while timestamps jump backwards by more than `backward_jump_threshold_ms` (default: 60,000 ms / 1 minute).
+- `CLOCK_ANOMALY`: Inconsistency between hardware clocks (e.g. EXIF camera clock vs GPS satellite clock discrepancy `> 120,000` ms) or backward step anomaly. Always labelled `weak_hint` with explicit limitations.
+
+
+
