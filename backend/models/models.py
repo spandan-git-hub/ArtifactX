@@ -827,7 +827,7 @@ class AuditLog(Base):
     ts_utc = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     actor = Column(String(255), nullable=False, default="system")
     action = Column(String(100), nullable=False, index=True)
-    case_id = Column(Integer, ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    case_id = Column(Integer, nullable=True, index=True)
     evidence_id = Column(Integer, nullable=True, index=True)
     details_json = Column(JSON, default=dict, nullable=False)
     prev_hash = Column(String(64), nullable=False)

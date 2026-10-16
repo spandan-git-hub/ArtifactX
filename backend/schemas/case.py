@@ -10,6 +10,12 @@ class CaseBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     investigator: Optional[str] = None
+    case_number: Optional[str] = None
+    examiner_name: Optional[str] = None
+    examiner_designation: Optional[str] = None
+    agency: Optional[str] = None
+    legal_authority: Optional[str] = None
+    jurisdiction: Optional[str] = None
 
 
 class CaseCreate(CaseBase):
@@ -20,6 +26,12 @@ class CaseUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     investigator: Optional[str] = None
+    case_number: Optional[str] = None
+    examiner_name: Optional[str] = None
+    examiner_designation: Optional[str] = None
+    agency: Optional[str] = None
+    legal_authority: Optional[str] = None
+    jurisdiction: Optional[str] = None
     status: Optional[str] = None
 
 

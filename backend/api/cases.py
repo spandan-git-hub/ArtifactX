@@ -4,21 +4,27 @@ import traceback
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.models.models import (
     Case, Evidence, EvidenceFile, AnalysisResult,
     WhatsAppMessage, WhatsAppContact, WhatsAppGroup,
+    WhatsAppRevocation, WhatsAppEdit, WhatsAppChat, WhatsAppJid,
     TelegramMessage, TelegramContact, TelegramGroup,
+    TelegramDialog, TelegramUser, TelegramChat, TelegramUnparsedBlob,
     TimelineEvent, DeletedMessage, MediaItem,
     CorrelationEdge, CorrelationFinding, PersonEntity, DerivedArtifact,
     RecoveredFinding, RecoveryRun, DecryptionOperation,
+    PipelineRun, PipelineStageRun,
     ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
 )
 from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
 from backend.schemas.metrics import CaseMetricsResponse
+from backend.services.audit_service import AuditService
 from backend.services.log_service import get_log_service
+from backend.utils.file_storage import delete_file
 
 router = APIRouter()
 
@@ -26,7 +32,17 @@ router = APIRouter()
 @router.post("", response_model=CaseRead)
 def create_case(data: CaseCreate, db: Session = Depends(get_db)):
     try:
-        case = Case(**data.model_dump())
+        dump = data.model_dump()
+        if not dump.get("case_number"):
+            count = db.query(Case).count()
+            dump["case_number"] = f"ARX-2026-{count + 1:03d}"
+
+        if dump.get("investigator") and not dump.get("examiner_name"):
+            dump["examiner_name"] = dump["investigator"]
+        elif dump.get("examiner_name") and not dump.get("investigator"):
+            dump["investigator"] = dump["examiner_name"]
+
+        case = Case(**dump)
         db.add(case)
         db.commit()
         db.refresh(case)
@@ -38,6 +54,21 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
             action="create_case",
             description=f"Case created: {case.name}"
         )
+
+        try:
+            AuditService.append(
+                db=db,
+                action="CASE_CREATED",
+                actor=case.examiner_name or case.investigator or "system",
+                case_id=case.id,
+                details={
+                    "case_id": case.id,
+                    "case_number": case.case_number,
+                    "name": case.name
+                }
+            )
+        except Exception:
+            pass
 
         return case
     except Exception as e:
@@ -193,30 +224,52 @@ def update_case(case_id: int, data: CaseUpdate, db: Session = Depends(get_db)):
 @router.delete("/{case_id}")
 def delete_case(case_id: int, db: Session = Depends(get_db)):
     try:
-        case_row = db.query(Case.name).filter(Case.id == case_id).first()
-        if not case_row:
+        case = db.query(Case).filter(Case.id == case_id).first()
+        if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
-        case_name = case_row[0]
+        case_name = case.name
+        case_number = case.case_number or f"Case #{case_id}"
 
-        # Fetch evidence IDs for cascade cleanup
-        evidence_rows = db.query(Evidence.id).filter(Evidence.case_id == case_id).all()
+        # 1. Fetch evidence items and clean up physical files on disk
+        evidence_rows = db.query(Evidence.id, Evidence.storage_path, Evidence.extracted_path).filter(Evidence.case_id == case_id).all()
         evidence_ids = [r[0] for r in evidence_rows]
+        for _, storage_path, extracted_path in evidence_rows:
+            if storage_path:
+                delete_file(storage_path)
+            if extracted_path:
+                delete_file(extracted_path)
 
-
-        # Bulk delete evidence-dependent tables
+        # 2. Bulk delete all evidence-dependent tables
         if evidence_ids:
+            db.query(WhatsAppRevocation).filter(WhatsAppRevocation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(WhatsAppEdit).filter(WhatsAppEdit.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(WhatsAppChat).filter(WhatsAppChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(WhatsAppJid).filter(WhatsAppJid.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+
+            db.query(TelegramDialog).filter(TelegramDialog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(TelegramUser).filter(TelegramUser.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(TelegramChat).filter(TelegramChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(TelegramUnparsedBlob).filter(TelegramUnparsedBlob.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(TelegramGroup).filter(TelegramGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+
             db.query(AnalysisResult).filter(AnalysisResult.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(EvidenceFile).filter(EvidenceFile.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(AnalysisLog).filter(AnalysisLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
 
-        # Bulk delete case-dependent tables
+        # 3. Clean up pipeline stage runs and runs
+        pipeline_runs = db.query(PipelineRun.id).filter(PipelineRun.case_id == case_id).all()
+        pipeline_run_ids = [pr[0] for pr in pipeline_runs]
+        if pipeline_run_ids:
+            db.query(PipelineStageRun).filter(PipelineStageRun.run_id.in_(pipeline_run_ids)).delete(synchronize_session=False)
+            db.query(PipelineRun).filter(PipelineRun.case_id == case_id).delete(synchronize_session=False)
+
+        # 4. Bulk delete case-dependent tables
         db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete(synchronize_session=False)
         db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete(synchronize_session=False)
         db.query(MediaItem).filter(MediaItem.case_id == case_id).delete(synchronize_session=False)
@@ -232,10 +285,27 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
         db.query(GeneratedReport).filter(GeneratedReport.case_id == case_id).delete(synchronize_session=False)
         db.query(Evidence).filter(Evidence.case_id == case_id).delete(synchronize_session=False)
 
-        # Delete case object
+        # 5. Delete Case object itself (AuditLog records remain immutable per DEC-010 / B5.5)
         db.query(Case).filter(Case.id == case_id).delete(synchronize_session=False)
         db.commit()
-        return {"message": f"Case '{case_name}' deleted successfully"}
+
+        # 7. Record append-only audit trail entry for deletion
+        try:
+            AuditService.append(
+                db=db,
+                action="CASE_DELETED",
+                actor="system",
+                case_id=case_id,
+                details={
+                    "deleted_case_id": case_id,
+                    "case_name": case_name,
+                    "case_number": case_number
+                }
+            )
+        except Exception:
+            pass
+
+        return {"message": f"Case '{case_name}' deleted successfully", "case_id": case_id}
     except HTTPException:
         raise
     except Exception as e:

@@ -1,18 +1,35 @@
 import React, { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useActiveCase } from '../context/CaseContext';
 
 export default function CaseOverviewPage() {
   const { caseId } = useParams();
-  const { activeCase, cases } = useActiveCase();
+  const navigate = useNavigate();
+  const { activeCase, cases, deleteCase } = useActiveCase();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Display case can be matched by URL param or context activeCase
-  const currentCase = cases.find(c => c.id === caseId || c.caseNumber === caseId) || activeCase;
+  const currentCase = cases.find(c => String(c.id) === String(caseId) || c.caseNumber === caseId) || activeCase;
 
   // View state dynamically determined by actual case status and evidence count
   const viewState = !currentCase || currentCase.evidenceCount === 0
     ? 'empty'
     : (currentCase.integrityState === 'Flagged Exception' || currentCase.integrityState === 'HASH_MISMATCH' ? 'failure' : 'normal');
+
+  const handleConfirmDelete = async () => {
+    if (!currentCase) return;
+    try {
+      setIsDeleting(true);
+      await deleteCase(currentCase.id);
+      setShowDeleteModal(false);
+      navigate('/cases');
+    } catch (err) {
+      console.error('Failed to delete case from overview:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto custom-scrollbar p-space-lg">
@@ -45,6 +62,17 @@ export default function CaseOverviewPage() {
                 {currentCase?.integrityState || 'Pending Ingestion'}
               </span>
             </div>
+            {currentCase && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-surface-container hover:bg-error/20 hover:text-error hover:border-error/40 text-on-surface-variant border border-outline-variant text-[11px] font-medium transition-colors"
+                title={`Delete Case ${currentCase.caseNumber}`}
+              >
+                <span className="material-symbols-outlined text-[14px]">delete</span>
+                <span>Delete Case</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -499,6 +527,70 @@ export default function CaseOverviewPage() {
                     View Ledger →
                   </Link>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= CONFIRMATION MODAL ================= */}
+        {showDeleteModal && currentCase && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          >
+            <div className="bg-surface-container-high border border-outline-variant rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-error/15 border border-error/30 text-error flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[24px]">warning</span>
+                </div>
+                <div>
+                  <h3 className="text-headline-sm font-headline-sm font-semibold text-on-surface">
+                    Delete Forensic Case?
+                  </h3>
+                  <p className="text-body-sm text-on-surface-variant mt-1">
+                    Are you sure you want to permanently delete case{' '}
+                    <span className="font-mono font-semibold text-primary">{currentCase.caseNumber}</span>
+                    {currentCase.title ? ` (${currentCase.title})` : ''}?
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-surface-container-lowest/70 border border-outline-variant/60 rounded-lg p-3 text-xs text-on-surface-variant space-y-1 font-mono">
+                <div>• Case ID: {currentCase.id}</div>
+                <div>• Total Evidence Exhibits: {currentCase.evidenceCount ?? 0}</div>
+                <div className="text-error mt-2 font-sans font-medium">
+                  Warning: All exhibits, physical extractions, timeline events, chats, and carved records will be permanently removed. This cannot be undone.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-lg bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-highest text-body-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 rounded-lg bg-error text-white hover:bg-error/90 text-body-sm font-medium transition-colors flex items-center space-x-1.5 shadow-sm"
+                >
+                  {isDeleting ? (
+                    <>
+                      <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                      <span>Delete Case</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 import hashlib
 import io
 import json
+from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import zipfile
@@ -57,6 +58,7 @@ from forensic.pipeline.models import (
     StageResult,
     StageStatus,
 )
+from forensic.pipeline.unpack import unpack_evidence_inputs
 from forensic.recovery.models import RecoveryFinding, RecoveryResult
 from forensic.recovery.orchestrator import RecoveryPipeline
 from forensic.telegram.models import TgParseResult, UnsupportedSchemaError as TgUnsupportedSchemaError
@@ -107,8 +109,15 @@ def run_pipeline(
     failed_evidence_ids: Set[str] = set()
     skipped_downstream_evidence_ids: Set[str] = set()
 
+    # 0. Safely unpack any archive exhibits (WhatsApp, Telegram, Synthetic packages)
+    unpacked_inputs, effective_keys = unpack_evidence_inputs(
+        inputs=inputs,
+        keys=keys,
+        max_unpacked_bytes=config.max_unpacked_bytes,
+    )
+
     # R11 Input Ordering Determinism: sort inputs deterministically by (name, sha256, evidence_id)
-    sorted_inputs = sorted(inputs, key=lambda x: (x.name, x.sha256, str(x.evidence_id)))
+    sorted_inputs = sorted(unpacked_inputs, key=lambda x: (x.name, x.sha256, str(x.evidence_id)))
 
     # In-memory working state
     verified_inputs: Dict[str, EvidenceInput] = {}
@@ -228,7 +237,7 @@ def run_pipeline(
         t0 = time.time()
 
         # Rule R7: Check if keys are available
-        if not keys:
+        if not effective_keys:
             failed_evidence_ids.add(ev_id)
             skipped_downstream_evidence_ids.add(ev_id)
             counts = {"decrypted": 0}
@@ -255,7 +264,7 @@ def run_pipeline(
 
         decryptor = Crypt14Decryptor() if fmt == "WHATSAPP_CRYPT14" else Crypt15Decryptor()
 
-        for key_mat in keys:
+        for key_mat in effective_keys:
             # Pre-stage integrity re-check before decryption (spec B13.1)
             if sha256_hex(inp.data).lower() != inp.sha256.lower():
                 last_error_code = "INTEGRITY_FAILURE"
@@ -349,21 +358,27 @@ def run_pipeline(
     # Helper: Find auxiliary evidence (WAL, SHM, Contacts, Media)
     wal_by_stem: Dict[str, bytes] = {}
     shm_by_stem: Dict[str, bytes] = {}
+    contacts_by_stem: Dict[str, bytes] = {}
     contacts_bytes: Optional[bytes] = None
 
     for inp in sorted_inputs:
         if inp.evidence_id in failed_evidence_ids:
             continue
         lower_name = inp.name.lower()
+        base_name = Path(inp.name).name.lower()
         detection = detected_formats.get(inp.evidence_id)
         if lower_name.endswith("-wal") or (detection and detection.format == "SQLITE_WAL"):
             stem = inp.name[:-4] if inp.name.endswith("-wal") else inp.name
             wal_by_stem[stem.lower()] = inp.data
+            wal_by_stem[Path(stem).name.lower()] = inp.data
         elif lower_name.endswith("-shm"):
             stem = inp.name[:-4]
             shm_by_stem[stem.lower()] = inp.data
-        elif lower_name in ("wa.db", "contacts.db") or inp.role == "wa_contacts" or (detection and detection.format == "WHATSAPP_WADB"):
+            shm_by_stem[Path(stem).name.lower()] = inp.data
+        elif base_name in ("wa.db", "contacts.db") or inp.role == "wa_contacts" or (detection and detection.format == "WHATSAPP_WADB"):
             contacts_bytes = inp.data
+            contacts_by_stem[lower_name] = inp.data
+            contacts_by_stem[base_name] = inp.data
         elif lower_name.endswith(".zip") or inp.role == "media_zip":
             # Extract media items safely from ZIP
             try:
@@ -470,8 +485,16 @@ def run_pipeline(
         t0 = time.time()
         # Find matching WAL/SHM
         base_stem = inp.name.replace(".crypt14", "").replace(".crypt15", "").lower()
-        wal_data = wal_by_stem.get(base_stem)
-        shm_data = shm_by_stem.get(base_stem)
+        base_stem_file = Path(base_stem).name.lower()
+        wal_data = wal_by_stem.get(base_stem) or wal_by_stem.get(base_stem_file)
+        shm_data = shm_by_stem.get(base_stem) or shm_by_stem.get(base_stem_file)
+
+        # Find matching contacts
+        pkg_dir = str(Path(inp.name).parent).lower().replace("\\", "/")
+        matching_contacts = next(
+            (b for path_k, b in contacts_by_stem.items() if pkg_dir and pkg_dir in path_k),
+            contacts_bytes
+        )
 
         fmt = detection.format
         is_wa = fmt in ("WHATSAPP_MSGSTORE", "WHATSAPP_CRYPT14", "WHATSAPP_CRYPT15") or (
@@ -487,7 +510,7 @@ def run_pipeline(
                     msgstore_source=db_bytes,
                     evidence_id=ev_id,
                     evidence_sha256=inp.sha256,
-                    wa_db_source=contacts_bytes,
+                    wa_db_source=matching_contacts,
                     derived_from_artifact_id=f"derived_{ev_id}" if ev_id in decrypted_databases else None,
                 )
                 wa_result = wa_parser.parse()

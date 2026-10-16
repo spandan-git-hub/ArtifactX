@@ -6,7 +6,7 @@ export default function NewCasePage() {
   const navigate = useNavigate();
   const { cases, addCase } = useActiveCase();
 
-  const nextCaseNumber = `ARX-2026-0${cases.length + 12}`;
+  const nextCaseNumber = `ARX-2026-${String(cases.length + 1).padStart(3, '0')}`;
 
   const [formData, setFormData] = useState({
     caseNumber: nextCaseNumber,
@@ -134,7 +134,7 @@ export default function NewCasePage() {
                 <input
                   type="text"
                   name="title"
-                  placeholder="e.g. Operation Falcon - Encrypted WhatsApp & Telegram Extraction"
+                  placeholder="Investigation / Docket Title"
                   value={formData.title}
                   onChange={handleChange}
                   required

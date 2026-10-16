@@ -120,6 +120,28 @@ export function CaseProvider({ children }) {
     }
   };
 
+  const deleteCase = async (id) => {
+    try {
+      await caseService.deleteCase(id);
+    } catch (err) {
+      console.warn('Backend deleteCase error:', err);
+    }
+
+    setCases(prev => {
+      const remaining = prev.filter(c => String(c.id) !== String(id));
+      localStorage.setItem('arx_cases', JSON.stringify(remaining));
+      return remaining;
+    });
+
+    setActiveCaseId(prev => {
+      if (String(prev) === String(id)) {
+        const remaining = cases.filter(c => String(c.id) !== String(id));
+        return remaining.length > 0 ? String(remaining[0].id) : null;
+      }
+      return prev;
+    });
+  };
+
   return (
     <CaseContext.Provider value={{
       cases,
@@ -128,6 +150,7 @@ export function CaseProvider({ children }) {
       loading,
       switchCase,
       addCase,
+      deleteCase,
       setCases,
       refreshCases: fetchCases
     }}>

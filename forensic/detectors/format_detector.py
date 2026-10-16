@@ -13,11 +13,13 @@ Implements signature-first format classification per spec 03_INGEST_INTEGRITY_AU
 
 from __future__ import annotations
 
-import math
-import sqlite3
 from dataclasses import dataclass, field
+import io
+import math
 from pathlib import Path
+import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
+import zipfile
 
 
 @dataclass
@@ -202,12 +204,38 @@ def detect_format(data: bytes, filename: Optional[str] = None) -> FormatDetectio
 
     # 4. ZIP archive check (PK\x03\x04)
     if data.startswith(b"PK\x03\x04") or data.startswith(b"PK\x05\x06") or data.startswith(b"PK\x07\x08"):
+        pkg_format = "ZIP"
+        pkg_details: Dict[str, Any] = {"entropy": round(entropy, 3)}
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                infos = zf.infolist()[:500]
+                namelist = [info.filename.lower() for info in infos if not info.is_dir()]
+                pkg_details["member_count"] = len(zf.infolist())
+
+                has_syn = any("expected_results.json" in n or "crypt15" in n or "test_backup.key" in n for n in namelist)
+                has_wa = any("com.whatsapp" in n or "msgstore" in n for n in namelist)
+                has_tg = any("org.telegram" in n or "cache4" in n for n in namelist)
+
+                if has_syn:
+                    pkg_format = "PACKAGE_SYNTHETIC"
+                    evidence_items.append("Identified synthetic verification benchmark container (msgstore.db.crypt15, expected_results.json).")
+                elif has_wa:
+                    pkg_format = "PACKAGE_WHATSAPP"
+                    evidence_items.append("Identified WhatsApp Android forensic package container (msgstore.db / wa.db / axolotl.db).")
+                elif has_tg:
+                    pkg_format = "PACKAGE_TELEGRAM"
+                    evidence_items.append("Identified Telegram Android forensic package container (cache4.db / accounts / userconfig).")
+                else:
+                    evidence_items.append("Starts with standard PK zip container magic signature.")
+        except Exception:
+            evidence_items.append("Starts with standard PK zip container magic signature.")
+
         return FormatDetection(
-            format="ZIP",
-            confidence_basis="magic_bytes",
-            evidence=["Starts with standard PK zip container magic signature."],
+            format=pkg_format,
+            confidence_basis="zip_structure_fingerprint" if pkg_format != "ZIP" else "magic_bytes",
+            evidence=evidence_items,
             conflicts=[],
-            details={"entropy": round(entropy, 3)},
+            details=pkg_details,
         )
 
     # 5. Media format checks (magic-first)

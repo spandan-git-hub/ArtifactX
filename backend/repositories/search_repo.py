@@ -441,13 +441,9 @@ class SearchRepository:
 
     # ==================== Helper Methods ====================
 
-    def _get_evidence_ids(self, case_id: int, app: str) -> List[int]:
-        """Get evidence IDs for a case filtered by app type."""
+    def _get_evidence_ids(self, case_id: int, app: Optional[str] = None) -> List[int]:
+        """Get evidence IDs for a case."""
         stmt = self.db.query(Evidence.id).filter(Evidence.case_id == case_id)
-
-        if app in ("whatsapp", "telegram"):
-            stmt = stmt.filter(Evidence.metadata_["app"].as_string() == app)
-
         evidence_records = stmt.all()
         return [e.id for e in evidence_records]
 
