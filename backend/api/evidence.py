@@ -3,6 +3,7 @@
 import io
 import logging
 import mimetypes
+import re
 import traceback
 import uuid
 import zipfile
@@ -278,13 +279,17 @@ def _process_and_store_evidence(
     detection = detect_format(file_bytes, safe_name)
     detected_format = detection.format
 
+    case = db.query(Case).filter(Case.id == case_id).first()
+    case_number_str = (case.case_number if case and case.case_number else f"case_{case_id}")
+    case_folder = re.sub(r'[^\w\-.]', '_', str(case_number_str))
+
     # 3. ZIP archive safety checks (B5.1, R12)
     is_zip = (detected_format == "ZIP") or _is_zip_file(safe_name, declared_content_type)
     evidence_type = "zip" if is_zip else "file"
     stored_name = f"{uuid.uuid4().hex}_{safe_name}"
 
-    # Save uploaded file to disk in uploads directory
-    file_disk_path = save_upload(stored_name, file_bytes)
+    # Save uploaded file to disk in uploads/<case_folder>/ directory (never committed to PostgreSQL BYTEA)
+    file_disk_path = save_upload(stored_name, file_bytes, subfolder=case_folder)
     storage_path = str(file_disk_path.resolve())
 
     extracted_files: List[SafeZipMember] = []
@@ -294,8 +299,8 @@ def _process_and_store_evidence(
     if is_zip:
         try:
             extracted_files = extract_zip_safe_in_memory(file_bytes)
-            # Save extracted ZIP member files to disk in uploads/extract_<uuid>/
-            extract_dir = create_extract_dir()
+            # Save extracted ZIP member files to disk in uploads/<case_folder>/extract_<uuid>/
+            extract_dir = create_extract_dir(subfolder=case_folder)
             extracted_path = str(extract_dir.resolve())
             save_extracted_members(extract_dir, extracted_files)
 
@@ -345,6 +350,8 @@ def _process_and_store_evidence(
         "is_zip": is_zip,
         "original_filename": filename or "unnamed",
         "stored_filename": stored_name,
+        "case_number": case_number_str,
+        "case_folder": case_folder,
         "sha512": sha512,
         "md5": md5,
         "sha1": sha1,
@@ -367,7 +374,8 @@ def _process_and_store_evidence(
         uploader=uploader,
         evidence_type=evidence_type,
         metadata_=evidence_metadata,
-        content_bytes=None,  # Stored on disk in uploads/ to prevent PostgreSQL BYTEA latency and bloat
+        content_bytes=None,  # Stored on disk in uploads/<case_folder>/ to prevent PostgreSQL BYTEA latency and bloat
+        _content_bytes=None,
         integrity_state=evidence_integrity_state,
         extracted_path=extracted_path,
         acquisition_method=acq_meta.get("acquisition_method"),
@@ -406,7 +414,8 @@ def _process_and_store_evidence(
                 file_size=member.size,
                 mime_type=member.mime_type,
                 metadata_=file_meta,
-                content_bytes=None,  # Saved on disk in extract_dir in uploads/
+                content_bytes=None,  # Saved on disk in extract_dir in uploads/<case_folder>/
+                _content_bytes=None,
                 is_media=media_type is not None,
                 media_type=media_type,
             )

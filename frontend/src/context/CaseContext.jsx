@@ -124,7 +124,8 @@ export function CaseProvider({ children }) {
     try {
       await caseService.deleteCase(id);
     } catch (err) {
-      console.warn('Backend deleteCase error:', err);
+      console.error('Backend deleteCase error:', err);
+      throw err;
     }
 
     setCases(prev => {

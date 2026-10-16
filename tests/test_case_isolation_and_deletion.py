@@ -457,3 +457,109 @@ def test_delete_nonexistent_case(test_env):
     res = client.delete("/api/cases/9999999")
     assert res.status_code == 404
     assert "Case not found" in res.json()["detail"]
+
+
+def test_evidence_uploads_by_case_number_and_zero_db_bytes(test_env):
+    """
+    Ensure evidence uploads:
+    1. Are saved in disk subfolders organized by case number in uploads/ (e.g. uploads/ARX-2026-ALPHA/).
+    2. Zero binary bytes committed to the database (content_bytes is NULL in DB).
+    3. Disk file can still be read through the ORM content_bytes property.
+    4. ZIP extraction members are saved in uploads/ARX-2026-ALPHA/extract_<uuid>/.
+    5. Deletion of the case cleanly wipes the case-specific directory in uploads/.
+    """
+    import io
+    import zipfile
+    from sqlalchemy import text
+    from backend.app.config import UPLOADS_DIR
+
+    client = test_env["client"]
+    db = test_env["SessionLocal"]()
+
+    try:
+        # 1. Create Case A and Case B
+        res_a = client.post("/api/cases", json={"name": "Case Alpha", "case_number": "ARX-2026-ALPHA"})
+        assert res_a.status_code == 200
+        case_a = res_a.json()
+
+        res_b = client.post("/api/cases", json={"name": "Case Beta", "case_number": "ARX-2026-BETA"})
+        assert res_b.status_code == 200
+        case_b = res_b.json()
+
+        # 2. Upload file to Case A
+        payload_a = b"FORENSIC_RAW_PAYLOAD_CASE_A_DATA"
+        res_up_a = client.post(
+            f"/api/evidence/upload?case_id={case_a['id']}",
+            files={"file": ("evidence_alpha.bin", payload_a, "application/octet-stream")},
+        )
+        assert res_up_a.status_code == 201, res_up_a.text
+        ev_a = res_up_a.json()
+        ev_a_id = ev_a["id"]
+
+        # 3. Upload a ZIP archive to Case B
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("subfolder/chat_log.txt", b"BETA_SECRET_CHAT_LOG")
+        zip_bytes = zip_buf.getvalue()
+
+        res_up_b = client.post(
+            f"/api/evidence/upload?case_id={case_b['id']}",
+            files={"file": ("archive_beta.zip", zip_bytes, "application/zip")},
+        )
+        assert res_up_b.status_code == 201, res_up_b.text
+        ev_b = res_up_b.json()
+        ev_b_id = ev_b["id"]
+
+        # 4. Verify physical disk folder partitioning by case number
+        case_a_dir = UPLOADS_DIR / "ARX-2026-ALPHA"
+        case_b_dir = UPLOADS_DIR / "ARX-2026-BETA"
+        assert case_a_dir.exists(), f"Case A uploads folder {case_a_dir} must exist"
+        assert case_b_dir.exists(), f"Case B uploads folder {case_b_dir} must exist"
+
+        # Verify storage_path is inside the case directory
+        ev_a_row = db.query(Evidence).filter(Evidence.id == ev_a_id).first()
+        assert "ARX-2026-ALPHA" in ev_a_row.storage_path
+        assert Path(ev_a_row.storage_path).exists()
+        assert Path(ev_a_row.storage_path).read_bytes() == payload_a
+
+        ev_b_row = db.query(Evidence).filter(Evidence.id == ev_b_id).first()
+        assert "ARX-2026-BETA" in ev_b_row.storage_path
+        assert "ARX-2026-BETA" in ev_b_row.extracted_path
+        assert Path(ev_b_row.extracted_path).exists()
+        extracted_file = Path(ev_b_row.extracted_path) / "subfolder" / "chat_log.txt"
+        assert extracted_file.exists()
+        assert extracted_file.read_bytes() == b"BETA_SECRET_CHAT_LOG"
+
+        # 5. Verify ZERO binary bytes committed to DB (NULL in database table)
+        raw_db_bytes_a = db.execute(text("SELECT content_bytes FROM evidence WHERE id = :id"), {"id": ev_a_id}).scalar()
+        assert raw_db_bytes_a is None, "Evidence content_bytes in database must be NULL (never stored in DB)"
+
+        raw_db_bytes_b = db.execute(text("SELECT content_bytes FROM evidence WHERE id = :id"), {"id": ev_b_id}).scalar()
+        assert raw_db_bytes_b is None, "Evidence content_bytes in database must be NULL"
+
+        raw_ef_bytes = db.execute(text("SELECT content_bytes FROM evidence_files WHERE evidence_id = :id"), {"id": ev_b_id}).fetchall()
+        for row in raw_ef_bytes:
+            assert row[0] is None, "EvidenceFile content_bytes in database must be NULL"
+
+        # 6. Verify ORM getter property transparently streams bytes from disk
+        db.refresh(ev_a_row)
+        assert ev_a_row.content_bytes == payload_a
+
+        db.refresh(ev_b_row)
+        assert ev_b_row.content_bytes == zip_bytes
+
+        # 7. Delete Case A: ensure uploads/ARX-2026-ALPHA is removed, uploads/ARX-2026-BETA survives
+        del_res = client.delete(f"/api/cases/{case_a['id']}")
+        assert del_res.status_code == 200
+
+        assert not case_a_dir.exists(), "Case A folder must be cleaned up on case deletion"
+        assert case_b_dir.exists(), "Case B folder must survive without any interference"
+        assert Path(ev_b_row.storage_path).exists()
+
+        # Clean up Case B
+        client.delete(f"/api/cases/{case_b['id']}")
+        assert not case_b_dir.exists()
+
+    finally:
+        db.close()
+

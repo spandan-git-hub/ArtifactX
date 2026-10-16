@@ -1,5 +1,6 @@
 """Case management API endpoints."""
 
+import re
 import traceback
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.config import UPLOADS_DIR
 from backend.app.database import get_db
 from backend.models.models import (
     Case, Evidence, EvidenceFile, AnalysisResult,
@@ -240,6 +242,16 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
             if extracted_path:
                 delete_file(extracted_path)
 
+        # 1b. Clean up case uploads directory in uploads/ if present
+        if case.case_number:
+            case_folder = re.sub(r'[^\w\-.]', '_', str(case.case_number))
+            case_dir = UPLOADS_DIR / case_folder
+            if case_dir.exists():
+                delete_file(case_dir)
+        case_fallback_dir = UPLOADS_DIR / f"case_{case_id}"
+        if case_fallback_dir.exists():
+            delete_file(case_fallback_dir)
+
         # 2. Bulk delete all evidence-dependent tables
         if evidence_ids:
             db.query(WhatsAppRevocation).filter(WhatsAppRevocation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
@@ -261,6 +273,13 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
             db.query(AnalysisResult).filter(AnalysisResult.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(EvidenceFile).filter(EvidenceFile.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
             db.query(AnalysisLog).filter(AnalysisLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(ErrorLog).filter(ErrorLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(DerivedArtifact).filter(DerivedArtifact.parent_evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(DecryptionOperation).filter(DecryptionOperation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(RecoveredFinding).filter(RecoveredFinding.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(TimelineEvent).filter(TimelineEvent.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(DeletedMessage).filter(DeletedMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+            db.query(MediaItem).filter(MediaItem.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
 
         # 3. Clean up pipeline stage runs and runs
         pipeline_runs = db.query(PipelineRun.id).filter(PipelineRun.case_id == case_id).all()

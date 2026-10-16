@@ -33,11 +33,12 @@ def save_upload(file_name: str, file_data: bytes, subfolder: Optional[str] = Non
     return dest_path
 
 
-def create_extract_dir(dir_name: Optional[str] = None) -> Path:
-    """Create a new extraction directory in uploads."""
+def create_extract_dir(dir_name: Optional[str] = None, subfolder: Optional[str] = None) -> Path:
+    """Create a new extraction directory in uploads under an optional subfolder (e.g. case number)."""
     import uuid
     name = dir_name or f"extract_{uuid.uuid4().hex}"
-    dest = UPLOADS_DIR / name
+    parent = UPLOADS_DIR / subfolder if subfolder else UPLOADS_DIR
+    dest = parent / name
     ensure_directory(dest)
     return dest
 
