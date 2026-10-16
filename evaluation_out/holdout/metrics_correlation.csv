@@ -1,6 +1,0 @@
-Type,Planted,Found,Recall_Prop,Decoys,Decoys_Linked,FPR_Prop
-crypto,3,3,1.0,3,0,0.0
-phone,1,1,1.0,1,0,0.0
-url,1,1,1.0,1,0,0.0
-media,1,1,1.0,1,0,0.0
-rendezvous,1,1,1.0,3,0,0.0
