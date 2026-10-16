@@ -1,8 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useActiveCase } from '../context/CaseContext';
+import { dashboardService } from '../services/dashboardService';
 
 export default function CaseMetricsPage() {
   const { activeCase } = useActiveCase();
+  const caseId = activeCase?.id;
+
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    if (!caseId) {
+      setStats(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await dashboardService.getCaseStats(caseId);
+      setStats(data);
+    } catch (err) {
+      console.warn('Error loading case stats:', err);
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const evidenceCount = stats?.evidence_count ?? activeCase?.evidenceCount ?? 0;
+  const totalMessages = stats?.total_messages ?? (activeCase?.recordCount ? parseInt(activeCase.recordCount.replace(/,/g, ''), 10) : 0);
+  const waMessages = stats?.whatsapp_messages ?? 0;
+  const tgMessages = stats?.telegram_messages ?? 0;
+  const carvedCount = stats?.deleted_messages ?? 0;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto custom-scrollbar p-space-lg space-y-4">
@@ -18,31 +50,24 @@ export default function CaseMetricsPage() {
             </span>
           </div>
           <p className="text-body-sm font-body-sm text-on-surface-variant">
-            Statistical extraction yield, cryptographic health indicators, and pipeline performance metrics for case {activeCase?.caseNumber}.
+            Statistical extraction yield, cryptographic health indicators, and pipeline performance metrics for case {activeCase?.caseNumber || 'N/A'}.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
           <button
             type="button"
-            onClick={() => alert('Ledger refreshed')}
-            className="btn-secondary text-xs"
+            onClick={loadStats}
+            disabled={loading || !caseId}
+            className="btn-secondary text-xs flex items-center gap-1"
           >
-            <span className="material-symbols-outlined text-[15px]">refresh</span>
-            <span>Refresh Ledger</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => alert('Exporting metrics attestation...')}
-            className="btn-primary text-xs"
-          >
-            <span className="material-symbols-outlined text-[15px]">print</span>
-            <span>Export Metrics Attestation</span>
+            <span className={`material-symbols-outlined text-[15px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+            <span>Refresh Telemetry</span>
           </button>
         </div>
       </div>
 
-      {/* MANDATORY AMBER / YELLOW CALLOUT BANNER (Strict Stitch Requirement) */}
+      {/* Methodological Callout Banner */}
       <div className="bg-amber-950/30 border border-amber-600/40 rounded-lg p-3.5 flex items-start space-x-3 text-amber-200 shadow-sm">
         <span className="material-symbols-outlined text-amber-400 text-lg shrink-0 mt-0.5">warning</span>
         <div className="text-body-sm font-body-sm text-amber-100/90 leading-relaxed text-xs">
@@ -50,7 +75,7 @@ export default function CaseMetricsPage() {
         </div>
       </div>
 
-      {/* 1. TOP KPI TILES (4 Across) */}
+      {/* TOP KPI TILES */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Tile 1 */}
         <div className="bg-surface-container border border-outline-variant rounded-lg p-3.5 flex flex-col justify-between shadow-xs">
@@ -59,27 +84,24 @@ export default function CaseMetricsPage() {
             <span className="material-symbols-outlined text-[16px] text-primary">dataset</span>
           </div>
           <div className="my-2">
-            <div className="text-xl font-bold font-mono text-on-surface">5 Mounted Artifacts</div>
+            <div className="text-xl font-bold font-mono text-on-surface">{evidenceCount} Registered</div>
           </div>
           <div className="flex items-center space-x-2 pt-1 border-t border-outline-variant text-[11px] font-mono">
-            <span className="text-tertiary font-medium">4 Verified Match</span>
-            <span className="text-outline">•</span>
-            <span className="text-error font-medium">1 Mismatch</span>
+            <span className="text-tertiary font-medium">{activeCase?.integrityState || 'Valid'}</span>
           </div>
         </div>
 
         {/* Tile 2 */}
         <div className="bg-surface-container border border-outline-variant rounded-lg p-3.5 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between text-outline text-[11px] font-label-ui uppercase tracking-wider">
-            <span>Last Re-Verification</span>
+            <span>Last Pipeline Status</span>
             <span className="material-symbols-outlined text-[16px] text-primary">update</span>
           </div>
           <div className="my-2">
-            <div className="text-xl font-bold font-mono text-on-surface">10:14:02 UTC</div>
+            <div className="text-xl font-bold font-mono text-on-surface">{activeCase?.lastPipeline || 'Not executed'}</div>
           </div>
           <div className="flex items-center justify-between pt-1 border-t border-outline-variant text-[11px] font-mono text-on-surface-variant">
-            <span>Ledger Depth: 48 blocks</span>
-            <span className="text-primary">Cycle: 00:04:12 ago</span>
+            <span>Updated: {activeCase?.updated || 'Recently'}</span>
           </div>
         </div>
 
@@ -95,7 +117,7 @@ export default function CaseMetricsPage() {
           <div className="flex items-center space-x-1 pt-1 border-t border-outline-variant text-[10.5px] font-mono text-on-surface-variant">
             <span className="text-outline">Root:</span>
             <code className="text-primary bg-surface-container-lowest px-1.5 py-0.2 rounded border border-outline-variant truncate">
-              7f8a2c1b9d0e...
+              {activeCase?.sha256Root ? `${activeCase.sha256Root.substring(0, 14)}...` : 'N/A'}
             </code>
           </div>
         </div>
@@ -103,56 +125,54 @@ export default function CaseMetricsPage() {
         {/* Tile 4 */}
         <div className="bg-surface-container border border-outline-variant rounded-lg p-3.5 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between text-outline text-[11px] font-label-ui uppercase tracking-wider">
-            <span>Global Parse Rate</span>
+            <span>Indexed Records</span>
             <span className="material-symbols-outlined text-[16px] text-primary">analytics</span>
           </div>
           <div className="my-2">
-            <div className="text-xl font-bold font-mono text-on-surface">98.4% Yield</div>
+            <div className="text-xl font-bold font-mono text-on-surface">{totalMessages} Total</div>
           </div>
           <div className="flex items-center justify-between pt-1 border-t border-outline-variant text-[11px] font-mono text-on-surface-variant">
-            <span>Total: 20,735 Records</span>
-            <span className="text-tertiary">386 Carved</span>
+            <span>{carvedCount} Carved</span>
+            <span className="text-tertiary">{evidenceCount > 0 ? 'Live Ingest' : 'No Data'}</span>
           </div>
         </div>
       </section>
 
-      {/* Extraction Yields by Artifact Table */}
+      {/* Extraction Yields Breakdown */}
       <div className="bg-surface-container border border-outline-variant rounded-lg p-4 shadow-xs space-y-3">
         <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-          <h2 className="text-headline-sm font-headline-sm text-on-surface font-semibold">
-            Extraction Yield &amp; Anomaly Distribution
+          <h2 className="text-headline-sm font-headline-sm text-on-surface font-semibold text-sm">
+            Extraction Yield &amp; Partition Distribution
           </h2>
-          <span className="text-[11px] font-mono text-outline">Partition Breakdown</span>
+          <span className="text-[11px] font-mono text-outline">Evidence Partition Breakdown</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-3 rounded bg-surface-container-low border border-outline-variant space-y-2">
             <div className="flex justify-between items-center text-xs font-semibold">
-              <span className="text-on-surface font-mono">WhatsApp (msgstore.db.crypt15)</span>
-              <span className="text-primary font-mono">98.4% Parsed</span>
+              <span className="text-on-surface font-mono">WhatsApp Data Store</span>
+              <span className="text-primary font-mono">{waMessages} Records</span>
             </div>
             <div className="w-full h-2 rounded bg-surface-container-lowest overflow-hidden flex">
-              <div className="h-full bg-primary" style={{ width: '98.4%' }} />
-              <div className="h-full bg-amber-500" style={{ width: '1.6%' }} />
+              <div className="h-full bg-primary" style={{ width: totalMessages > 0 ? `${Math.min(100, (waMessages / totalMessages) * 100)}%` : '0%' }} />
             </div>
             <div className="flex justify-between text-[11px] text-on-surface-variant font-mono">
-              <span>12,842 clean records</span>
-              <span className="text-amber-500">208 unparsed/tombstones</span>
+              <span>{waMessages} indexed messages</span>
+              <span className="text-outline">{totalMessages > 0 ? `${((waMessages / totalMessages) * 100).toFixed(0)}%` : '0%'}</span>
             </div>
           </div>
 
           <div className="p-3 rounded bg-surface-container-low border border-outline-variant space-y-2">
             <div className="flex justify-between items-center text-xs font-semibold">
-              <span className="text-on-surface font-mono">Telegram (cache4.db + wal)</span>
-              <span className="text-primary font-mono">97.8% Parsed</span>
+              <span className="text-on-surface font-mono">Telegram Data Store</span>
+              <span className="text-primary font-mono">{tgMessages} Records</span>
             </div>
             <div className="w-full h-2 rounded bg-surface-container-lowest overflow-hidden flex">
-              <div className="h-full bg-primary" style={{ width: '97.8%' }} />
-              <div className="h-full bg-amber-500" style={{ width: '2.2%' }} />
+              <div className="h-full bg-primary" style={{ width: totalMessages > 0 ? `${Math.min(100, (tgMessages / totalMessages) * 100)}%` : '0%' }} />
             </div>
             <div className="flex justify-between text-[11px] text-on-surface-variant font-mono">
-              <span>7,893 clean records</span>
-              <span className="text-amber-500">178 unparsed/corrupt</span>
+              <span>{tgMessages} indexed messages</span>
+              <span className="text-outline">{totalMessages > 0 ? `${((tgMessages / totalMessages) * 100).toFixed(0)}%` : '0%'}</span>
             </div>
           </div>
         </div>

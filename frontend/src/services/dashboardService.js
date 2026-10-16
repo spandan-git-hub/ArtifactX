@@ -26,10 +26,11 @@ export const getCaseOverview = async (caseId) => {
   return response.data;
 };
 
-// Default export
-export default {
+export const dashboardService = {
   getCaseStats,
   getCorrelationStats,
   getTimelineStats,
   getCaseOverview,
 };
+
+export default dashboardService;

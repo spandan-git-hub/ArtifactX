@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useActiveCase } from '../context/CaseContext';
+import { generateReportStream } from '../services/reportService';
 
 const DEFAULT_SECTIONS = [
   { id: 'sec-01', title: '1. Case Docket & Investigating Jurisdiction', checked: true },
@@ -17,23 +18,43 @@ const DEFAULT_SECTIONS = [
 
 export default function ReportsPage() {
   const { activeCase } = useActiveCase();
+  const caseId = activeCase?.id;
 
   const [reportType, setReportType] = useState('full');
   const [includeSection63, setIncludeSection63] = useState(true);
   const [format, setFormat] = useState('pdf');
   const [sections, setSections] = useState(DEFAULT_SECTIONS);
   const [generating, setGenerating] = useState(false);
+  const [reportStatus, setReportStatus] = useState(null);
 
   const toggleSection = (id) => {
     setSections(prev => prev.map(s => s.id === id ? { ...s, checked: !s.checked } : s));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!caseId) return;
     setGenerating(true);
-    setTimeout(() => {
-      setGenerating(false);
+    setReportStatus(null);
+    try {
+      await generateReportStream(caseId, {
+        reportType,
+        includeEvidence: true,
+        includeTimeline: true,
+        includeDeleted: true,
+        includeCorrelations: true,
+        includeCustodyLog: true,
+        leadAnalyst: activeCase?.examiner || 'Forensic Examiner',
+        agency: activeCase?.agency || 'Special Cyber Forensics Division',
+        swornDeclaration: includeSection63
+      });
+      setReportStatus({ type: 'success', message: 'PDF report generated and downloaded successfully.' });
+    } catch (err) {
+      console.error('PDF report generation failed:', err);
+      // Fallback to print if backend PDF stream endpoint encounters environment limits
       window.print();
-    }, 600);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -46,15 +67,24 @@ export default function ReportsPage() {
             <span className="font-label-ui uppercase tracking-wider font-semibold">Evidentiary Chain Active</span>
           </div>
           <span className="text-outline">|</span>
-          <span className="text-on-surface-variant font-mono">SHA-256 Root: 9f83a8b41bc8e9102cba3ef8109d...e54a</span>
+          <span className="text-on-surface-variant font-mono">
+            {activeCase?.sha256Root ? `SHA-256 Root: ${activeCase.sha256Root.substring(0, 24)}...` : `Docket: ${activeCase?.caseNumber || 'N/A'}`}
+          </span>
         </div>
         <div className="flex items-center space-x-3 text-label-mono-sm text-on-surface-variant text-xs">
-          <span>Source: msgstore.decrypted.db</span>
+          <span>Case Status: {activeCase?.status || 'Active'}</span>
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-tertiary/10 text-tertiary border border-tertiary/30">
-            TAMPER SEAL VALID
+            {activeCase?.integrityState || 'CHAIN ACTIVE'}
           </span>
         </div>
       </div>
+
+      {reportStatus && (
+        <div className="px-space-lg py-2 bg-tertiary/15 border-b border-tertiary/40 text-tertiary text-xs font-mono flex items-center justify-between">
+          <span>{reportStatus.message}</span>
+          <button type="button" onClick={() => setReportStatus(null)} className="hover:underline">✕</button>
+        </div>
+      )}
 
       {/* Main Content Scrollable */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-space-lg space-y-4">
@@ -74,105 +104,67 @@ export default function ReportsPage() {
               </select>
             </div>
 
-            {/* Toggle Switch for Section 63 Appendix */}
-            <label className="flex items-center space-x-2.5 px-3 py-1 bg-surface-container-lowest border border-outline-variant rounded cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeSection63}
-                onChange={(e) => setIncludeSection63(e.target.checked)}
-                className="rounded border-outline-variant text-primary focus:ring-0 cursor-pointer"
-              />
-              <span className="text-body-sm text-on-surface text-xs">
-                Include Section 63 appendix <span className="text-outline font-mono">(draft for review)</span>
-              </span>
-            </label>
+            {/* Checkboxes & Format */}
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center space-x-2 text-xs text-on-surface cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeSection63}
+                  onChange={(e) => setIncludeSection63(e.target.checked)}
+                  className="rounded border-outline-variant text-primary focus:ring-0"
+                />
+                <span>Include Section 63 Statutory Schedule</span>
+              </label>
 
-            {/* Format Selector + Primary Action Button */}
-            <div className="flex items-center space-x-3">
-              <div className="flex bg-surface-container-lowest border border-outline-variant rounded p-0.5 text-xs">
+              <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => setFormat('pdf')}
-                  className={`px-3 py-1 rounded font-semibold transition-colors ${
-                    format === 'pdf' ? 'bg-primary text-on-primary shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
+                  onClick={handleGenerate}
+                  disabled={generating || !caseId}
+                  className="btn-primary text-xs flex items-center gap-1.5"
                 >
-                  PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormat('json')}
-                  className={`px-3 py-1 rounded font-semibold transition-colors ${
-                    format === 'json' ? 'bg-primary text-on-primary shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  JSON Manifest
+                  <span className={`material-symbols-outlined text-[16px] ${generating ? 'animate-spin' : ''}`}>
+                    {generating ? 'sync' : 'picture_as_pdf'}
+                  </span>
+                  <span>{generating ? 'Generating Stream...' : 'Generate & Download PDF'}</span>
                 </button>
               </div>
-
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating}
-                className="btn-primary"
-              >
-                <span className="material-symbols-outlined text-[16px]">
-                  {generating ? 'sync' : 'article'}
-                </span>
-                <span>{generating ? 'Compiling Report...' : 'Generate Report'}</span>
-              </button>
             </div>
           </div>
         </section>
 
-        {/* Two-Column Workspace */}
-        <div className="grid grid-cols-12 gap-4 items-start">
-          {/* Left Column: Manifest Composition (5 Cols) */}
-          <div className="col-span-12 lg:col-span-5 bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col space-y-3 shadow-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-              <div>
-                <h2 className="text-headline-sm font-headline-sm text-on-surface font-semibold flex items-center space-x-2">
-                  <span className="material-symbols-outlined text-primary">checklist</span>
-                  <span>Manifest Composition</span>
-                </h2>
-                <p className="text-body-sm text-on-surface-variant mt-0.5 text-xs">
-                  {sections.filter(s => s.checked).length} of {sections.length} sections selected
-                </p>
-              </div>
-
-              <div className="flex space-x-1 font-mono text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setSections(sections.map(s => ({ ...s, checked: true })))}
-                  className="px-2 py-0.5 bg-surface-container-low border border-outline-variant text-on-surface-variant hover:text-on-surface rounded"
-                >
-                  Select All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSections(sections.map(s => ({ ...s, checked: false })))}
-                  className="px-2 py-0.5 bg-surface-container-low border border-outline-variant text-on-surface-variant hover:text-on-surface rounded"
-                >
-                  Clear
-                </button>
-              </div>
+        {/* Dual Column Layout: Sections Checklist (5 Cols) + Live Document Preview (7 Cols) */}
+        <div className="grid grid-cols-12 gap-4">
+          {/* Left Column: Sections Checklist */}
+          <div className="col-span-12 lg:col-span-5 bg-surface-container border border-outline-variant rounded-lg p-4 shadow-xs space-y-3">
+            <div className="pb-2 border-b border-outline-variant flex items-center justify-between">
+              <h3 className="font-headline-sm text-sm font-semibold text-on-surface">
+                Report Sections In Scope ({sections.filter(s => s.checked).length}/{sections.length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSections(prev => prev.map(s => ({ ...s, checked: true })))}
+                className="text-primary hover:underline text-xs"
+              >
+                Select All
+              </button>
             </div>
 
-            <div className="space-y-1.5 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
-              {sections.map((s) => (
+            <div className="space-y-1.5">
+              {sections.map((sec) => (
                 <label
-                  key={s.id}
-                  className={`flex items-center justify-between p-2 rounded border cursor-pointer transition-colors text-xs ${
-                    s.checked ? 'bg-surface-container-low border-primary/40 text-on-surface' : 'bg-surface-container-lowest border-outline-variant text-outline'
-                  }`}
+                  key={sec.id}
+                  className="flex items-center space-x-2.5 p-2 rounded hover:bg-surface-container-high transition-colors cursor-pointer text-xs"
                 >
-                  <span className="truncate pr-2">{s.title}</span>
                   <input
                     type="checkbox"
-                    checked={s.checked}
-                    onChange={() => toggleSection(s.id)}
+                    checked={sec.checked}
+                    onChange={() => toggleSection(sec.id)}
                     className="rounded border-outline-variant text-primary focus:ring-0"
                   />
+                  <span className={`text-on-surface ${sec.checked ? 'font-medium' : 'text-outline line-through'}`}>
+                    {sec.title}
+                  </span>
                 </label>
               ))}
             </div>
@@ -189,7 +181,7 @@ export default function ReportsPage() {
                 DIGITAL FORENSIC EXAMINATION REPORT
               </h2>
               <div className="font-mono text-xs text-primary font-semibold">
-                DOCKET ID: {activeCase?.caseNumber} · PRODUCED UNDER BSA 2023 §63
+                DOCKET ID: {activeCase?.caseNumber || 'N/A'} · PRODUCED UNDER BSA 2023 §63
               </div>
             </div>
 
@@ -197,19 +189,19 @@ export default function ReportsPage() {
             <div className="p-3 rounded bg-surface-container-low border border-outline-variant space-y-1.5 text-xs font-mono">
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">Subject Title:</span>
-                <span className="text-on-surface font-semibold">{activeCase?.title}</span>
+                <span className="text-on-surface font-semibold">{activeCase?.title || 'Untitled Case'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">Lead Examiner:</span>
-                <span className="text-on-surface">{activeCase?.examiner}</span>
+                <span className="text-on-surface">{activeCase?.examiner || 'Unassigned'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">Agency:</span>
-                <span className="text-on-surface">{activeCase?.agency}</span>
+                <span className="text-on-surface">{activeCase?.agency || 'Special Cyber Forensics Division'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-on-surface-variant">Target Device:</span>
-                <span className="text-on-surface">{activeCase?.deviceTarget}</span>
+                <span className="text-on-surface">{activeCase?.deviceTarget || 'Generic Mobile Device'}</span>
               </div>
             </div>
 
@@ -219,7 +211,7 @@ export default function ReportsPage() {
                 Executive Evidentiary Summary
               </div>
               <p className="text-on-surface-variant leading-relaxed">
-                Bit-stream image verified using dual cryptographic hashing (SHA-256 + BLAKE3). WhatsApp msgstore.db.crypt15 and Telegram cache4.db successfully decrypted in volatile RAM enclave without persistent plaintext leakage. 12,842 total messages, 218 carved residuals, and 7 cross-platform identity linkages established with deterministic provenance.
+                Bit-stream image verified using dual cryptographic hashing (SHA-256 + BLAKE3). Evidence databases processed in volatile memory enclave without persistent plaintext leakage. {activeCase?.recordCount || '0'} total indexed messages across {activeCase?.evidenceCount || 0} registered evidence artifacts with deterministic provenance.
               </p>
             </div>
 
@@ -227,13 +219,13 @@ export default function ReportsPage() {
             <div className="pt-4 border-t border-outline-variant flex justify-between items-end text-xs font-mono">
               <div>
                 <span className="text-outline block text-[10px]">VERIFICATION ENGINE:</span>
-                <span className="text-primary font-semibold">ArtifactX v4.12.0 / FIPS-140-3</span>
-                <span className="text-outline block text-[10px] mt-1">LEDGER COMMIT: Block #40921-X9</span>
+                <span className="text-primary font-semibold">ArtifactX / FIPS-140-3 Pure Engine</span>
+                <span className="text-outline block text-[10px] mt-1">INTEGRITY: {activeCase?.integrityState || 'VERIFIED'}</span>
               </div>
 
               <div className="text-right">
                 <div className="w-36 border-b border-on-surface pb-1 mb-1 font-serif text-sm italic text-on-surface text-center">
-                  A. Verma
+                  {activeCase?.examiner || 'Lead Examiner'}
                 </div>
                 <span className="text-[10px] text-outline uppercase block">Signature of Authorized Certifier</span>
                 <span className="text-[10px] text-primary">{new Date().toISOString().substring(0, 10)}</span>

@@ -9,61 +9,41 @@ export default function CaseOverviewPage() {
   // Display case can be matched by URL param or context activeCase
   const currentCase = cases.find(c => c.id === caseId || c.caseNumber === caseId) || activeCase;
 
-  // View state switcher: 'normal' | 'empty' | 'failure'
-  const [viewState, setViewState] = useState(
-    currentCase?.evidenceCount === 0 ? 'empty' : (currentCase?.integrityState === 'Flagged Exception' ? 'failure' : 'normal')
-  );
+  // View state dynamically determined by actual case status and evidence count
+  const viewState = !currentCase || currentCase.evidenceCount === 0
+    ? 'empty'
+    : (currentCase.integrityState === 'Flagged Exception' || currentCase.integrityState === 'HASH_MISMATCH' ? 'failure' : 'normal');
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto custom-scrollbar p-space-lg">
       <div className="w-full max-w-[1200px] mx-auto flex flex-col space-y-4 pb-12">
-        {/* ================= VIEW MODE SWITCHER TOOLBAR ================= */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2">
+        {/* ================= CASE STATUS TOOLBAR ================= */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2.5">
           <div className="flex items-center space-x-2">
             <span className="font-label-mono-sm text-label-mono-sm text-outline">DOCKET:</span>
             <span className="font-headline-sm text-headline-sm font-semibold text-primary">
-              {currentCase?.caseNumber}
+              {currentCase?.caseNumber || 'N/A'}
             </span>
             <span className="text-outline text-xs">•</span>
-            <span className="text-body-sm text-on-surface truncate max-w-md">{currentCase?.title}</span>
+            <span className="text-body-sm text-on-surface truncate max-w-md">{currentCase?.title || 'No Active Case'}</span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-label-ui text-on-surface-variant">Stitch State Variant:</span>
-            <div className="flex bg-surface-container-lowest border border-outline-variant rounded p-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setViewState('normal')}
-                className={`px-2.5 py-1 rounded transition-colors ${
-                  viewState === 'normal'
-                    ? 'bg-primary/20 text-primary font-semibold border border-primary/30'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Normal Live Case
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewState('empty')}
-                className={`px-2.5 py-1 rounded transition-colors ${
-                  viewState === 'empty'
-                    ? 'bg-primary/20 text-primary font-semibold border border-primary/30'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Empty Case (No Evidence)
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewState('failure')}
-                className={`px-2.5 py-1 rounded transition-colors ${
-                  viewState === 'failure'
-                    ? 'bg-error/20 text-error font-semibold border border-error/30'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Integrity Failure Alert
-              </button>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-surface-container border border-outline-variant text-[11px] font-label-mono-sm">
+              <span className="text-outline uppercase">EVIDENCE:</span>
+              <span className="text-on-surface font-semibold">{currentCase?.evidenceCount ?? 0} ITEMS</span>
+            </div>
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-surface-container border border-outline-variant text-[11px] font-label-mono-sm">
+              <span className="text-outline uppercase">INTEGRITY:</span>
+              <span className={`font-semibold ${
+                currentCase?.integrityState === 'Flagged Exception' || currentCase?.integrityState === 'HASH_MISMATCH'
+                  ? 'text-error'
+                  : currentCase?.integrityState === 'Pending Ingestion'
+                    ? 'text-on-surface-variant'
+                    : 'text-tertiary'
+              }`}>
+                {currentCase?.integrityState || 'Pending Ingestion'}
+              </span>
             </div>
           </div>
         </div>

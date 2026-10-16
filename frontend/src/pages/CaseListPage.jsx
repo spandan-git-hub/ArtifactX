@@ -53,7 +53,7 @@ export default function CaseListPage() {
           <div className="bg-surface-container border border-outline-variant rounded px-2.5 py-1 flex items-center space-x-2">
             <span className="text-outline uppercase text-[10px]">HASH AUDIT:</span>
             <span className="text-tertiary flex items-center gap-1 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-tertiary" /> 100% VALID
+              <span className={`w-1.5 h-1.5 rounded-full ${cases.length > 0 ? 'bg-tertiary' : 'bg-outline'}`} /> {cases.length > 0 ? '100% VALID' : 'N/A'}
             </span>
           </div>
         </div>

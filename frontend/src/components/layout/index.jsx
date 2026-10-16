@@ -32,22 +32,22 @@ export function Layout({ children }) {
   else if (path.includes('/limitations')) sectionName = 'Limitations';
   else if (path.includes('/reports')) sectionName = 'Reports';
 
-  const caseId = activeCase?.id || 'ARX-2026-014';
+  const caseId = activeCase?.id || '';
 
   const navTabs = [
-    { name: 'Overview', icon: 'dashboard', path: `/cases/${caseId}/overview`, badge: 'LIVE', badgeColor: 'bg-primary/20 text-primary' },
-    { name: 'Evidence', icon: 'folder_open', path: `/cases/${caseId}/evidence`, count: activeCase?.evidenceCount ?? 4 },
-    { name: 'Decryption', icon: 'key', path: `/cases/${caseId}/decryption`, dot: 'bg-amber-500' },
-    { name: 'Pipeline', icon: 'alt_route', path: `/cases/${caseId}/pipeline` },
-    { name: 'Messages', icon: 'chat', path: `/cases/${caseId}/messages`, count: '12.8k' },
-    { name: 'Timeline', icon: 'schedule', path: `/cases/${caseId}/timeline` },
-    { name: 'Recovery', icon: 'restore', path: `/cases/${caseId}/recovery`, count: '218' },
-    { name: 'Correlations', icon: 'hub', path: `/cases/${caseId}/correlations` },
-    { name: 'Reports', icon: 'description', path: `/cases/${caseId}/reports` },
-    { name: 'Section 63', icon: 'gavel', path: `/cases/${caseId}/section63` },
-    { name: 'Integrity & Audit', icon: 'verified_user', path: `/cases/${caseId}/integrity` },
-    { name: 'Metrics', icon: 'analytics', path: `/cases/${caseId}/metrics` },
-    { name: 'Limitations', icon: 'info', path: `/cases/${caseId}/limitations` },
+    { name: 'Overview', icon: 'dashboard', path: caseId ? `/cases/${caseId}/overview` : '/cases', badge: activeCase ? 'LIVE' : undefined, badgeColor: 'bg-primary/20 text-primary' },
+    { name: 'Evidence', icon: 'folder_open', path: caseId ? `/cases/${caseId}/evidence` : '/cases', count: activeCase?.evidenceCount },
+    { name: 'Decryption', icon: 'key', path: caseId ? `/cases/${caseId}/decryption` : '/cases' },
+    { name: 'Pipeline', icon: 'alt_route', path: caseId ? `/cases/${caseId}/pipeline` : '/cases' },
+    { name: 'Messages', icon: 'chat', path: caseId ? `/cases/${caseId}/messages` : '/cases', count: activeCase?.recordCount && activeCase.recordCount !== '0' ? activeCase.recordCount : undefined },
+    { name: 'Timeline', icon: 'schedule', path: caseId ? `/cases/${caseId}/timeline` : '/cases' },
+    { name: 'Recovery', icon: 'restore', path: caseId ? `/cases/${caseId}/recovery` : '/cases' },
+    { name: 'Correlations', icon: 'hub', path: caseId ? `/cases/${caseId}/correlations` : '/cases' },
+    { name: 'Reports', icon: 'description', path: caseId ? `/cases/${caseId}/reports` : '/cases' },
+    { name: 'Section 63', icon: 'gavel', path: caseId ? `/cases/${caseId}/section63` : '/cases' },
+    { name: 'Integrity & Audit', icon: 'verified_user', path: caseId ? `/cases/${caseId}/integrity` : '/cases' },
+    { name: 'Metrics', icon: 'analytics', path: caseId ? `/cases/${caseId}/metrics` : '/cases' },
+    { name: 'Limitations', icon: 'info', path: caseId ? `/cases/${caseId}/limitations` : '/cases' },
   ];
 
   const isTabActive = (tabPath) => {
@@ -100,7 +100,7 @@ export function Layout({ children }) {
             >
               <span className="text-[10px] text-on-surface-variant font-mono uppercase tracking-wider">ACTIVE CONTEXT:</span>
               <span className="text-label-mono-sm font-label-mono-sm font-medium text-primary">
-                {activeCase?.caseNumber || 'ARX-2026-014'}
+                {activeCase?.caseNumber || 'No Case Selected'}
               </span>
               <span className="material-symbols-outlined text-[14px] text-on-surface-variant">sync_alt</span>
             </button>
@@ -523,5 +523,26 @@ export function Layout({ children }) {
         </div>
       )}
     </div>
+  );
+}
+
+export function Header({ breadcrumbs = [] }) {
+  return (
+    <header className="h-12 w-full border-b border-outline-variant bg-surface-container-low flex items-center justify-between px-space-lg shrink-0">
+      <nav className="flex items-center space-x-2 text-body-sm font-body-sm">
+        {breadcrumbs.map((b, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <span className="text-outline">/</span>}
+            {b.path ? (
+              <Link to={b.path} className="text-on-surface-variant hover:text-on-surface transition-colors">
+                {b.label}
+              </Link>
+            ) : (
+              <span className="text-on-surface font-semibold">{b.label}</span>
+            )}
+          </React.Fragment>
+        ))}
+      </nav>
+    </header>
   );
 }

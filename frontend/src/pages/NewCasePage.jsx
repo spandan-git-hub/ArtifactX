@@ -11,14 +11,14 @@ export default function NewCasePage() {
   const [formData, setFormData] = useState({
     caseNumber: nextCaseNumber,
     title: '',
-    agency: 'Special Cyber Forensics Division, Directorate of Enforcement',
-    examiner: 'A. Verma (Examiner #8942)',
-    deviceTarget: 'Android Mobile Device (Android 14 / OneUI 6.1)',
-    priority: 'Priority Investigation',
-    incidentType: 'Encrypted Messaging Exfiltration / FinTech Audit',
+    agency: '',
+    examiner: '',
+    deviceTarget: '',
+    priority: 'Standard Investigation',
+    incidentType: '',
     description: '',
     section63Enacted: true,
-    intakeHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    intakeHash: ''
   });
 
   const handleChange = (e) => {
@@ -29,11 +29,11 @@ export default function NewCasePage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title) return;
 
-    const created = addCase({
+    const created = await addCase({
       caseNumber: formData.caseNumber,
       title: formData.title,
       agency: formData.agency,
@@ -43,7 +43,6 @@ export default function NewCasePage() {
       status: 'Active',
       integrityState: 'Pending Ingestion',
       evidenceCount: 0,
-      recordCount: '0',
     });
 
     navigate(`/cases/${created.id}/overview`);

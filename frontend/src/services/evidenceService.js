@@ -70,8 +70,7 @@ export const deleteEvidence = async (evidenceId) => {
   await axios.delete(`${API_BASE}/evidence/${evidenceId}`);
 };
 
-// Default export for backward compatibility
-export default {
+export const evidenceService = {
   uploadEvidence,
   getEvidences,
   getEvidence,
@@ -82,3 +81,5 @@ export default {
   inspectSqliteDatabase,
   deleteEvidence,
 };
+
+export default evidenceService;

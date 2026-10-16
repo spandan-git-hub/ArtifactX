@@ -1,89 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useActiveCase } from '../context/CaseContext';
-
-const TIMELINE_EVENTS = [
-  {
-    id: 'tl-01',
-    app: 'WhatsApp',
-    type: 'Incoming Message',
-    timestamp: '2026-03-30 10:14:01.092 UTC',
-    actor: '+91 98765 43210 (K. Patel)',
-    content: 'Target coordinates confirmed: 28.6139° N, 77.2090° E. Deploying field unit now.',
-    strength: 'Deterministic',
-    strengthScore: 0.98,
-    hash: '8a72cf19d45e08b1a32f91bc740192e8fa312904bc78e120aa45192803bba221',
-    rowid: 84922
-  },
-  {
-    id: 'tl-02',
-    app: 'WhatsApp',
-    type: 'Outgoing Message',
-    timestamp: '2026-03-30 10:12:45.412 UTC',
-    actor: 'Target Subject (+91 98111 22334)',
-    content: 'Decrypt token accepted. Do not commit logs until Section 63 schedule drafted.',
-    strength: 'Deterministic',
-    strengthScore: 0.96,
-    hash: '9b4a11f082e4c9012a8120b33411a7fa0218b9412e84c9012a8120b33411a7fa',
-    rowid: 84921
-  },
-  {
-    id: 'tl-03',
-    app: 'Telegram',
-    type: 'Channel Broadcast',
-    timestamp: '2026-03-30 09:42:15.118 UTC',
-    actor: '@falcon_lead (Commander)',
-    content: 'File crypt15 staged on node 04 for batch recovery.',
-    strength: 'Strong',
-    strengthScore: 0.88,
-    hash: '4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c',
-    rowid: 4121
-  },
-  {
-    id: 'tl-04',
-    app: 'WhatsApp',
-    type: 'Remote Revocation (Deleted)',
-    timestamp: '2026-03-30 07:55:10.004 UTC',
-    actor: 'Target Subject',
-    content: '[CARVED WAL FRAME #189]: Transfer completed to wallet 0x71C...49b2. Wipe all cache.',
-    strength: 'Strong',
-    strengthScore: 0.94,
-    hash: '01f5e88d11ac293847291048b291048572910485729104857291048572910485',
-    rowid: 84900,
-    isCarved: true
-  },
-  {
-    id: 'tl-gap-01',
-    isGap: true,
-    duration: '4 hours 15 minutes',
-    range: '2026-03-30 03:40:00 — 2026-03-30 07:55:00 UTC',
-    note: 'Inactivity interval flagged across all messaging databases. Device potentially in flight or RF-shielded bag.'
-  },
-  {
-    id: 'tl-05',
-    app: 'Telegram',
-    type: 'Media Attachment',
-    timestamp: '2026-03-30 03:39:48.891 UTC',
-    actor: '@falcon_lead',
-    content: 'Image transmission: key_derivation_chart.png (SHA-256: 7fa0218b...33411a)',
-    strength: 'Deterministic',
-    strengthScore: 0.95,
-    hash: '7fa0218b9412e84c9012a8120b33411ae3b0c44298fc1c149afbf4c8996fb924',
-    rowid: 4110
-  }
-];
+import { timelineService } from '../services/timelineService';
 
 export default function TimelinePage() {
   const { activeCase } = useActiveCase();
 
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
   const [appFilter, setAppFilter] = useState('All');
   const [strengthFilter, setStrengthFilter] = useState('All');
   const [search, setSearch] = useState('');
 
-  const filteredEvents = TIMELINE_EVENTS.filter((e) => {
+  const caseId = activeCase?.id;
+
+  const loadTimeline = useCallback(async () => {
+    if (!caseId) {
+      setEvents([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await timelineService.getTimeline(caseId);
+      if (Array.isArray(data)) {
+        setEvents(data);
+      } else if (data?.events && Array.isArray(data.events)) {
+        setEvents(data.events);
+      } else {
+        setEvents([]);
+      }
+    } catch (err) {
+      console.warn('Error fetching timeline events from API:', err);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [loadTimeline]);
+
+  const handleRebuild = async () => {
+    if (!caseId) return;
+    setRebuilding(true);
+    try {
+      await timelineService.buildTimeline(caseId);
+      await loadTimeline();
+    } catch (err) {
+      console.error('Failed to rebuild timeline:', err);
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
+  const filteredEvents = events.filter((e) => {
     if (e.isGap) return true;
-    if (appFilter !== 'All' && e.app !== appFilter) return false;
-    if (strengthFilter !== 'All' && e.strength !== strengthFilter) return false;
-    if (search && !e.content.toLowerCase().includes(search.toLowerCase()) && !e.actor.toLowerCase().includes(search.toLowerCase())) return false;
+    const app = e.app || (e.source_type?.toLowerCase().includes('wa') ? 'WhatsApp' : 'Telegram');
+    if (appFilter !== 'All' && app !== appFilter) return false;
+    const strength = e.strength || (e.confidence_score >= 0.95 ? 'Deterministic' : 'Strong');
+    if (strengthFilter !== 'All' && strength !== strengthFilter) return false;
+    const content = e.content || e.message_text || e.summary || '';
+    const actor = e.actor || e.sender || e.source_identifier || '';
+    if (search && !content.toLowerCase().includes(search.toLowerCase()) && !actor.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -97,46 +76,42 @@ export default function TimelinePage() {
               <h1 className="text-headline-md font-headline-md text-on-surface font-semibold">
                 Forensic Chronological Timeline
               </h1>
-              <span className="px-2 py-0.5 text-label-ui rounded bg-tertiary/10 border border-tertiary/30 text-tertiary flex items-center gap-1 text-xs">
-                <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                Rebuilt — identical
-              </span>
+              {events.length > 0 && (
+                <span className="px-2 py-0.5 text-label-ui rounded bg-tertiary/10 border border-tertiary/30 text-tertiary flex items-center gap-1 text-xs">
+                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                  Reconstructed
+                </span>
+              )}
             </div>
             <p className="text-body-sm text-on-surface-variant mt-0.5">
-              Multi-source reconstructed timeline across WhatsApp and Telegram evidentiary databases for case {activeCase?.caseNumber}.
+              Multi-source chronological timeline across forensic evidence databases for case {activeCase?.caseNumber || 'N/A'}.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center h-8 px-2 rounded bg-surface-container-lowest border border-outline-variant font-mono text-xs text-on-surface-variant">
-              <span className="text-outline mr-1">SHA-256:</span>
-              <span className="text-on-surface mr-1.5 font-medium">9b4a11f082e4...</span>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard?.writeText('9b4a11f082e4c9012a8120b33411a7fa0218b9412e84c9012a8120b33411a7fa')}
-                className="hover:text-primary transition-colors cursor-pointer"
-                title="Copy Hash"
-              >
-                <span className="material-symbols-outlined text-[13px]">content_copy</span>
-              </button>
-            </div>
+            {activeCase?.sha256Root && (
+              <div className="flex items-center h-8 px-2 rounded bg-surface-container-lowest border border-outline-variant font-mono text-xs text-on-surface-variant">
+                <span className="text-outline mr-1">ROOT:</span>
+                <span className="text-on-surface mr-1.5 font-medium">{activeCase.sha256Root.substring(0, 12)}...</span>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(activeCase.sha256Root)}
+                  className="hover:text-primary transition-colors cursor-pointer"
+                  title="Copy Hash"
+                >
+                  <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                </button>
+              </div>
+            )}
 
             <button
               type="button"
-              onClick={() => alert('Exporting Timeline CSV...')}
-              className="btn-secondary text-xs h-8"
+              disabled={rebuilding || !caseId}
+              onClick={handleRebuild}
+              className="btn-secondary text-xs h-8 flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-[14px]">file_download</span>
-              <span>Export Timeline CSV</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => alert('Opening Section 63 Chronology Slip...')}
-              className="btn-primary text-xs h-8"
-            >
-              <span className="material-symbols-outlined text-[14px]">gavel</span>
-              <span>Section 63 Chronology Slip</span>
+              <span className={`material-symbols-outlined text-[14px] ${rebuilding ? 'animate-spin' : ''}`}>sync</span>
+              <span>{rebuilding ? 'Rebuilding...' : 'Rebuild Timeline'}</span>
             </button>
           </div>
         </div>
@@ -178,7 +153,7 @@ export default function TimelinePage() {
 
           <div className="flex items-center gap-1.5 text-label-ui text-outline text-xs">
             <span>Indexed Chrono Events:</span>
-            <span className="text-primary font-mono font-semibold">12,842</span>
+            <span className="text-primary font-mono font-semibold">{filteredEvents.length}</span>
           </div>
         </div>
       </section>
@@ -186,44 +161,79 @@ export default function TimelinePage() {
       {/* Visual Chronological Timeline Feed */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
         <div className="max-w-4xl mx-auto space-y-4">
-          {filteredEvents.map((item) => {
+          {loading && (
+            <div className="py-12 text-center text-on-surface-variant font-mono text-sm">
+              <span className="material-symbols-outlined text-3xl animate-spin text-primary mb-2">sync</span>
+              <p>Reconstructing chronological timeline from database records...</p>
+            </div>
+          )}
+
+          {!loading && filteredEvents.length === 0 && (
+            <div className="py-16 text-center text-on-surface-variant border border-dashed border-outline-variant rounded-lg bg-surface-container-low p-8">
+              <span className="material-symbols-outlined text-4xl text-outline mb-3">timeline</span>
+              <h3 className="text-body-lg font-medium text-on-surface">No Timeline Events Recorded</h3>
+              <p className="text-body-sm text-on-surface-variant max-w-md mx-auto mt-1 mb-4">
+                No events found matching the current criteria. Ingest evidence files and run the extraction pipeline to construct the forensic timeline.
+              </p>
+              {caseId && (
+                <button
+                  type="button"
+                  onClick={handleRebuild}
+                  className="btn-primary text-xs h-8 inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                  Build Timeline Now
+                </button>
+              )}
+            </div>
+          )}
+
+          {!loading && filteredEvents.map((item, idx) => {
+            const eventId = item.id || `ev-${idx}`;
             if (item.isGap) {
               return (
                 <div
-                  key={item.id}
+                  key={eventId}
                   className="p-3 rounded-lg border border-dashed border-amber-600/50 bg-amber-950/15 flex items-center gap-3 text-amber-200 text-xs my-3"
                 >
                   <span className="material-symbols-outlined text-amber-400 text-lg">timelapse</span>
                   <div className="flex-1">
                     <div className="font-semibold text-amber-300">
-                      Forensic Inactivity Gap Detected: {item.duration}
+                      Forensic Inactivity Gap Detected: {item.duration || 'Inactivity Interval'}
                     </div>
-                    <p className="text-on-surface-variant text-[11px] mt-0.5">{item.note}</p>
+                    <p className="text-on-surface-variant text-[11px] mt-0.5">{item.note || item.description}</p>
                   </div>
-                  <span className="font-mono text-[10px] text-amber-400/80">{item.range}</span>
+                  <span className="font-mono text-[10px] text-amber-400/80">{item.range || ''}</span>
                 </div>
               );
             }
 
+            const app = item.app || (item.source_type?.toLowerCase().includes('wa') ? 'WhatsApp' : 'Telegram');
+            const actor = item.actor || item.sender || item.source_identifier || 'Unknown Participant';
+            const content = item.content || item.message_text || item.summary || '[Payload data]';
+            const timestamp = item.timestamp || item.created_at || 'Undated';
+            const strength = item.strength || (item.confidence_score >= 0.95 ? 'Deterministic' : 'Strong');
+            const strengthScore = item.strengthScore ?? item.confidence_score ?? 1.0;
+
             return (
               <div
-                key={item.id}
+                key={eventId}
                 className={`p-4 rounded-lg border bg-surface-container transition-all hover:border-primary/50 space-y-2 ${
-                  item.isCarved ? 'border-amber-600/40 bg-amber-950/10' : 'border-outline-variant'
+                  item.isCarved || item.is_carved ? 'border-amber-600/40 bg-amber-950/10' : 'border-outline-variant'
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/60 pb-2">
                   <div className="flex items-center gap-2">
                     <span className={`material-symbols-outlined text-sm ${
-                      item.app === 'WhatsApp' ? 'text-emerald-400' : 'text-blue-400'
+                      app === 'WhatsApp' ? 'text-emerald-400' : 'text-blue-400'
                     }`}>
-                      {item.app === 'WhatsApp' ? 'chat' : 'send'}
+                      {app === 'WhatsApp' ? 'chat' : 'send'}
                     </span>
-                    <span className="font-semibold text-on-surface text-sm">{item.actor}</span>
+                    <span className="font-semibold text-on-surface text-sm">{actor}</span>
                     <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-surface-container-high border border-outline-variant text-on-surface-variant">
-                      {item.type}
+                      {item.type || item.event_type || 'Message'}
                     </span>
-                    {item.isCarved && (
+                    {(item.isCarved || item.is_carved) && (
                       <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold">
                         CARVED RESIDUAL
                       </span>
@@ -231,27 +241,29 @@ export default function TimelinePage() {
                   </div>
 
                   <div className="flex items-center gap-3 font-mono text-xs text-on-surface-variant">
-                    <span className="text-on-surface">{item.timestamp}</span>
+                    <span className="text-on-surface">{timestamp}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                      item.strength === 'Deterministic'
+                      strength === 'Deterministic'
                         ? 'bg-tertiary/10 text-tertiary border border-tertiary/30'
                         : 'bg-primary/10 text-primary border border-primary/30'
                     }`}>
-                      {item.strength} ({(item.strengthScore * 100).toFixed(0)}%)
+                      {strength} ({(strengthScore * 100).toFixed(0)}%)
                     </span>
                   </div>
                 </div>
 
                 <p className="text-body-md text-on-surface leading-relaxed text-sm select-text">
-                  {item.content}
+                  {content}
                 </p>
 
                 <div className="pt-1 flex items-center justify-between font-mono text-[10px] text-outline">
-                  <span>RowID: {item.rowid}</span>
-                  <div className="flex items-center gap-1">
-                    <span>SHA-256:</span>
-                    <span className="text-on-surface-variant">{item.hash.substring(0, 24)}...</span>
-                  </div>
+                  <span>RowID: {item.rowid || item.record_id || item.id || 'N/A'}</span>
+                  {item.hash && (
+                    <div className="flex items-center gap-1">
+                      <span>SHA-256:</span>
+                      <span className="text-on-surface-variant">{item.hash.substring(0, 24)}...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

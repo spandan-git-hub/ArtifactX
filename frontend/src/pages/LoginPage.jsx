@@ -6,8 +6,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
-  const [username, setUsername] = useState('a.verma@forensics.agency.gov');
-  const [password, setPassword] = useState('ForensicPin-2026!');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -153,6 +153,7 @@ export default function LoginPage() {
                   <input
                     id="examiner-id"
                     type="text"
+                    placeholder="examiner@forensics.agency.gov"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -176,10 +177,11 @@ export default function LoginPage() {
                   <input
                     id="password-input"
                     type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter workstation passphrase"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full h-8 px-2.5 pr-8 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-label-mono-md text-label-mono-md focus:border-primary focus:outline-none"
+                    className="w-full h-8 px-2.5 pr-8 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-label-mono-md text-label-mono-md focus:border-primary focus:outline-none placeholder:text-outline"
                   />
                   <button
                     type="button"

@@ -15,7 +15,7 @@ import PipelinePage from './pages/PipelinePage';
 import MessagesPage from './pages/MessagesPage';
 import TimelinePage from './pages/TimelinePage';
 import RecoveryPage from './pages/RecoveryPage';
-import CorrelationsPage from './pages/CorrelationsPage';
+import CorrelationPage from './pages/CorrelationPage';
 import Section63Page from './pages/Section63Page';
 import IntegrityAuditPage from './pages/IntegrityAuditPage';
 import CaseMetricsPage from './pages/CaseMetricsPage';
@@ -57,8 +57,8 @@ export default function App() {
                   <Route path="/cases/:caseId/chat" element={<MessagesPage />} />
                   <Route path="/cases/:caseId/timeline" element={<TimelinePage />} />
                   <Route path="/cases/:caseId/recovery" element={<RecoveryPage />} />
-                  <Route path="/cases/:caseId/correlations" element={<CorrelationsPage />} />
-                  <Route path="/cases/:caseId/correlation" element={<CorrelationsPage />} />
+                  <Route path="/cases/:caseId/correlations" element={<CorrelationPage />} />
+                  <Route path="/cases/:caseId/correlation" element={<CorrelationPage />} />
                   <Route path="/cases/:caseId/section63" element={<Section63Page />} />
                   <Route path="/cases/:caseId/integrity" element={<IntegrityAuditPage />} />
                   <Route path="/cases/:caseId/metrics" element={<CaseMetricsPage />} />
