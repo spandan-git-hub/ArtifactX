@@ -68,6 +68,7 @@ class Case(Base):
     decryption_operations = relationship("DecryptionOperation", back_populates="case", cascade="all, delete-orphan")
     person_entities = relationship("PersonEntity", back_populates="case", cascade="all, delete-orphan")
     correlation_findings = relationship("CorrelationFinding", back_populates="case", cascade="all, delete-orphan")
+    pipeline_runs = relationship("PipelineRun", back_populates="case", cascade="all, delete-orphan")
 
 
 class Evidence(Base):
@@ -787,6 +788,50 @@ class AuditLog(Base):
     details_json = Column(JSON, default=dict, nullable=False)
     prev_hash = Column(String(64), nullable=False)
     entry_hash = Column(String(64), nullable=False, index=True)
+
+
+class PipelineRun(Base):
+    """Execution run of the forensic analysis pipeline (B13.2)."""
+
+    __tablename__ = "pipeline_runs"
+
+    id = Column(String(64), primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(50), nullable=False, default="IN_PROGRESS", index=True)
+    config_json = Column(JSON, nullable=True)
+    content_hash = Column(String(64), nullable=True, index=True)
+    summary_json = Column(JSON, nullable=True)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
+
+    case = relationship("Case", back_populates="pipeline_runs")
+    stage_runs = relationship(
+        "PipelineStageRun",
+        back_populates="pipeline_run",
+        cascade="all, delete-orphan",
+        order_by="PipelineStageRun.id",
+    )
+
+
+class PipelineStageRun(Base):
+    """Per-stage execution result of a pipeline run (B13.2)."""
+
+    __tablename__ = "pipeline_stage_runs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    run_id = Column(String(64), ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    stage = Column(String(50), nullable=False, index=True)
+    evidence_id = Column(String(50), nullable=True, index=True)
+    status = Column(String(50), nullable=False, index=True)
+    error_code = Column(String(50), nullable=True)
+    skip_reason = Column(String(255), nullable=True)
+    counts_json = Column(JSON, nullable=True)
+    output_hash = Column(String(64), nullable=True)
+    duration_ms = Column(Float, nullable=True)
+    errors_json = Column(JSON, nullable=True)
+
+    pipeline_run = relationship("PipelineRun", back_populates="stage_runs")
+
 
 
 # ==============================================================================

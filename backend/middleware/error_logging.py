@@ -16,6 +16,7 @@ logger = structlog.get_logger()
 # Endpoints that process raw cryptographic keys or secrets (master.md R5)
 KEY_BEARING_ENDPOINTS: Set[str] = {
     "/decryption/run",
+    "/pipeline/run",
 }
 
 
