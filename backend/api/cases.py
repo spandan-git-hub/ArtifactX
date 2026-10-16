@@ -17,6 +17,7 @@ from backend.models.models import (
     ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
 )
 from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
+from backend.schemas.metrics import CaseMetricsResponse
 from backend.services.log_service import get_log_service
 
 router = APIRouter()
@@ -250,3 +251,18 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
             method="DELETE"
         )
         raise HTTPException(status_code=500, detail=f"Failed to delete case: {str(e)}")
+
+
+@router.get("/{case_id}/metrics", response_model=CaseMetricsResponse)
+def get_case_metrics_endpoint(case_id: int, db: Session = Depends(get_db)):
+    """Retrieve case metrics, audit head, and integrity verification status (spec C1.5).
+
+    Never returns ungrounded accuracy claims. List queries load no BYTEA.
+    """
+    from backend.services.metrics_service import get_case_metrics
+
+    metrics = get_case_metrics(db=db, case_id=case_id)
+    if not metrics:
+        raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+    return metrics.to_dict()
+

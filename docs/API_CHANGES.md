@@ -558,3 +558,88 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
 - **Endpoint:** `GET /api/pipeline/runs/{run_id}` (B13.2)
   - Retrieves full detail of a pipeline run including all child `pipeline_stage_runs` records.
 
+## 2026-10-16 C1 — Per-Case Metrics Endpoint (Spec C1.5, 12_METRICS_AND_EVALUATION.md)
+- **Endpoint:** `GET /api/cases/{case_id}/metrics`
+  - **Purpose:** Production casework metrics reporting without ground truth. Exposes evidence verification states, audit-chain head hash, per-stage status and timings, parsed vs unparsed breakdowns, findings per tier and strength, timestamp anomaly counts, honest negative reporting (below threshold counts), and active technical limitations.
+  - **Rule R19 Compliance:** Queries strictly defer/omit BYTEA columns (`content_bytes` never loaded into memory).
+  - **Spec C1.5 Policy Rule:** Never includes empirical accuracy or recall claims (no ground-truth manifest exists for production casework). Contains explicit `accuracy_statement`: `"Accuracy not measured for this case (production casework without ground truth)."`.
+  - **Sample Response (200 OK):**
+    ```json
+    {
+      "case_id": "1",
+      "accuracy_statement": "Accuracy not measured for this case (production casework without ground truth).",
+      "evidence_count": 2,
+      "evidence_verification_states": {
+        "MATCH": 2,
+        "MISMATCH": 0,
+        "LEGACY_UNVERIFIABLE": 0,
+        "PENDING": 0
+      },
+      "last_integrity_reverification": null,
+      "audit_chain_verification": {
+        "valid": true,
+        "head_hash": "a4f89b91c78e3427f...",
+        "block_count": 14,
+        "last_verified_at": "2026-10-16T14:15:00Z"
+      },
+      "pipeline_stages": [
+        {
+          "stage": "integrity",
+          "status": "COMPLETED",
+          "duration_ms": 1,
+          "counts": {},
+          "error": null
+        },
+        {
+          "stage": "parse",
+          "status": "COMPLETED",
+          "duration_ms": 24,
+          "counts": {"messages": 381, "contacts": 45},
+          "error": null
+        }
+      ],
+      "total_runtime_ms": 25,
+      "parsing_summary": {
+        "total_parsed_records": 426,
+        "breakdown": {
+          "whatsapp_messages": 381,
+          "whatsapp_contacts": 45,
+          "telegram_messages": 0,
+          "telegram_contacts": 0
+        },
+        "unparsed_blobs": 0,
+        "unparsed_reasons": {}
+      },
+      "findings_per_tier": {
+        "tier_1": 3,
+        "tier_2": 4,
+        "tier_3": 8,
+        "tier_4": 1
+      },
+      "findings_per_strength": {
+        "definitive": 4,
+        "strong": 1,
+        "moderate": 2,
+        "weak_hint": 0,
+        "none": 0
+      },
+      "timestamp_quality_flags": {
+        "anomalous_timestamps_detected": 0
+      },
+      "below_threshold_count": 1,
+      "honest_failures": [],
+      "limitations_triggered": [
+        {
+          "code": "LIM-HEURISTIC-ORDERING",
+          "description": "Confidence scores represent heuristic ordering, not calibrated posterior probabilities."
+        },
+        {
+          "code": "LIM-NO-GROUND-TRUTH",
+          "description": "Casework accuracy metrics are unmeasured without a ground-truth reference manifest."
+        }
+      ],
+      "computed_at": "2026-10-16T14:20:00Z"
+    }
+    ```
+
+

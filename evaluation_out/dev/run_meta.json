@@ -1,0 +1,22 @@
+{
+  "dataset_manifest_hashes": {
+    "DS-01-dev": "8a3e94b825d9b95bf2cfa9bbb8b70ba6fc0ea47443cf51085133d37891092c7d",
+    "DS-02-dev": "4a51b240cd2b71aebcb2220199b24c5d3702faad0fb929f6731180ecd26d8220",
+    "DS-03-dev": "c953ad35a5a2ae3f6171a1bd0067b24665223f3dba047fbb860179c577941601",
+    "DS-04-dev": "8f38cb0e5031cf4b15238343e346eb70942a83549f59bedd4bf3b6dff89b7430",
+    "DS-05-dev": "1a7a29420ee8512aaeb782a84ec6e9a8e45c6dfbd15d6869613c21219e22222c",
+    "DS-06-dev": "6c3eb8831669a7006408d872dbf392f7b5acf6a1786d95c0fd34d8e6cda7e877",
+    "DS-07-dev": "c3a7240ed75092057cecd054eb55e7e8314627da15f4fc0868320563693a32e3",
+    "DS-08-dev": "84233cfbdf53014e25ac92897e2027138c186db76effae946fb83596cdfc1072"
+  },
+  "environment": {
+    "cpu_architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11",
+    "python_version": "3.14.6",
+    "sqlite_version": "3.53.1"
+  },
+  "git_commit": "4bb760ded463b493e953a15bb963a67cea1f2a5f",
+  "thresholds_version": "1.0.0",
+  "variant": "dev"
+}

@@ -401,6 +401,35 @@ def run_pipeline(
                         })
             except Exception:
                 pass
+        elif any(lower_name.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
+            try:
+                m_data = inp.data
+                m_lower = lower_name
+                m_hash = sha256_hex(m_data)
+                extracted_media_items.append(
+                    MediaItem(
+                        evidence_id=int(inp.evidence_id) if inp.evidence_id.isdigit() else 0,
+                        file_path=inp.name,
+                        sha256=m_hash,
+                        mime_type="image/jpeg" if "jp" in m_lower else "image/png",
+                        media_type="image",
+                    )
+                )
+                dh = compute_dhash(m_data)
+                ph = compute_phash(m_data)
+                plat = "whatsapp" if ("whatsapp" in m_lower or "wa" in m_lower) else "telegram"
+                media_exif_records.append({
+                    "evidence_id": inp.evidence_id,
+                    "evidence_sha256": inp.sha256,
+                    "file_name": inp.name,
+                    "sha256": m_hash,
+                    "dhash": dh,
+                    "phash": ph,
+                    "platform": plat,
+                    "data_bytes": m_data,
+                })
+            except Exception:
+                pass
 
     # =========================================================================
     # STAGE 4: Parsing (WhatsApp msgstore & Telegram cache4)
@@ -853,7 +882,7 @@ def run_pipeline(
             "sha256": m_exif.get("sha256", ""),
             "dhash": m_exif.get("dhash"),
             "phash": m_exif.get("phash"),
-            "platform": "whatsapp" if "whatsapp" in m_exif.get("file_name", "").lower() else "telegram",
+            "platform": m_exif.get("platform") or ("whatsapp" if ("wa" in m_exif.get("file_name", "").lower() or "whatsapp" in m_exif.get("file_name", "").lower()) else "telegram"),
             "evidence_id": m_exif.get("evidence_id", "0"),
         })
     media_findings = media_correlator.correlate_media_findings(media_records_for_corr)

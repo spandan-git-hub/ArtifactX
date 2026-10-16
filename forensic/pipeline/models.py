@@ -163,3 +163,25 @@ class PipelineResult:
                     safe_data[k] = v
             res["data"] = safe_data
         return res
+
+    @property
+    def correlation_findings(self) -> List[Any]:
+        """Convenience property for correlation findings in result data."""
+        return list(self.data.get("correlations", []))
+
+    @property
+    def timeline_events(self) -> List[Any]:
+        """Convenience property for timeline events in result data."""
+        t = self.data.get("timeline")
+        return list(getattr(t, "events", [])) if t else []
+
+    @property
+    def recovered_records(self) -> List[Any]:
+        """Convenience property for recovered records in result data."""
+        rec = self.data.get("recovered", {})
+        if isinstance(rec, dict):
+            findings: List[Any] = []
+            for r in rec.values():
+                findings.extend(getattr(r, "findings", []))
+            return findings
+        return []
