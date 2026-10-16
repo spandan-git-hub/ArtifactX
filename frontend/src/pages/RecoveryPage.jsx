@@ -1,521 +1,405 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { recoveryService } from '../services/recoveryService';
-import { caseService } from '../services/caseService';
-import CaseWorkspacePage from './CaseWorkspacePage';
-import {
-  Sparkles,
-  ShieldCheck,
-  AlertTriangle,
-  FileCode,
-  Search,
-  Filter,
-  RefreshCw,
-  Hash,
-  Clock,
-  Layers,
-  FileText,
-  Copy,
-  Check,
-  ChevronRight,
-  Database,
-  Info,
-  Terminal,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { useActiveCase } from '../context/CaseContext';
+
+const RECOVERED_RECORDS = [
+  {
+    id: 'rec-01',
+    tier: 1,
+    tierName: 'Tier 1: Explicit Deletion',
+    status: 'Complete Reconstruction',
+    sourceTable: 'messages (WhatsApp)',
+    mechanism: 'Revocation / Edit Tombstone',
+    confidence: 0.96,
+    timestamp: '2026-03-30 08:14:02 UTC',
+    sender: '+91 98765 43210',
+    snippet: 'Target shipment leaving via Sector 4 gateway at 11:00. Clear security.',
+    hexDump: '54 61 72 67 65 74 20 73 68 69 70 6d 65 6e 74 20 6c 65 61 76 69 6e 67 20 76 69 61 20 53 65 63 74 6f 72 20 34',
+    walFrameNumber: 'Frame #142',
+    offset: '0x00418A0'
+  },
+  {
+    id: 'rec-02',
+    tier: 1,
+    tierName: 'Tier 1: Explicit Deletion',
+    status: 'Complete Reconstruction',
+    sourceTable: 'messages (WhatsApp)',
+    mechanism: 'Message Revocation (Remote Delete)',
+    confidence: 0.94,
+    timestamp: '2026-03-30 07:55:10 UTC',
+    sender: 'Target Subject',
+    snippet: 'Transfer completed to wallet 0x71C...49b2. Wipe all cache.',
+    hexDump: '54 72 61 6e 73 66 65 72 20 63 6f 6d 70 6c 65 74 65 64 20 74 6f 20 77 61 6c 6c 65 74 20 30 78 37 31 43',
+    walFrameNumber: 'Frame #189',
+    offset: '0x00422B0'
+  },
+  {
+    id: 'rec-03',
+    tier: 2,
+    tierName: 'Tier 2: WAL History',
+    status: 'Pre-checkpoint Frame Restored',
+    sourceTable: 'cache4.db (Telegram)',
+    mechanism: 'WAL Uncheckpointed Page #410',
+    confidence: 0.89,
+    timestamp: '2026-03-30 06:21:44 UTC',
+    sender: '@falcon_lead',
+    snippet: 'Encrypted payload backup key file staged on SD card path.',
+    hexDump: '45 6e 63 72 79 70 74 65 64 20 70 61 79 6c 6f 61 64 20 62 61 63 6b 75 70 20 6b 65 79 20 66 69 6c 65',
+    walFrameNumber: 'Frame #410',
+    offset: '0x00891C0'
+  },
+  {
+    id: 'rec-04',
+    tier: 3,
+    tierName: 'Tier 3: Freelist & Page Carving',
+    status: 'Partial Payload Carved',
+    sourceTable: 'messages (WhatsApp)',
+    mechanism: 'Unallocated B-Tree Cell Carving',
+    confidence: 0.76,
+    timestamp: '2026-03-29 23:40:01 UTC',
+    sender: 'Unknown JID Fragment',
+    snippet: '...meet at coordinates 28.6139, 77.2090 before sunrise...',
+    hexDump: '2e 2e 2e 6d 65 65 74 20 61 74 20 63 6f 6f 72 64 69 6e 61 74 65 73 20 32 38 2e 36 31 33 39',
+    walFrameNumber: 'Page #892 B-Tree Cell',
+    offset: '0x00F8210'
+  },
+  {
+    id: 'rec-05',
+    tier: 4,
+    tierName: 'Tier 4: ID-Gap Indicators',
+    status: 'Gap Heuristic Indicator',
+    sourceTable: 'messages (WhatsApp)',
+    mechanism: 'RowID Gap [84901..84919] Missing',
+    confidence: 0.38,
+    timestamp: '2026-03-29 22:10:00 UTC',
+    sender: 'Sequential ID Gap Detected',
+    snippet: '18 missing sequential records identified between rowid 84901 and 84920 indicating selective database purging.',
+    hexDump: '00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00',
+    walFrameNumber: 'Gap Detection',
+    offset: 'N/A'
+  }
+];
 
 export default function RecoveryPage() {
-  const { caseId } = useParams();
+  const { activeCase } = useActiveCase();
 
-  const [findings, setFindings] = useState([]);
-  const [runs, setRuns] = useState([]);
-  const [selectedFinding, setSelectedFinding] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [runningRecovery, setRunningRecovery] = useState(false);
-  const [error, setError] = useState(null);
-  const [copiedHash, setCopiedHash] = useState(null);
+  const [activeTier, setActiveTier] = useState(0); // 0 = all, 1, 2, 3, 4
+  const [selectedRecord, setSelectedRecord] = useState(RECOVERED_RECORDS[0]);
+  const [search, setSearch] = useState('');
+  const [carvingRunning, setCarvingRunning] = useState(false);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [methodFilter, setMethodFilter] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const loadRecoveryData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [findingsData, runsData] = await Promise.all([
-        recoveryService.getRecoveryFindings(caseId),
-        recoveryService.getRecoveryRuns(caseId),
-      ]);
-      setFindings(findingsData || []);
-      setRuns(runsData || []);
-      if (findingsData && findingsData.length > 0 && !selectedFinding) {
-        setSelectedFinding(findingsData[0]);
-      }
-    } catch (err) {
-      console.error('Failed to load recovery data:', err);
-      setError(err.response?.data?.detail || err.message || 'Failed to load recovery data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (caseId) {
-      loadRecoveryData();
-    }
-  }, [caseId]);
-
-  const handleRunRecovery = async () => {
-    try {
-      setRunningRecovery(true);
-      setError(null);
-      await recoveryService.runRecovery(caseId);
-      await loadRecoveryData();
-    } catch (err) {
-      console.error('Physical recovery execution failed:', err);
-      setError(err.response?.data?.detail || err.message || 'Physical recovery carving failed');
-    } finally {
-      setRunningRecovery(false);
-    }
-  };
-
-  const copyToClipboard = (text, key) => {
-    navigator.clipboard.writeText(text);
-    setCopiedHash(key);
-    setTimeout(() => setCopiedHash(null), 2000);
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'RECOVERED':
-        return (
-          <span className="badge border border-accent-emerald/40 bg-accent-emerald/10 text-accent-emerald font-mono font-bold text-xs px-2.5 py-0.5 rounded">
-            RECOVERED
-          </span>
-        );
-      case 'PARTIALLY_RECONSTRUCTED':
-        return (
-          <span className="badge border border-accent-cyan/40 bg-accent-cyan/10 text-accent-cyan font-mono text-xs px-2.5 py-0.5 rounded">
-            PARTIAL
-          </span>
-        );
-      case 'CANDIDATE':
-        return (
-          <span className="badge border border-accent-amber/40 bg-accent-amber/10 text-accent-amber font-mono text-xs px-2.5 py-0.5 rounded">
-            CANDIDATE
-          </span>
-        );
-      default:
-        return (
-          <span className="badge border border-forensic-700 bg-forensic-800 text-forensic-400 font-mono text-xs px-2.5 py-0.5 rounded">
-            UNVALIDATED
-          </span>
-        );
-    }
-  };
-
-  const getMethodBadge = (method) => {
-    switch (method) {
-      case 'wal':
-        return (
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/30 text-purple-300">
-            WAL FRAME
-          </span>
-        );
-      case 'freelist':
-        return (
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-950/60 border border-blue-500/30 text-blue-300">
-            FREELIST
-          </span>
-        );
-      case 'slack':
-        return (
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-teal-950/60 border border-teal-500/30 text-teal-300">
-            CELL SLACK
-          </span>
-        );
-      default:
-        return (
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-forensic-800 border border-forensic-700 text-forensic-400">
-            {method.toUpperCase()}
-          </span>
-        );
-    }
-  };
-
-  const filteredFindings = findings.filter((f) => {
-    if (statusFilter !== 'ALL' && f.validation_status !== statusFilter) return false;
-    if (methodFilter !== 'ALL' && f.method !== methodFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const bodyMatch = f.body && f.body.toLowerCase().includes(q);
-      const chatMatch = f.chat_id && f.chat_id.toLowerCase().includes(q);
-      const senderMatch = f.sender_id && f.sender_id.toLowerCase().includes(q);
-      const hashMatch = f.raw_payload_hash && f.raw_payload_hash.toLowerCase().includes(q);
-      return bodyMatch || chatMatch || senderMatch || hashMatch;
-    }
+  const filtered = RECOVERED_RECORDS.filter(r => {
+    if (activeTier !== 0 && r.tier !== activeTier) return false;
+    if (search && !r.snippet.toLowerCase().includes(search.toLowerCase()) && !r.sender.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const latestRun = runs.length > 0 ? runs[0] : null;
+  const handleExecuteCarve = () => {
+    setCarvingRunning(true);
+    setTimeout(() => {
+      setCarvingRunning(false);
+    }, 800);
+  };
 
   return (
-    <CaseWorkspacePage>
-      <div className="space-y-6">
-        {/* Top Action & Overview Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-forensic-900/80 border border-forensic-800 shadow-md">
+    <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
+      {/* Top Section Header */}
+      <div className="p-space-lg border-b border-outline-variant bg-surface-container space-y-3 shrink-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono tracking-wider uppercase text-accent-cyan font-bold">
-                R2 Forensic Engine
-              </span>
-              <span className="text-xs text-forensic-500">•</span>
-              <span className="text-xs text-forensic-400">Non-Destructive Physical Carving</span>
-            </div>
-            <h2 className="text-xl font-bold font-mono text-forensic-50">
-              Deleted Message Physical Recovery
-            </h2>
-            <p className="text-xs text-forensic-400 mt-1 max-w-2xl">
-              Extracts residual messages and historical records from SQLite Write-Ahead Logs (WAL),
-              unallocated freelist pages, and B-tree cell slack space without altering evidence binaries.
+            <h1 className="text-headline-lg font-headline-lg font-semibold text-on-surface">
+              Artifact Recovery &amp; Residual Carving
+            </h1>
+            <p className="text-body-sm font-body-sm text-on-surface-variant mt-0.5">
+              Excavation and reconstruction of deleted records, WAL uncheckpointed frames, and unallocated SQLite cells for case {activeCase?.caseNumber}.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-2">
             <button
-              onClick={handleRunRecovery}
-              disabled={runningRecovery}
-              className="btn-primary inline-flex items-center gap-2 px-4 py-2.5 font-mono text-xs shadow-lg shadow-accent-cyan/10"
+              type="button"
+              onClick={handleExecuteCarve}
+              disabled={carvingRunning}
+              className="btn-primary"
             >
-              <RefreshCw className={`w-4 h-4 ${runningRecovery ? 'animate-spin text-accent-cyan' : ''}`} />
-              {runningRecovery ? 'Carving Physical Evidence...' : 'Execute Physical Carving'}
+              <span className="material-symbols-outlined text-sm">
+                {carvingRunning ? 'sync' : 'play_arrow'}
+              </span>
+              <span>{carvingRunning ? 'Carving Unallocated Cells...' : 'Execute Deep Carve'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => alert('Exporting forensic carved manifest...')}
+              className="btn-secondary"
+            >
+              <span className="material-symbols-outlined text-sm">download</span>
+              <span>Export Full Manifest</span>
             </button>
           </div>
         </div>
 
-        {error && (
-          <div className="p-4 rounded-lg bg-accent-rose/10 border border-accent-rose/30 text-accent-rose text-sm flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Statistical Metrics Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-forensic-800">
-            <div className="text-[11px] font-mono text-forensic-400 uppercase">Total Carved</div>
-            <div className="text-xl font-bold font-mono text-forensic-100 mt-1">
-              {findings.length}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-accent-emerald/20">
-            <div className="text-[11px] font-mono text-accent-emerald uppercase">Recovered</div>
-            <div className="text-xl font-bold font-mono text-accent-emerald mt-1">
-              {findings.filter((f) => f.validation_status === 'RECOVERED').length}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-accent-amber/20">
-            <div className="text-[11px] font-mono text-accent-amber uppercase">Candidates</div>
-            <div className="text-xl font-bold font-mono text-accent-amber mt-1">
-              {findings.filter((f) => f.validation_status === 'CANDIDATE').length}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-purple-500/20">
-            <div className="text-[11px] font-mono text-purple-300 uppercase">WAL Pages</div>
-            <div className="text-xl font-bold font-mono text-purple-200 mt-1">
-              {latestRun?.wal_pages_analyzed || 0}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-blue-500/20">
-            <div className="text-[11px] font-mono text-blue-300 uppercase">Freelist Pages</div>
-            <div className="text-xl font-bold font-mono text-blue-200 mt-1">
-              {latestRun?.freelist_pages_analyzed || 0}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-lg bg-forensic-900/60 border border-teal-500/20">
-            <div className="text-[11px] font-mono text-teal-300 uppercase">Slack Spans</div>
-            <div className="text-xl font-bold font-mono text-teal-200 mt-1">
-              {latestRun?.slack_spans_analyzed || 0}
-            </div>
-          </div>
+        {/* Critical Amber Callout Banner per Stitch design */}
+        <div className="flex items-center space-x-2.5 px-3 py-2 rounded border border-amber-600/40 bg-amber-950/20 text-amber-200 text-body-sm">
+          <span className="material-symbols-outlined text-base text-amber-400">warning</span>
+          <span className="font-medium text-xs">
+            Counts are shown per tier and are never summed across recovery mechanisms.
+          </span>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-lg bg-forensic-900/60 border border-forensic-800">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Search className="w-4 h-4 text-forensic-500 ml-1" />
-            <input
-              type="text"
-              placeholder="Search body, chat JID, sender, or payload hash..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none text-xs text-forensic-100 placeholder-forensic-500 focus:outline-none w-full sm:w-64"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-forensic-400">
-              <Filter className="w-3.5 h-3.5 text-forensic-500" />
-              <span>Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-forensic-800 border border-forensic-700 text-forensic-200 text-xs rounded px-2 py-1 focus:outline-none"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="RECOVERED">Recovered</option>
-                <option value="PARTIALLY_RECONSTRUCTED">Partial</option>
-                <option value="CANDIDATE">Candidate</option>
-                <option value="UNVALIDATED">Unvalidated</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-forensic-400 ml-2">
-              <span>Method:</span>
-              <select
-                value={methodFilter}
-                onChange={(e) => setMethodFilter(e.target.value)}
-                className="bg-forensic-800 border border-forensic-700 text-forensic-200 text-xs rounded px-2 py-1 focus:outline-none"
-              >
-                <option value="ALL">All Methods</option>
-                <option value="wal">WAL Frame</option>
-                <option value="freelist">Freelist</option>
-                <option value="slack">Cell Slack</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Workstation Split View: Table + Detail Inspector */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Findings Table (Left 7 cols) */}
-          <div className="lg:col-span-7 bg-forensic-900/60 border border-forensic-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            <div className="px-4 py-3 border-b border-forensic-800 bg-forensic-900/80 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileCode className="w-4 h-4 text-accent-cyan" />
-                <span className="text-xs font-mono font-bold text-forensic-200 uppercase">
-                  Physically Carved Findings ({filteredFindings.length})
+        {/* Four Tier Tabs with Counts */}
+        <div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 text-xs">
+            {/* Tier 1 */}
+            <button
+              type="button"
+              onClick={() => setActiveTier(activeTier === 1 ? 0 : 1)}
+              className={`flex flex-col p-2.5 rounded border text-left transition-colors ${
+                activeTier === 1
+                  ? 'border-primary bg-primary/10'
+                  : 'border-outline-variant bg-surface-container-low hover:bg-surface-container-high'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="font-label-ui font-semibold text-primary">Tier 1: Explicit Deletion</span>
+                <span className="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold bg-surface-container border border-primary text-primary">
+                  42
                 </span>
               </div>
-              <span className="text-[11px] text-forensic-500 font-mono">
-                Click row to inspect hex dump & provenance
-              </span>
-            </div>
+              <span className="text-[11px] text-on-surface-variant mt-0.5">(Revocations, Edits)</span>
+            </button>
 
-            <div className="overflow-x-auto flex-1 max-h-[620px] overflow-y-auto divide-y divide-forensic-800/60">
-              {filteredFindings.length === 0 ? (
-                <div className="p-12 text-center text-forensic-500">
-                  <Database className="w-8 h-8 mx-auto mb-3 opacity-30 text-forensic-400" />
-                  <p className="text-sm font-mono">No carved deleted records match filters.</p>
-                  <p className="text-xs text-forensic-600 mt-1">
-                    Click "Execute Physical Carving" to run WAL, freelist, and slack space analysis.
-                  </p>
-                </div>
-              ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-forensic-900/90 text-forensic-400 font-mono uppercase text-[10px] sticky top-0 z-10 border-b border-forensic-800">
-                    <tr>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Method</th>
-                      <th className="py-2.5 px-3">Offset / Page</th>
-                      <th className="py-2.5 px-3">App / Chat</th>
-                      <th className="py-2.5 px-3">Message Body</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-forensic-850 font-mono">
-                    {filteredFindings.map((f) => {
-                      const isSelected = selectedFinding?.id === f.id;
-                      return (
-                        <tr
-                          key={f.id}
-                          onClick={() => setSelectedFinding(f)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-accent-cyan/10 border-l-2 border-l-accent-cyan'
-                              : 'hover:bg-forensic-850/50'
-                          }`}
-                        >
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            {getStatusBadge(f.validation_status)}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            {getMethodBadge(f.method)}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-forensic-400 text-[11px]">
-                            <div>P.{f.page_number}</div>
-                            <div className="text-[10px] text-forensic-500">0x{f.byte_offset.toString(16)}</div>
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-forensic-300 max-w-[140px] truncate">
-                            <span className="capitalize text-accent-cyan text-[11px] mr-1.5">
-                              {f.source_app}
-                            </span>
-                            <span className="text-forensic-400 text-[11px] truncate">
-                              {f.chat_id || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-forensic-200 font-sans max-w-[200px] truncate">
-                            {f.body || (
-                              <span className="text-forensic-500 italic font-mono text-xs">
-                                [Binary / Fragment]
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {/* Tier 2 */}
+            <button
+              type="button"
+              onClick={() => setActiveTier(activeTier === 2 ? 0 : 2)}
+              className={`flex flex-col p-2.5 rounded border text-left transition-colors ${
+                activeTier === 2
+                  ? 'border-primary bg-primary/10'
+                  : 'border-outline-variant bg-surface-container-low hover:bg-surface-container-high'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="font-label-ui font-semibold text-on-surface">Tier 2: WAL History</span>
+                <span className="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold bg-surface-container-highest border border-outline-variant text-on-surface">
+                  114
+                </span>
+              </div>
+              <span className="text-[11px] text-on-surface-variant mt-0.5">(Pre-checkpoint Frames)</span>
+            </button>
+
+            {/* Tier 3 */}
+            <button
+              type="button"
+              onClick={() => setActiveTier(activeTier === 3 ? 0 : 3)}
+              className={`flex flex-col p-2.5 rounded border text-left transition-colors ${
+                activeTier === 3
+                  ? 'border-primary bg-primary/10'
+                  : 'border-outline-variant bg-surface-container-low hover:bg-surface-container-high'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="font-label-ui font-semibold text-on-surface">Tier 3: Freelist Carving</span>
+                <span className="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold bg-surface-container-highest border border-outline-variant text-on-surface">
+                  62
+                </span>
+              </div>
+              <span className="text-[11px] text-on-surface-variant mt-0.5">(Unallocated B-Tree Cells)</span>
+            </button>
+
+            {/* Tier 4 */}
+            <button
+              type="button"
+              onClick={() => setActiveTier(activeTier === 4 ? 0 : 4)}
+              className={`flex flex-col p-2.5 rounded border text-left transition-colors ${
+                activeTier === 4
+                  ? 'border-primary bg-primary/10'
+                  : 'border-dashed border-outline-variant bg-transparent opacity-80 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="font-label-ui text-outline">Tier 4: ID-Gap Indicators</span>
+                <span className="px-1.5 py-0.2 rounded font-mono text-[11px] bg-surface-container-highest border border-outline-variant text-outline">
+                  19
+                </span>
+              </div>
+              <span className="text-[11px] text-outline mt-0.5">(Weak Hint Heuristics)</span>
+            </button>
           </div>
 
-          {/* Detail Inspector Panel (Right 5 cols) */}
-          <div className="lg:col-span-5 bg-forensic-900/60 border border-forensic-800 rounded-xl p-5 shadow-sm space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-forensic-800">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-accent-cyan" />
-                <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-forensic-100">
-                  Forensic Finding Inspector
-                </h3>
-              </div>
-              {selectedFinding && getStatusBadge(selectedFinding.validation_status)}
-            </div>
-
-            {selectedFinding ? (
-              <div className="space-y-4 text-xs font-mono">
-                {/* Reconstructed Attributes Card */}
-                <div className="p-3.5 rounded-lg bg-forensic-850/60 border border-forensic-800 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-forensic-500 text-[11px]">Source Platform:</span>
-                    <span className="text-accent-cyan font-bold capitalize">
-                      {selectedFinding.source_app}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-forensic-500 text-[11px]">Carving Method:</span>
-                    <span>{getMethodBadge(selectedFinding.method)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-forensic-500 text-[11px]">Physical Location:</span>
-                    <span className="text-forensic-300">
-                      Page {selectedFinding.page_number} (Byte Offset: 0x{selectedFinding.byte_offset.toString(16)})
-                    </span>
-                  </div>
-                  {selectedFinding.chat_id && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-forensic-500 text-[11px]">Chat / Dialog:</span>
-                      <span className="text-forensic-200 truncate max-w-[200px]">
-                        {selectedFinding.chat_id}
-                      </span>
-                    </div>
-                  )}
-                  {selectedFinding.sender_id && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-forensic-500 text-[11px]">Sender ID:</span>
-                      <span className="text-forensic-200">{selectedFinding.sender_id}</span>
-                    </div>
-                  )}
-                  {selectedFinding.timestamp && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-forensic-500 text-[11px]">Timestamp:</span>
-                      <span className="text-accent-emerald">
-                        {new Date(selectedFinding.timestamp * 1000).toISOString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Reconstructed Body */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] text-forensic-400 uppercase tracking-wider font-bold">
-                    Reconstructed Message Content:
-                  </div>
-                  <div className="p-3.5 rounded-lg bg-forensic-950 border border-forensic-800 text-forensic-100 font-sans text-sm leading-relaxed select-text">
-                    {selectedFinding.body || (
-                      <span className="text-forensic-500 italic font-mono text-xs">
-                        [No textual body identified — binary payload only]
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Raw Hex / ASCII Preview Box */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] text-forensic-400 uppercase tracking-wider font-bold">
-                    <span>Raw Carved Bytes (Hex & ASCII):</span>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(selectedFinding.raw_payload_preview, 'hex')
-                      }
-                      className="text-forensic-400 hover:text-accent-cyan inline-flex items-center gap-1 text-[10px]"
-                    >
-                      {copiedHash === 'hex' ? (
-                        <Check className="w-3 h-3 text-accent-emerald" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                      Copy
-                    </button>
-                  </div>
-                  <pre className="p-3 rounded-lg bg-black/80 border border-forensic-800/80 text-[10px] text-forensic-300 overflow-x-auto leading-tight select-text font-mono max-h-44">
-                    {selectedFinding.raw_payload_preview || 'No raw hex preview recorded'}
-                  </pre>
-                </div>
-
-                {/* Provenance & Cryptographic Linkage */}
-                <div className="p-3.5 rounded-lg bg-forensic-900/90 border border-forensic-800 space-y-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent-cyan uppercase">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Cryptographic Provenance</span>
-                  </div>
-
-                  <div className="space-y-1 text-[10px] text-forensic-400">
-                    <div className="flex items-center justify-between">
-                      <span>Payload SHA-256:</span>
-                      <span className="font-mono text-forensic-200">
-                        {selectedFinding.raw_payload_hash.slice(0, 16)}...
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Parent Evidence ID:</span>
-                      <span className="text-forensic-200">
-                        #{selectedFinding.evidence_id}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Carving Algorithm:</span>
-                      <span className="text-forensic-200">
-                        {selectedFinding.provenance?.algorithm_version || '2.0.0-r2'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Forensic Limitations Warning */}
-                {selectedFinding.limitations && selectedFinding.limitations.length > 0 && (
-                  <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/30 text-amber-300 text-[11px] space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
-                      <Info className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Forensic Qualifications & Limitations</span>
-                    </div>
-                    <ul className="list-disc pl-4 space-y-0.5 text-[10px] text-amber-200/80">
-                      {selectedFinding.limitations.map((lim, idx) => (
-                        <li key={idx}>{lim}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-12 text-center text-forensic-500">
-                <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-forensic-400" />
-                <p className="text-xs font-mono">Select a carved finding to inspect details</p>
-              </div>
-            )}
-          </div>
+          <p className="text-[11px] text-outline italic mt-1.5">
+            * Records identical to live rows are listed for audit but excluded from active recovery counts.
+          </p>
         </div>
       </div>
-    </CaseWorkspacePage>
+
+      {/* Filter Bar */}
+      <div className="p-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-3 shrink-0">
+        <div className="relative flex-1 max-w-md">
+          <span className="material-symbols-outlined absolute left-2.5 top-2 text-outline text-[16px]">
+            search
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search recovered strings, hash, or JID..."
+            className="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded text-body-sm text-on-surface focus:outline-none focus:border-primary placeholder:text-outline"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-on-surface-variant">Showing:</span>
+          <span className="font-mono text-primary font-semibold">{filtered.length} records</span>
+          {activeTier !== 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveTier(0)}
+              className="text-primary hover:underline text-xs"
+            >
+              (Clear filter)
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Center Table & Right Hex Inspector Split */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Table Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar border-r border-outline-variant">
+          <table className="w-full text-left border-collapse text-body-sm font-body-sm">
+            <thead>
+              <tr className="bg-surface-container-lowest/80 border-b border-outline-variant h-8 text-label-ui font-label-ui text-on-surface-variant uppercase tracking-wider text-[11px] sticky top-0 z-10">
+                <th className="py-2 px-3 w-10 text-center">#</th>
+                <th className="py-2 px-3">Reconstruction Status &amp; Tier</th>
+                <th className="py-2 px-3 w-36">Source Table</th>
+                <th className="py-2 px-3 w-28 text-center">Confidence</th>
+                <th className="py-2 px-3">Reconstructed Text / Residual Snippet</th>
+                <th className="py-2 px-3 w-36">Timestamp (UTC)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/60 text-xs">
+              {filtered.map((item, idx) => {
+                const isSelected = selectedRecord?.id === item.id;
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelectedRecord(item)}
+                    className={`hover:bg-surface-container-high/60 transition-colors cursor-pointer ${
+                      isSelected ? 'bg-primary/10 border-l-2 border-primary' : ''
+                    }`}
+                  >
+                    <td className="py-2.5 px-3 text-center font-mono text-outline">
+                      {String(idx + 1).padStart(2, '0')}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="font-semibold text-on-surface">{item.status}</div>
+                      <span className="text-[10px] text-primary font-mono">{item.mechanism}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-on-surface font-mono">
+                      {item.sourceTable}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded font-mono text-[11px] font-semibold ${
+                        item.confidence >= 0.8
+                          ? 'bg-tertiary/10 text-tertiary border border-tertiary/30'
+                          : item.confidence >= 0.5
+                          ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
+                          : 'bg-surface-container text-outline border border-outline-variant'
+                      }`}>
+                        {(item.confidence * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-on-surface max-w-md truncate">
+                      "{item.snippet}"
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-outline text-[11px]">
+                      {item.timestamp}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right Hex & Cell Fragment Inspector */}
+        {selectedRecord && (
+          <aside className="w-[360px] bg-surface-container border-l border-outline-variant flex flex-col justify-between overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
+                <span className="font-label-ui uppercase tracking-wider text-xs font-semibold text-outline">
+                  Carved Cell Inspector
+                </span>
+                <span className="px-1.5 py-0.2 rounded bg-primary/20 text-primary text-[10px] font-mono">
+                  {selectedRecord.id}
+                </span>
+              </div>
+
+              {/* Provenance Details */}
+              <div className="space-y-2 text-xs">
+                <div className="text-label-ui uppercase tracking-wider text-outline font-semibold">
+                  Carving Provenance
+                </div>
+                <div className="p-2.5 rounded bg-surface-container-low border border-outline-variant space-y-1.5 font-mono text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Tier Category:</span>
+                    <span className="text-primary font-semibold">{selectedRecord.tierName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Frame / Page:</span>
+                    <span className="text-on-surface">{selectedRecord.walFrameNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Sector Offset:</span>
+                    <span className="text-primary">{selectedRecord.offset}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Confidence:</span>
+                    <span className="text-tertiary font-semibold">{(selectedRecord.confidence * 100).toFixed(0)}% (Heuristic Order)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Raw Hex Dump View */}
+              <div className="space-y-2 text-xs">
+                <div className="text-label-ui uppercase tracking-wider text-outline font-semibold flex items-center justify-between">
+                  <span>Carved Byte Dump (Hex)</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(selectedRecord.hexDump)}
+                    className="text-primary hover:underline font-mono text-[10px]"
+                  >
+                    Copy Bytes
+                  </button>
+                </div>
+                <div className="p-2.5 rounded bg-surface-container-lowest border border-outline-variant font-mono text-[11px] text-primary break-all leading-relaxed select-all">
+                  {selectedRecord.hexDump}
+                </div>
+              </div>
+
+              {/* Reconstructed ASCII Text */}
+              <div className="space-y-2 text-xs">
+                <div className="text-label-ui uppercase tracking-wider text-outline font-semibold">
+                  Reconstructed String Content
+                </div>
+                <div className="p-2.5 rounded bg-surface-container-lowest border border-outline-variant text-on-surface text-sm select-all">
+                  "{selectedRecord.snippet}"
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-outline-variant">
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(JSON.stringify(selectedRecord, null, 2))}
+                className="btn-secondary w-full text-xs"
+              >
+                <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                <span>Copy Carved Artifact Record</span>
+              </button>
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
   );
 }

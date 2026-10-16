@@ -1,75 +1,80 @@
-import { useState } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import CaseListPage from './pages/CaseListPage';
-import CaseDetailPage from './pages/CaseDetailPage';
-import SearchPage from './pages/SearchPage';
-import DashboardPage from './pages/DashboardPage';
-import ReportsPage from './pages/ReportsPage';
-import LogsPage from './pages/LogsPage';
-import EvidencePage from './pages/EvidencePage';
-import ChatViewerPage from './pages/ChatViewerPage';
-import TimelinePage from './pages/TimelinePage';
-import CorrelationPage from './pages/CorrelationPage';
-import RecoveryPage from './pages/RecoveryPage';
-import DecryptionPage from './pages/DecryptionPage';
-import CaseForm from './components/cases/CaseForm';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
+import { CaseProvider } from './context/CaseContext';
 import { Layout } from './components/layout';
-import { Shield, FolderPlus } from 'lucide-react';
 
-function HomeScreen() {
+import LoginPage from './pages/LoginPage';
+import CaseListPage from './pages/CaseListPage';
+import NewCasePage from './pages/NewCasePage';
+import CaseOverviewPage from './pages/CaseOverviewPage';
+import EvidenceListPage from './pages/EvidenceListPage';
+import UploadEvidencePage from './pages/UploadEvidencePage';
+import DecryptionPage from './pages/DecryptionPage';
+import PipelinePage from './pages/PipelinePage';
+import MessagesPage from './pages/MessagesPage';
+import TimelinePage from './pages/TimelinePage';
+import RecoveryPage from './pages/RecoveryPage';
+import CorrelationsPage from './pages/CorrelationsPage';
+import Section63Page from './pages/Section63Page';
+import IntegrityAuditPage from './pages/IntegrityAuditPage';
+import CaseMetricsPage from './pages/CaseMetricsPage';
+import LimitationsPage from './pages/LimitationsPage';
+import ReportsPage from './pages/ReportsPage';
+
+export default function App() {
   return (
-    <div className="min-h-screen bg-forensic-950 flex items-center justify-center">
-      <div className="text-center animate-in">
-        <div className="w-20 h-20 rounded-2xl bg-accent-cyan/20 flex items-center justify-center mx-auto mb-6 glow">
-          <Shield className="h-10 w-10 text-accent-cyan" />
-        </div>
-        <h1 className="text-4xl font-mono font-bold text-gradient mb-3">ArtifactX</h1>
-        <p className="text-forensic-400 text-lg mb-8 max-w-md mx-auto">
-          Digital forensic analysis platform for extracting and analyzing evidence from mobile applications
-        </p>
-        <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="status-dot status-dot-active" />
-          <span className="text-sm text-forensic-500 font-mono">System Online</span>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/cases" className="btn-primary inline-flex items-center gap-2">
-            Access Dashboard
-          </Link>
-          <Link to="/cases/create" className="btn-secondary inline-flex items-center gap-2">
-            <FolderPlus className="w-4 h-4 text-accent-cyan" />
-            Create New Case
-          </Link>
-        </div>
-      </div>
-    </div>
+    <ThemeProvider>
+      <CaseProvider>
+        <Routes>
+          {/* Standalone Login Page */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Root redirect to Cases */}
+          <Route path="/" element={<Navigate to="/cases" replace />} />
+
+          {/* Workstation Application Shell Routes */}
+          <Route
+            path="/*"
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="/cases" element={<CaseListPage />} />
+                  <Route path="/cases/new" element={<NewCasePage />} />
+                  <Route path="/cases/create" element={<NewCasePage />} />
+
+                  {/* Case Specific Modules */}
+                  <Route path="/cases/:caseId" element={<CaseOverviewPage />} />
+                  <Route path="/cases/:caseId/overview" element={<CaseOverviewPage />} />
+                  <Route path="/cases/:caseId/evidence" element={<EvidenceListPage />} />
+                  <Route path="/cases/:caseId/evidence/:evidenceId" element={<EvidenceListPage />} />
+                  <Route path="/cases/:caseId/upload" element={<UploadEvidencePage />} />
+                  <Route path="/cases/:caseId/decryption" element={<DecryptionPage />} />
+                  <Route path="/cases/:caseId/pipeline" element={<PipelinePage />} />
+                  <Route path="/cases/:caseId/pipeline/history" element={<PipelinePage />} />
+                  <Route path="/cases/:caseId/pipeline/quality" element={<PipelinePage />} />
+                  <Route path="/cases/:caseId/messages" element={<MessagesPage />} />
+                  <Route path="/cases/:caseId/chat" element={<MessagesPage />} />
+                  <Route path="/cases/:caseId/timeline" element={<TimelinePage />} />
+                  <Route path="/cases/:caseId/recovery" element={<RecoveryPage />} />
+                  <Route path="/cases/:caseId/correlations" element={<CorrelationsPage />} />
+                  <Route path="/cases/:caseId/correlation" element={<CorrelationsPage />} />
+                  <Route path="/cases/:caseId/section63" element={<Section63Page />} />
+                  <Route path="/cases/:caseId/integrity" element={<IntegrityAuditPage />} />
+                  <Route path="/cases/:caseId/metrics" element={<CaseMetricsPage />} />
+                  <Route path="/cases/:caseId/dashboard" element={<CaseMetricsPage />} />
+                  <Route path="/cases/:caseId/limitations" element={<LimitationsPage />} />
+                  <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
+                  <Route path="/cases/:caseId/logs" element={<PipelinePage />} />
+
+                  {/* Catch-all redirect */}
+                  <Route path="*" element={<Navigate to="/cases" replace />} />
+                </Routes>
+              </Layout>
+            }
+          />
+        </Routes>
+      </CaseProvider>
+    </ThemeProvider>
   );
 }
-
-function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  return (
-    <Layout sidebarCollapsed={sidebarCollapsed} onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}>
-      <Routes>
-        <Route path="/" element={<HomeScreen />} />
-        <Route path="/cases" element={<CaseListPage />} />
-        <Route path="/cases/create" element={<CaseForm />} />
-        <Route path="/cases/:id" element={<CaseDetailPage />} />
-        <Route path="/cases/:id/edit" element={<CaseForm />} />
-        <Route path="/cases/:caseId/evidence" element={<EvidencePage />} />
-        <Route path="/cases/:caseId/chat" element={<ChatViewerPage />} />
-        <Route path="/cases/:caseId/recovery" element={<RecoveryPage />} />
-        <Route path="/cases/:caseId/decryption" element={<DecryptionPage />} />
-        <Route path="/cases/:caseId/timeline" element={<TimelinePage />} />
-        <Route path="/cases/:caseId/correlation" element={<CorrelationPage />} />
-        <Route path="/cases/:caseId/search" element={<SearchPage />} />
-        <Route path="/cases/:caseId/dashboard" element={<DashboardPage />} />
-        <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
-        <Route path="/cases/:caseId/logs" element={<LogsPage />} />
-      </Routes>
-    </Layout>
-  );
-}
-
-
-export default App;
