@@ -37,8 +37,8 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('quoted_row_id', sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column('location_lat', sa.Float(), nullable=True))
         batch_op.add_column(sa.Column('location_lon', sa.Float(), nullable=True))
-        batch_op.add_column(sa.Column('is_revoked', sa.Boolean(), nullable=False, server_default=sa.text('0')))
-        batch_op.add_column(sa.Column('is_edited', sa.Boolean(), nullable=False, server_default=sa.text('0')))
+        batch_op.add_column(sa.Column('is_revoked', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+        batch_op.add_column(sa.Column('is_edited', sa.Boolean(), nullable=False, server_default=sa.text('false')))
         batch_op.add_column(sa.Column('flags', sa.JSON(), nullable=True, server_default='[]'))
 
         batch_op.create_index('ix_wa_messages_key_id', ['key_id'], unique=False)
@@ -76,7 +76,7 @@ def upgrade() -> None:
         sa.Column('original_key_id', sa.String(length=255), nullable=False),
         sa.Column('edited_ts', sa.BigInteger(), nullable=True),
         sa.Column('sender_ts', sa.BigInteger(), nullable=True),
-        sa.Column('prior_text_not_present', sa.Boolean(), server_default=sa.text('1')),
+        sa.Column('prior_text_not_present', sa.Boolean(), server_default=sa.text('true')),
         sa.Column('edited_text', sa.Text(), nullable=True),
         sa.Column('finding_id', sa.String(length=64), nullable=True),
         sa.Column('confidence_score', sa.Float(), server_default='1.0'),
@@ -95,7 +95,7 @@ def upgrade() -> None:
         sa.Column('chat_row_id', sa.Integer(), nullable=True),
         sa.Column('jid', sa.String(length=255), nullable=False),
         sa.Column('subject', sa.String(length=512), nullable=True),
-        sa.Column('is_group', sa.Boolean(), server_default=sa.text('0')),
+        sa.Column('is_group', sa.Boolean(), server_default=sa.text('false')),
         sa.Column('hidden', sa.Integer(), server_default='0'),
         sa.Column('archived', sa.Integer(), server_default='0'),
         sa.Column('last_message_row_id', sa.Integer(), nullable=True),
@@ -116,7 +116,7 @@ def upgrade() -> None:
         sa.Column('server', sa.String(length=255), nullable=True),
         sa.Column('jid_type', sa.Integer(), server_default='0'),
         sa.Column('phone_number', sa.String(length=50), nullable=True),
-        sa.Column('is_group', sa.Boolean(), server_default=sa.text('0')),
+        sa.Column('is_group', sa.Boolean(), server_default=sa.text('false')),
         sa.Column('provenance', sa.JSON(), server_default='{}'),
     )
     op.create_index('ix_wa_jids_raw_string', 'wa_jids', ['raw_string'], unique=False)

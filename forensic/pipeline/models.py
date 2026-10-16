@@ -136,5 +136,19 @@ class PipelineResult:
             "duration_ms": self.duration_ms,
         }
         if include_data:
-            res["data"] = self.data
+            safe_data: Dict[str, Any] = {}
+            for k, v in self.data.items():
+                if k == "decrypted_databases" and isinstance(v, dict):
+                    safe_data[k] = {
+                        eid: {
+                            "size_bytes": len(raw),
+                            "sha256": sha256_hex(raw),
+                        }
+                        if isinstance(raw, (bytes, bytearray))
+                        else raw
+                        for eid, raw in v.items()
+                    }
+                else:
+                    safe_data[k] = v
+            res["data"] = safe_data
         return res

@@ -22,16 +22,32 @@ ALLOWLISTED_FILES = [
     "backend/utils/logging_config.py",
 ]
 
+# Function-level allowlist per DEC-011 and spec B13.3:
+# CLI --out writing is the only allowed write in forensic/, confined to write_cli_output
+ALLOWLISTED_FUNCTIONS = {
+    ("forensic/cli.py", "write_cli_output"): "CLI output file export per DEC-011 and spec B13.3 (analysis result only, never evidence)",
+}
+
 TARGET_DIRS = ["backend", "forensic"]
 
 
 class DiskWriteVisitor(ast.NodeVisitor):
-    def __init__(self, filename: str, lines: list[str]):
+    def __init__(self, filename: str, lines: list[str], rel_path: str = ""):
         self.filename = filename
         self.lines = lines
+        self.rel_path = rel_path
+        self.current_func: str = ""
         self.violations: list[tuple[int, str]] = []
 
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        prev_func = self.current_func
+        self.current_func = node.name
+        self.generic_visit(node)
+        self.current_func = prev_func
+
     def _is_suppressed(self, lineno: int) -> bool:
+        if (self.rel_path, self.current_func) in ALLOWLISTED_FUNCTIONS:
+            return True
         if 1 <= lineno <= len(self.lines):
             line = self.lines[lineno - 1]
             if "guard:allow-disk-write" in line or "guard:allow" in line:
@@ -97,7 +113,12 @@ def scan_file(file_path: Path) -> list[tuple[int, str]]:
     except Exception as e:
         return [(1, f"Syntax / Parse error: {e}")]
 
-    visitor = DiskWriteVisitor(str(file_path), content.splitlines())
+    try:
+        rel_path = file_path.relative_to(ROOT_DIR).as_posix()
+    except ValueError:
+        rel_path = str(file_path).replace("\\", "/")
+
+    visitor = DiskWriteVisitor(str(file_path), content.splitlines(), rel_path=rel_path)
     visitor.visit(tree)
     return visitor.violations
 

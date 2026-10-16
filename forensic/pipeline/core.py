@@ -264,7 +264,7 @@ def run_pipeline(
                     key_mat,
                     max_decompressed_size=config.max_unpacked_bytes,
                 )
-                decrypted_bytes = decrypted_res.payload_bytes
+                decrypted_bytes = decrypted_res.plaintext
                 decrypted_databases[ev_id] = decrypted_bytes
                 primary_databases[ev_id] = decrypted_bytes
                 decrypt_success = True
@@ -274,7 +274,7 @@ def run_pipeline(
                     "key_type": key_mat.key_type,
                     "key_fingerprint": key_mat.fingerprint(),
                     "decrypted_size": len(decrypted_bytes),
-                    "tables_found": list(decrypted_res.tables),
+                    "output_sha256": decrypted_res.output_sha256,
                 }
                 counts = {"decrypted": 1, "size_bytes": len(decrypted_bytes)}
                 stages.append(
