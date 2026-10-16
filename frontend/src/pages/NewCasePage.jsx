@@ -259,7 +259,7 @@ export default function NewCasePage() {
 
               <div className="p-3 bg-surface-container-low border border-outline-variant rounded space-y-1">
                 <div className="flex items-center justify-between text-label-mono-sm text-[11px]">
-                  <span className="text-on-surface-variant">Default Case Genesis Seed Hash:</span>
+                  <span className="text-on-surface-variant">Default Case Genesis Root Hash:</span>
                   <span className="text-primary font-medium">ED25519 Enclave Bound</span>
                 </div>
                 <code className="text-[11px] font-mono text-on-surface block bg-surface-container-lowest p-1.5 rounded border border-outline-variant select-all">

@@ -479,3 +479,82 @@ Maintained per `master.md` §1 and §6. Tracks all backend API contract changes 
   - `right_ref: Optional[Dict[str, Any]]`
   - `ambiguity: Optional[Dict[str, Any]]`
   - `below_threshold: Optional[bool]`
+
+## 2026-10-16 B13 — Pipeline Orchestration & End-to-End API (spec: 11_PIPELINE_AND_E2E.md)
+
+- **Database Migration:** Alembic revision `b13d88a101ef` (`pipeline_runs_schema.py`)
+  - `pipeline_runs`: `id (int)`, `case_id (int, FK)`, `status (varchar)`, `config_json (JSONB/Text)`, `content_hash (varchar(64))`, `summary_json (JSONB/Text)`, `started_at (timestamp)`, `finished_at (timestamp)`, `duration_ms (float)`.
+  - `pipeline_stage_runs`: `id (int)`, `run_id (int, FK)`, `stage (varchar(32))`, `evidence_id (int, nullable)`, `status (varchar(32))`, `error_code (varchar(64), nullable)`, `skip_reason (text, nullable)`, `counts_json (JSONB/Text)`, `output_hash (varchar(64))`, `duration_ms (float)`, `started_at (timestamp)`.
+
+- **Endpoint:** `POST /api/cases/{case_id}/pipeline/run` (B13.2)
+  - **Purpose:** Executes pure deterministic analysis pipeline (`run_pipeline`) across case exhibits from bytes to findings.
+  - **Single-Flight Concurrency Exclusion:** If a pipeline run for the same case is currently in `RUNNING` status, immediately returns `HTTP 409 Conflict` (`"A pipeline run is already in progress for case {case_id}"`).
+  - **Pre-Stage Integrity Verification:** Each exhibit re-hashes content bytes against claimed SHA-256 before processing (R3). Mismatch triggers `INTEGRITY_FAILURE` and isolates failure without crashing unrelated exhibits (R7).
+  - **Radioactive Key Handling (R5):**
+    - Request model accepts `keys: List[PipelineKeyInput]` with `key_type` (`"crypt14"`, `"crypt15"`), `key_hex` (`SecretStr`), and `key_file_b64` (`SecretStr`).
+    - Error logging middleware excludes `/pipeline/run` request bodies from capture.
+    - Keys are retained strictly in memory during execution; never persisted to DB, never written to disk, and never logged in audit trails.
+  - **Append-Only Audit Logging:** Records `PIPELINE_START`, per-stage events, and `PIPELINE_COMPLETE` in append-only cryptographic hash chain.
+  - **Sample Request Body:**
+    ```json
+    {
+      "evidence_ids": [1, 2],
+      "keys": [
+        {
+          "key_type": "crypt15",
+          "key_hex": "4a7b..."
+        }
+      ],
+      "config": {
+        "thresholds_version": "1.0.0"
+      }
+    }
+    ```
+  - **Sample Response (200 OK):**
+    ```json
+    {
+      "id": 1,
+      "case_id": 101,
+      "status": "COMPLETED",
+      "content_hash": "<64-hex-sha256-content-hash>",
+      "started_at": "2026-10-16T10:30:00Z",
+      "finished_at": "2026-10-16T10:30:01Z",
+      "duration_ms": 148.69,
+      "summary": {
+        "total_inputs": 2,
+        "failed_inputs": 0,
+        "counts": {
+          "whatsapp_messages": 381,
+          "telegram_messages": 0,
+          "recovered_findings": 48,
+          "timeline_events": 425,
+          "correlation_findings": 2
+        }
+      },
+      "stage_runs": [
+        {
+          "stage": "integrity",
+          "evidence_id": 1,
+          "status": "COMPLETED",
+          "duration_ms": 0.16,
+          "output_hash": "e3b0c44..."
+        },
+        {
+          "stage": "parse",
+          "evidence_id": 1,
+          "status": "COMPLETED",
+          "duration_ms": 5.25,
+          "counts_json": {"messages": 381},
+          "output_hash": "7f8a9b..."
+        }
+      ]
+    }
+    ```
+
+- **Endpoint:** `GET /api/cases/{case_id}/pipeline/runs` (B13.2)
+  - Lists all historical pipeline runs for a case ordered by `started_at.desc()`.
+  - Deferred BYTEA loading (R19): Strictly excludes large raw data buffers from query responses.
+
+- **Endpoint:** `GET /api/pipeline/runs/{run_id}` (B13.2)
+  - Retrieves full detail of a pipeline run including all child `pipeline_stage_runs` records.
+

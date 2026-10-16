@@ -27,7 +27,7 @@ HEX_64_REGEX = re.compile(r"""['"][0-9a-fA-F]{64}['"]""")
 # Private key PEM header
 PEM_PRIVATE_KEY_REGEX = re.compile(r"-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----")
 
-EXCLUDED_HEX_DIRS = {"tests", "testdata", "alembic"}
+EXCLUDED_HEX_DIRS = {"tests", "testdata", "alembic", "frontend"}
 
 
 def check_git_tracked_env() -> list[str]:
