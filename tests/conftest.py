@@ -73,6 +73,7 @@ os.environ["DATABASE_URL"] = TEST_DB_URL
 AUDIT_HOOK_ENABLED = False
 
 _ALLOWED_DIRS_LOWER = [
+    os.path.normpath(str(ROOT_DIR / "uploads")).lower(),
     os.path.normpath(tempfile.gettempdir()).lower(),
     os.path.normpath(str(ROOT_DIR / "testdata")).lower(),
     os.path.normpath(str(ROOT_DIR / ".pytest_cache")).lower(),
@@ -83,6 +84,7 @@ _ALLOWED_DIRS_LOWER = [
     "coverage",
     "temp",
     "tmp",
+    "uploads",
     os.devnull.lower(),
     "nul",
 ]

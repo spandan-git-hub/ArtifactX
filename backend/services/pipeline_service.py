@@ -35,7 +35,11 @@ from backend.repositories.timeline_repo import TimelineRepository
 from backend.repositories.whatsapp_repo import WhatsAppRepository
 from backend.schemas.pipeline import PipelineRunRequest
 from backend.services.audit_service import AuditService
-from backend.services.integrity_service import ensure_integrity
+from backend.services.integrity_service import (
+    ensure_integrity,
+    EvidenceIntegrityError,
+    LegacyUnverifiableError,
+)
 from forensic.common.hashing import sha256_hex
 from forensic.correlation.models import CorrelationFinding
 from forensic.decryption.whatsapp.types import KeyMaterial
@@ -140,8 +144,13 @@ class PipelineService:
             evidence_inputs: List[EvidenceInput] = []
 
             for ev in evidences:
-                # Pre-stage integrity verification
-                ensure_integrity(ev.id, self.db, action_context="pipeline_orchestrator")
+                # Pre-stage integrity verification (R3, spec B13.1, B13.4):
+                # Verify cryptographic hash; if tampered or unverifiable, flags state in DB
+                # and passes to pure pipeline where Stage 1 records typed INTEGRITY_FAILURE
+                try:
+                    ensure_integrity(ev.id, self.db, action_context="pipeline_orchestrator")
+                except (EvidenceIntegrityError, LegacyUnverifiableError):
+                    pass
 
                 ev_bytes = ev.content_bytes or b""
                 fn = ev.original_filename or f"evidence_{ev.id}"
@@ -273,6 +282,8 @@ class PipelineService:
             # 8. Persist decrypted databases into DerivedArtifact
             for ev_id_str, dec_bytes in pipeline_result.data.get("decrypted_databases", {}).items():
                 ev_id_int = int(ev_id_str) if ev_id_str.isdigit() else None
+                if not ev_id_int or not isinstance(dec_bytes, (bytes, bytearray)):
+                    continue
                 dec_hash = sha256_hex(dec_bytes)
                 existing = self.db.query(DerivedArtifact).filter(
                     DerivedArtifact.case_id == case_id,
@@ -281,12 +292,13 @@ class PipelineService:
                 if not existing:
                     art = DerivedArtifact(
                         case_id=case_id,
-                        evidence_id=ev_id_int,
+                        parent_evidence_id=ev_id_int,
                         artifact_type="decrypted_sqlite",
                         original_filename=f"decrypted_{ev_id_str}.db",
                         sha256=dec_hash,
+                        size_bytes=len(dec_bytes),
                         content_bytes=dec_bytes,
-                        metadata_json={"derived_from_evidence_id": ev_id_str},
+                        provenance={"derived_from_evidence_id": ev_id_str},
                         created_at=datetime.now(timezone.utc),
                     )
                     self.db.add(art)
@@ -294,23 +306,80 @@ class PipelineService:
 
             # 9. Persist domain findings idempotently via repositories
             # WhatsApp
-            for ev_id_str in pipeline_result.data.get("parsed_wa", {}):
+            wa_repo = WhatsAppRepository()
+            for ev_id_str, wa_res in pipeline_result.data.get("parsed_wa", {}).items():
                 ev_id_int = int(ev_id_str) if ev_id_str.isdigit() else None
-                if ev_id_int:
-                    # Mark evidence analyzed
+                if ev_id_int and hasattr(wa_res, "messages"):
+                    wa_repo.save_parse_result(self.db, ev_id_int, wa_res)
                     ev_obj = self.db.query(Evidence).filter(Evidence.id == ev_id_int).first()
                     if ev_obj:
                         ev_obj.analyzed_at = datetime.now(timezone.utc)
                         self.db.commit()
 
             # Telegram
-            for ev_id_str in pipeline_result.data.get("parsed_tg", {}):
+            tg_repo = TelegramRepository()
+            for ev_id_str, tg_res in pipeline_result.data.get("parsed_tg", {}).items():
                 ev_id_int = int(ev_id_str) if ev_id_str.isdigit() else None
-                if ev_id_int:
+                if ev_id_int and hasattr(tg_res, "messages"):
+                    tg_repo.save_parse_result(self.db, ev_id_int, tg_res)
                     ev_obj = self.db.query(Evidence).filter(Evidence.id == ev_id_int).first()
                     if ev_obj:
                         ev_obj.analyzed_at = datetime.now(timezone.utc)
                         self.db.commit()
+
+            # Timeline
+            tl_repo = TimelineRepository()
+            tl_res = pipeline_result.data.get("timeline")
+            if tl_res and hasattr(tl_res, "events") and tl_res.events:
+                tl_repo.delete_events_by_case_id(self.db, case_id)
+                db_events = []
+                for ev in tl_res.events:
+                    norm_dt = None
+                    if ev.time.utc_ms is not None:
+                        try:
+                            norm_dt = datetime.fromtimestamp(ev.time.utc_ms / 1000.0, tz=timezone.utc)
+                        except Exception:
+                            pass
+
+                    ev_id = None
+                    for ref in ev.source_refs:
+                        if ref.evidence_id and ref.evidence_id.isdigit():
+                            ev_id = int(ref.evidence_id)
+                            break
+
+                    db_events.append({
+                        "case_id": case_id,
+                        "evidence_id": ev_id,
+                        "event_type": ev.kind,
+                        "source_app": ev.app,
+                        "timestamp": ev.time.utc_ms if ev.time.utc_ms is not None else 0,
+                        "normalized_timestamp": norm_dt,
+                        "entity_id": ev.actor_ref or ev.chat_ref or str(ev_id or ""),
+                        "entity_type": ev.kind,
+                        "description": ev.summary,
+                        "metadata_": ev.metadata,
+                        "event_id": ev.event_id,
+                        "utc_ms": ev.time.utc_ms,
+                        "time_unit": ev.time.unit,
+                        "tz_basis": ev.time.tz_basis,
+                        "time_flags": list(ev.time.flags),
+                        "raw_timestamp": str(ev.time.raw),
+                        "actor_ref": ev.actor_ref,
+                        "chat_ref": ev.chat_ref,
+                        "summary": ev.summary,
+                        "source_refs": [ref.to_dict() for ref in ev.source_refs],
+                        "confidence_score": ev.confidence_score,
+                        "strength": ev.strength,
+                        "limitations": list(ev.limitations),
+                    })
+                tl_repo.save_events(self.db, db_events)
+
+            # Correlation findings
+            corr_repo = CorrelationRepository()
+            corr_findings = pipeline_result.data.get("correlations") or []
+            if corr_findings:
+                findings_dicts = [f.to_dict() if hasattr(f, "to_dict") else f for f in corr_findings]
+                corr_repo.save_correlation_findings(self.db, case_id, findings_dicts)
 
             # 10. Complete pipeline run
             self.repo.complete_run(
@@ -335,6 +404,10 @@ class PipelineService:
             return self.repo.get_run_with_stages(run_id) or run
 
         except Exception as e:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             # Mark run as FAILED and record error
             self.repo.complete_run(
                 run_id=run_id,

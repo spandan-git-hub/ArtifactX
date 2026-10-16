@@ -12,12 +12,21 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, UploadFile, File, status
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, load_only
 
-from backend.app.config import settings
+from backend.app.config import settings, UPLOADS_DIR
 from backend.app.database import get_db
 from backend.models.models import ActivityLog, Case, Evidence, EvidenceFile
+from backend.utils.file_storage import (
+    save_upload,
+    delete_file,
+    resolve_evidence_path,
+    resolve_evidence_file_path,
+    create_extract_dir,
+    save_extracted_members,
+)
 from backend.utils.hashing import (
     IncrementalHasher,
     compute_sha256_bytes,
@@ -273,14 +282,23 @@ def _process_and_store_evidence(
     is_zip = (detected_format == "ZIP") or _is_zip_file(safe_name, declared_content_type)
     evidence_type = "zip" if is_zip else "file"
     stored_name = f"{uuid.uuid4().hex}_{safe_name}"
-    storage_path = f"db://evidence/{stored_name}"
+
+    # Save uploaded file to disk in uploads directory
+    file_disk_path = save_upload(stored_name, file_bytes)
+    storage_path = str(file_disk_path.resolve())
 
     extracted_files: List[SafeZipMember] = []
     evidence_integrity_state = "OK"
+    extracted_path: Optional[str] = None
 
     if is_zip:
         try:
             extracted_files = extract_zip_safe_in_memory(file_bytes)
+            # Save extracted ZIP member files to disk in uploads/extract_<uuid>/
+            extract_dir = create_extract_dir()
+            extracted_path = str(extract_dir.resolve())
+            save_extracted_members(extract_dir, extracted_files)
+
         except ZipLimitExceeded as zle:
             evidence_integrity_state = "ARCHIVE_REJECTED"
             AuditService.append(
@@ -330,7 +348,8 @@ def _process_and_store_evidence(
         "sha512": sha512,
         "md5": md5,
         "sha1": sha1,
-        "storage_mode": "postgres_bytea",
+        "storage_mode": "disk_file",
+        "storage_path": storage_path,
         "detection": detection.to_dict(),
     }
 
@@ -348,9 +367,9 @@ def _process_and_store_evidence(
         uploader=uploader,
         evidence_type=evidence_type,
         metadata_=evidence_metadata,
-        content_bytes=file_bytes,
+        content_bytes=None,  # Stored on disk in uploads/ to prevent PostgreSQL BYTEA latency and bloat
         integrity_state=evidence_integrity_state,
-        extracted_path=f"db://evidence/{stored_name}/extracted" if is_zip else None,
+        extracted_path=extracted_path,
         acquisition_method=acq_meta.get("acquisition_method"),
         device_make_model=acq_meta.get("device_make_model"),
         device_os_version=acq_meta.get("device_os_version"),
@@ -373,7 +392,7 @@ def _process_and_store_evidence(
                 "md5": member.md5,
                 "sha1": member.sha1,
                 "parent_sha256": sha256,
-                "storage_mode": "postgres_bytea",
+                "storage_mode": "disk_file",
                 "original_filename": member.original_filename,
             }
             media_type = _media_type_from_mime(member.mime_type)
@@ -387,7 +406,7 @@ def _process_and_store_evidence(
                 file_size=member.size,
                 mime_type=member.mime_type,
                 metadata_=file_meta,
-                content_bytes=member.content_bytes,
+                content_bytes=None,  # Saved on disk in extract_dir in uploads/
                 is_media=media_type is not None,
                 media_type=media_type,
             )
@@ -816,15 +835,23 @@ def get_evidence_file(evidence_id: int, file_id: int, db: Session = Depends(get_
             .filter(EvidenceFile.id == file_id, EvidenceFile.evidence_id == evidence_id)
             .first()
         )
-        if not evidence_file:
-            raise HTTPException(status_code=404, detail="File not found in evidence")
-        if not evidence_file.content_bytes:
+        filename = Path(evidence_file.relative_path).name or evidence.original_filename
+
+        # Stream directly from disk in uploads if available
+        file_path = resolve_evidence_file_path(evidence_file)
+        if file_path and file_path.is_file():
+            return FileResponse(
+                path=file_path,
+                filename=filename,
+                media_type=evidence_file.mime_type or "application/octet-stream",
+            )
+
+        content_bytes = evidence_file.content_bytes
+        if not content_bytes:
             raise HTTPException(status_code=404, detail="File content not available in storage (legacy unverifiable row)")
 
-        from fastapi.responses import Response
-        filename = Path(evidence_file.relative_path).name or evidence.original_filename
         return Response(
-            content=evidence_file.content_bytes,
+            content=content_bytes,
             media_type=evidence_file.mime_type or "application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
@@ -973,13 +1000,21 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
         Evidence.case_id,
         Evidence.original_filename,
         Evidence.sha256,
+        Evidence.storage_path,
+        Evidence.extracted_path,
     ).filter(Evidence.id == evidence_id).first()
 
     if not row:
         raise HTTPException(status_code=404, detail="Evidence not found")
 
-    case_id, original_filename, sha256 = row
+    case_id, original_filename, sha256, storage_path, extracted_path = row
     sha_prefix = sha256[:8] if sha256 else "unknown"
+
+    # Delete storage files and extracted directory on disk if present
+    if storage_path:
+        delete_file(storage_path)
+    if extracted_path:
+        delete_file(extracted_path)
 
     from backend.models.models import (
         WhatsAppMessage, WhatsAppContact, WhatsAppGroup,

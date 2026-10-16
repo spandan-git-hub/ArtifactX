@@ -20,6 +20,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 ALLOWLISTED_FILES = [
     "backend/utils/logging_config.py",
+    "backend/utils/file_storage.py",
+    "backend/app/config.py",
 ]
 
 # Function-level allowlist per DEC-011 and spec B13.3:

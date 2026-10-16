@@ -91,6 +91,21 @@ class AuditChainVerificationResult:
 class AuditService:
     """Service for appending to and verifying the hash-chained audit log."""
 
+    def __init__(self, db: Optional[Session] = None):
+        self.db = db
+
+    def verify_case_chain(self, case_id: Optional[int] = None) -> Dict[str, Any]:
+        if not self.db:
+            raise ValueError("Database session required for verify_case_chain")
+        res = self.verify_audit_chain(self.db, case_id=case_id)
+        return {
+            "valid": res.ok,
+            "entries_checked": res.checked,
+            "head_hash": res.head_hash,
+            "first_bad_seq": res.first_bad_seq,
+            "error_detail": res.error_detail,
+        }
+
     @classmethod
     def append(
         cls,

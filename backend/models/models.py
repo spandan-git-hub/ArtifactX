@@ -17,7 +17,7 @@ from sqlalchemy import (
     event,
     inspect,
 )
-from sqlalchemy.orm import deferred, relationship
+from sqlalchemy.orm import deferred, relationship, synonym
 
 from backend.app.database import Base
 
@@ -91,8 +91,30 @@ class Evidence(Base):
     evidence_type = Column(String(50))
     metadata_ = Column("metadata_", JSON, default=dict)
     extracted_path = Column(String(1024))
-    # Deferred BYTEA column (R19, B5.1): never loaded on list/summary queries
-    content_bytes = deferred(Column(LargeBinary, nullable=True))
+    # Deferred BYTEA column (R19, B5.1): never loaded on list/summary queries. Can be None when stored on disk in uploads/
+    _content_bytes = deferred(Column("content_bytes", LargeBinary, nullable=True))
+
+    def _get_evidence_bytes(self):
+        if self._content_bytes is not None:
+            return self._content_bytes
+        from backend.utils.file_storage import resolve_evidence_path
+        p = resolve_evidence_path(self.storage_path)
+        if p and p.is_file():
+            try:
+                return p.read_bytes()
+            except Exception:
+                return None
+        return None
+
+    def _set_evidence_bytes(self, value):
+        self._content_bytes = value
+
+    content_bytes = synonym("_content_bytes", descriptor=property(_get_evidence_bytes, _set_evidence_bytes))
+
+    def get_content_bytes(self):
+        """Retrieve raw bytes from in-memory content_bytes or local disk in uploads/."""
+        return self.content_bytes
+
     integrity_state = Column(String(50), nullable=False, default="OK", server_default="OK")
 
     # Acquisition metadata (B5.2)
@@ -153,8 +175,30 @@ class EvidenceFile(Base):
     file_size = Column(Integer)
     mime_type = Column(String(255))
     metadata_ = Column("metadata_", JSON, default=dict)
-    # Deferred BYTEA column (R19, B5.1)
-    content_bytes = deferred(Column(LargeBinary, nullable=True))
+    # Deferred BYTEA column (R19, B5.1): never loaded on list/summary queries. Can be None when stored on disk in uploads/
+    _content_bytes = deferred(Column("content_bytes", LargeBinary, nullable=True))
+
+    def _get_file_bytes(self):
+        if self._content_bytes is not None:
+            return self._content_bytes
+        from backend.utils.file_storage import resolve_evidence_file_path
+        p = resolve_evidence_file_path(self)
+        if p and p.is_file():
+            try:
+                return p.read_bytes()
+            except Exception:
+                return None
+        return None
+
+    def _set_file_bytes(self, value):
+        self._content_bytes = value
+
+    content_bytes = synonym("_content_bytes", descriptor=property(_get_file_bytes, _set_file_bytes))
+
+    def get_content_bytes(self):
+        """Retrieve raw bytes from in-memory content_bytes or local disk in uploads/."""
+        return self.content_bytes
+
     is_media = Column(Boolean, default=False)
     media_type = Column(String(50))
 
@@ -841,23 +885,29 @@ class PipelineStageRun(Base):
 @event.listens_for(Evidence, "before_update")
 def _prevent_evidence_content_update(mapper, connection, target):
     state = inspect(target)
-    for col in ("content_bytes", "sha256"):
-        history = state.get_history(col, True)
-        if history.has_changes():
-            raise EvidenceImmutableError(
-                f"Evidence '{col}' is strictly immutable once set (master.md R3)."
-            )
+    for col in ("_content_bytes", "content_bytes", "sha256"):
+        try:
+            history = state.get_history(col, True)
+            if history.has_changes():
+                raise EvidenceImmutableError(
+                    f"Evidence '{col}' is strictly immutable once set (master.md R3)."
+                )
+        except (KeyError, AttributeError):
+            pass
 
 
 @event.listens_for(EvidenceFile, "before_update")
 def _prevent_evidence_file_content_update(mapper, connection, target):
     state = inspect(target)
-    for col in ("content_bytes", "sha256"):
-        history = state.get_history(col, True)
-        if history.has_changes():
-            raise EvidenceImmutableError(
-                f"EvidenceFile '{col}' is strictly immutable once set (master.md R3)."
-            )
+    for col in ("_content_bytes", "content_bytes", "sha256"):
+        try:
+            history = state.get_history(col, True)
+            if history.has_changes():
+                raise EvidenceImmutableError(
+                    f"EvidenceFile '{col}' is strictly immutable once set (master.md R3)."
+                )
+        except (KeyError, AttributeError):
+            pass
 
 
 @event.listens_for(AuditLog, "before_update")

@@ -188,7 +188,11 @@ def run_pipeline(
         t0 = time.time()
         detection = detect_format(inp.data, filename=inp.name)
         detected_formats[inp.evidence_id] = detection
-        counts = {"detected": 1, "conflicts": len(detection.conflicts)}
+        counts = {
+            "detected": 1,
+            "conflicts": len(detection.conflicts),
+            "extension_conflicts": len(detection.conflicts),
+        }
         stages.append(
             StageResult(
                 stage="detect",
@@ -1021,11 +1025,11 @@ def run_pipeline(
 
     # Data container for callers/service layer (persistence or CLI)
     collected_data = {
-        "parsed_wa": {eid: res.to_dict() for eid, res in parsed_wa.items()},
-        "parsed_tg": {eid: res.to_dict() for eid, res in parsed_tg.items()},
-        "recovered": {eid: res.to_dict() for eid, res in recovered_data.items()},
-        "timeline": timeline_result.to_dict(),
-        "correlations": [f.to_dict() for f in reported_findings],
+        "parsed_wa": parsed_wa,
+        "parsed_tg": parsed_tg,
+        "recovered": recovered_data,
+        "timeline": timeline_result,
+        "correlations": reported_findings,
         "decrypted_databases": decrypted_databases,
     }
 

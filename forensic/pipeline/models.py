@@ -148,6 +148,17 @@ class PipelineResult:
                         else raw
                         for eid, raw in v.items()
                     }
+                elif isinstance(v, dict):
+                    safe_data[k] = {
+                        sub_k: sub_v.to_dict() if hasattr(sub_v, "to_dict") else sub_v
+                        for sub_k, sub_v in v.items()
+                    }
+                elif isinstance(v, (list, tuple)):
+                    safe_data[k] = [
+                        item.to_dict() if hasattr(item, "to_dict") else item for item in v
+                    ]
+                elif hasattr(v, "to_dict"):
+                    safe_data[k] = v.to_dict()
                 else:
                     safe_data[k] = v
             res["data"] = safe_data

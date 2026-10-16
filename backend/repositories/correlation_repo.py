@@ -39,6 +39,7 @@ class CorrelationRepository:
 
     def save_person_entities(self, db: Session, case_id: int, persons: List[dict]):
         """Save resolved person entity clusters."""
+        self.delete_person_entities_by_case_id(db, case_id)
         if not persons:
             return
         objs = []
@@ -78,15 +79,19 @@ class CorrelationRepository:
 
     def save_correlation_findings(self, db: Session, case_id: int, findings: List[dict]):
         """Save specialized correlation findings with forensic attributes (B12.6, B12.7)."""
+        self.delete_findings_by_case_id(db, case_id)
         if not findings:
             return
         objs = []
-        for f in findings:
+        for i, f in enumerate(findings):
             f_id = f.get("finding_id") or f.get("finding_uuid", "")
             k = f.get("kind") or f.get("finding_type", "unknown")
+            uuid_val = f.get("finding_uuid")
+            if not uuid_val or uuid_val == f_id:
+                uuid_val = f"cf_{case_id}_{i}_{f_id}"[:64]
             obj = CorrelationFinding(
                 case_id=case_id,
-                finding_uuid=f_id,
+                finding_uuid=uuid_val,
                 finding_id=f_id,
                 finding_type=k,
                 kind=k,

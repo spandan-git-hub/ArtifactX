@@ -36,3 +36,5 @@ def get_settings() -> Settings:
 
 settings = get_settings()
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)  # guard:allow-disk-write: ensure uploads directory exists
