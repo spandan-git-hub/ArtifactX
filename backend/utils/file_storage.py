@@ -53,7 +53,9 @@ def save_extracted_members(extract_dir: Path, members: list) -> None:
             norm_path = member.get("relative_path")
             content = member.get("content_bytes")
         if norm_path and content is not None:
-            dest = extract_dir / norm_path
+            # Replace characters illegal on Windows filesystems (e.g. :: for nested zip members)
+            safe_rel = norm_path.replace("::", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace('"', "_").replace("<", "_").replace(">", "_").replace("|", "_")
+            dest = extract_dir / safe_rel
             ensure_directory(dest.parent)
             dest.write_bytes(content)
 
@@ -126,6 +128,7 @@ def resolve_evidence_file_path(evidence_file: Any) -> Optional[Path]:
     # 1. If parent evidence has extracted_path, look in extracted_path
     evidence = getattr(evidence_file, "evidence", None)
     if evidence:
+        safe_rel = rel_path.replace("::", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace('"', "_").replace("<", "_").replace(">", "_").replace("|", "_")
         ext_path = getattr(evidence, "extracted_path", None)
         if ext_path and not str(ext_path).startswith("db://"):
             resolved_ext = resolve_evidence_path(ext_path)
@@ -133,6 +136,9 @@ def resolve_evidence_file_path(evidence_file: Any) -> Optional[Path]:
                 candidate = resolved_ext / rel_path
                 if candidate.is_file():
                     return candidate
+                candidate_safe = resolved_ext / safe_rel
+                if candidate_safe.is_file():
+                    return candidate_safe
 
         # If not zip or no extracted_path, check parent storage_path directory
         st_path = getattr(evidence, "storage_path", None)
@@ -143,6 +149,9 @@ def resolve_evidence_file_path(evidence_file: Any) -> Optional[Path]:
                 candidate = base_dir / rel_path
                 if candidate.is_file():
                     return candidate
+                candidate_safe = base_dir / safe_rel
+                if candidate_safe.is_file():
+                    return candidate_safe
 
     # 2. Check directly under UPLOADS_DIR
     c1 = UPLOADS_DIR / rel_path

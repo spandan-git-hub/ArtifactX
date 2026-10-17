@@ -452,7 +452,7 @@ export function Layout({ children }) {
         </aside>
 
         {/* ================= MAIN CONTENT CANVAS ================= */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+        <main className="flex-1 flex flex-col h-full min-h-0 overflow-hidden bg-background">
           {children}
         </main>
       </div>

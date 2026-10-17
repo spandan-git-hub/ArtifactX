@@ -27,9 +27,15 @@ from backend.models.models import (
     EvidenceFile,
 )
 from backend.schemas.decryption import (
+    CandidateKeyInfo,
+    DecryptionInventoryResponse,
+    DecryptionInventoryStats,
     DecryptionOperationResponse,
     DecryptionRunRequest,
     DerivedArtifactResponse,
+    DirectlyUsableFileInfo,
+    DiscoveredKeyInfo,
+    EncryptedFileInfo,
     FormatDetectionResponse,
 )
 from backend.services.audit_service import AuditService
@@ -52,15 +58,49 @@ def _clean_pg_text(val: Any) -> Any:
     return val
 
 
+def _inspect_sqlite_tables(target_bytes: Optional[bytes]) -> tuple[int, list[str]]:
+    """Quickly read sqlite_master table names in-memory without persistent or temporary disk I/O."""
+    if not target_bytes or not target_bytes.startswith(b"SQLite format 3\x00"):
+        return 0, []
+    import sqlite3
+    try:
+        conn = sqlite3.connect(":memory:")
+        conn.deserialize(target_bytes)
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+        tables = [row[0] for row in cur.fetchall()]
+        conn.close()
+        return len(tables), tables[:15]
+    except Exception:
+        return 0, []
+
+
+def _detect_file_category(filename: str, mime: Optional[str] = None) -> str:
+    fn = filename.lower()
+    if fn.endswith((".db", ".sqlite", ".sqlite3")) or "sqlite" in (mime or "").lower():
+        return "database"
+    if fn.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".mp4", ".m4v", ".mov", ".opus", ".mp3", ".ogg", ".wav", ".aac")):
+        return "media"
+    if fn.endswith((".xml", ".json", ".plist", ".ini", ".cfg", ".conf", ".txt", ".log")):
+        return "config"
+    if fn.endswith((".key", ".pem", ".pub", ".crt", ".der", ".keystore")) or "key" in fn:
+        return "key"
+    if fn.endswith((".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".html", ".htm")):
+        return "document"
+    return "other"
+
+
 def _get_target_bytes_and_name(
     db: Session,
     evidence_id: int,
     file_id: Optional[int] = None,
 ) -> tuple[bytes, str, Optional[int]]:
-    """Retrieve target binary buffer from PostgreSQL BYTEA and determine filename."""
+    """Retrieve target binary buffer from PostgreSQL BYTEA or disk storage and determine filename."""
     evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence item not found.")
+
+    from backend.utils.file_storage import resolve_evidence_path, resolve_evidence_file_path
 
     if file_id:
         ev_file = db.query(EvidenceFile).filter(
@@ -70,17 +110,25 @@ def _get_target_bytes_and_name(
         if not ev_file:
             raise HTTPException(status_code=404, detail="Target evidence member file not found.")
         target_bytes = ev_file.content_bytes
+        if not target_bytes:
+            disk_p = resolve_evidence_file_path(ev_file)
+            if disk_p and disk_p.is_file():
+                target_bytes = disk_p.read_bytes()
         filename = ev_file.relative_path.split("/")[-1]
         resolved_file_id = ev_file.id
     else:
         target_bytes = evidence.content_bytes
+        if not target_bytes:
+            disk_p = resolve_evidence_path(evidence.storage_path)
+            if disk_p and disk_p.is_file():
+                target_bytes = disk_p.read_bytes()
         filename = evidence.original_filename
         resolved_file_id = None
 
     if not target_bytes:
         raise HTTPException(
             status_code=400,
-            detail="Evidence binary buffer is not available in PostgreSQL BYTEA storage.",
+            detail="Evidence binary buffer is not available in storage.",
         )
 
     return target_bytes, filename, resolved_file_id
@@ -148,29 +196,44 @@ def run_decryption(
     input_sha256 = hashlib.sha256(target_bytes).hexdigest()
 
     # 2. Extract secret input (R5: SecretStr prevents leaking in repr/logs)
-    secret_obj = req.key_data or req.key_material
-    if not secret_obj:
-        raise HTTPException(
-            status_code=400,
-            detail="key_data or key_material must be provided.",
-        )
+    secret_input: Union[str, bytes, None] = None
+    if req.key_file_id:
+        kf = db.query(EvidenceFile).filter(EvidenceFile.id == req.key_file_id).first()
+        if kf and kf.content_bytes:
+            secret_input = kf.content_bytes
 
-    raw_secret_str = secret_obj.get_secret_value()
-    if not raw_secret_str.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Key material cannot be empty.",
-        )
+    if not secret_input:
+        secret_obj = req.key_data or req.key_material
+        if not secret_obj:
+            raise HTTPException(
+                status_code=400,
+                detail="key_data, key_material, or key_file_id must be provided.",
+            )
 
-    # Normalize key material if base64 encoded
-    secret_input: Union[str, bytes] = raw_secret_str
-    if req.key_type in ("crypt14_keyfile", "crypt15_keyfile"):
-        try:
-            decoded = base64.b64decode(raw_secret_str)
-            if decoded.startswith(b"\xac\xed\x00\x05") or len(decoded) in (158, 131, 59, 32):
-                secret_input = decoded
-        except Exception:
-            pass
+        raw_secret_str = secret_obj.get_secret_value().strip()
+        if not raw_secret_str:
+            raise HTTPException(
+                status_code=400,
+                detail="Key material cannot be empty.",
+            )
+
+        clean = raw_secret_str.replace(" ", "").replace("-", "")
+        if clean.lower().startswith("0x"):
+            clean = clean[2:]
+        if len(clean) == 64 and all(c in "0123456789abcdefABCDEF" for c in clean):
+            secret_input = clean
+        else:
+            try:
+                decoded = base64.b64decode(raw_secret_str)
+                if len(decoded) in (32, 59, 131, 158) or decoded.startswith(b"\xac\xed\x00\x05"):
+                    secret_input = decoded
+                else:
+                    secret_input = clean
+            except Exception:
+                try:
+                    secret_input = bytes.fromhex(clean)
+                except Exception:
+                    secret_input = raw_secret_str
 
     # 3. Create initial operation audit record (status=RUNNING, no secret logged)
     fmt_hint = req.format_override or ""
@@ -206,7 +269,9 @@ def run_decryption(
         for ext in (".crypt12", ".crypt14", ".crypt15"):
             if base_name.endswith(ext):
                 base_name = base_name[: -len(ext)]
-        if not base_name.endswith(".db") and artifact_type == "decrypted_sqlite":
+        if base_name.endswith(".db"):
+            base_name = base_name[:-3]
+        if artifact_type == "decrypted_sqlite":
             derived_filename = f"{base_name}_decrypted.db"
         else:
             derived_filename = f"{base_name}_decrypted"
@@ -239,6 +304,19 @@ def run_decryption(
         db.add(derived)
         db.commit()
         db.refresh(derived)
+
+        # Attempt automatic forensic indexing of decrypted SQLite database
+        if artifact_type == "decrypted_sqlite":
+            try:
+                from backend.services.whatsapp_service import WhatsAppService
+                wa_service = WhatsAppService()
+                wa_service.parse_evidence_sync(
+                    evidence_id=evidence.id,
+                    db=db,
+                    derived_artifact_id=str(derived.id),
+                )
+            except Exception as pe:
+                print(f"[Decryption] Post-decryption parsing non-fatal notice: {pe}")
 
         # 5. Update operation audit record
         op.status = "SUCCEEDED"
@@ -506,3 +584,263 @@ def stream_derived_artifact(
             "X-Artifact-SHA256": artifact.sha256,
         },
     )
+
+
+@router.get(
+    "/cases/{case_id}/decryption/inventory",
+    response_model=DecryptionInventoryResponse,
+)
+def get_case_decryption_inventory(
+    case_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Return comprehensive inventory of all files identified from uploaded evidence files,
+    strictly grouped into:
+    1. Directly Usable files (unencrypted databases, media, configs, logs, plus decrypted artifacts)
+    2. Encrypted files (crypt14, crypt15, sqlcipher, etc.) with identified candidate keys for autofill
+    """
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found.")
+
+    evidence_items = (
+        db.query(Evidence)
+        .filter(Evidence.case_id == case_id)
+        .order_by(Evidence.id.asc())
+        .all()
+    )
+    derived_artifacts = (
+        db.query(DerivedArtifact)
+        .filter(DerivedArtifact.case_id == case_id)
+        .order_by(DerivedArtifact.id.desc())
+        .all()
+    )
+
+    from forensic.decryption.whatsapp.keys import WhatsAppKeyParser
+
+    # 1. Discover all candidate keys across the case's evidence files
+    discovered_keys: List[DiscoveredKeyInfo] = []
+
+    for ev in evidence_items:
+        for ef in ev.files:
+            fn = ef.relative_path.lower()
+            if any(k in fn for k in ["key", ".key", "keystore"]) and (ef.file_size or 0) < 20000:
+                raw_bytes = ef.content_bytes
+                if raw_bytes:
+                    ktype = "generic_key"
+                    autofill_val = raw_bytes.hex()
+                    preview = raw_bytes[:16].hex()
+                    # Try crypt15
+                    try:
+                        root_km, _ = WhatsAppKeyParser.parse_crypt15_key(raw_bytes)
+                        ktype = "crypt15_keyfile"
+                        autofill_val = root_km.raw_key.hex()
+                        preview = root_km.raw_key.hex()
+                    except Exception:
+                        # Try crypt14
+                        try:
+                            c14_km = WhatsAppKeyParser.parse_crypt14_key(raw_bytes)
+                            ktype = "crypt14_keyfile"
+                            autofill_val = c14_km.raw_key.hex()
+                            preview = c14_km.raw_key.hex()
+                        except Exception:
+                            pass
+
+                    discovered_keys.append(
+                        DiscoveredKeyInfo(
+                            key_file_id=ef.id,
+                            filename=ef.relative_path.split("/")[-1],
+                            relative_path=ef.relative_path,
+                            key_type=ktype,
+                            size_bytes=len(raw_bytes),
+                            source_container=ev.original_filename,
+                            preview_hex=preview,
+                            autofill_value=autofill_val,
+                        )
+                    )
+
+    # 2. Build map of existing DerivedArtifacts to mark encrypted files that have already been decrypted
+    derived_parent_file_ids = {a.parent_file_id: a for a in derived_artifacts if a.parent_file_id}
+    derived_parent_ev_ids = {a.parent_evidence_id: a for a in derived_artifacts if not a.parent_file_id}
+
+    encrypted_files: List[EncryptedFileInfo] = []
+    directly_usable: List[DirectlyUsableFileInfo] = []
+
+    # 3. Add derived artifacts directly to directly_usable section
+    for da in derived_artifacts:
+        t_cnt, t_names = _inspect_sqlite_tables(da.content_bytes) if da.artifact_type == "decrypted_sqlite" else (0, [])
+        directly_usable.append(
+            DirectlyUsableFileInfo(
+                id=f"art_{da.id}",
+                is_derived=True,
+                artifact_id=da.id,
+                evidence_id=da.parent_evidence_id,
+                file_id=da.parent_file_id,
+                filename=da.original_filename,
+                relative_path=f"derived/{da.original_filename}",
+                size_bytes=da.size_bytes or (len(da.content_bytes) if da.content_bytes else 0),
+                sha256=da.sha256,
+                category="database" if da.artifact_type == "decrypted_sqlite" else "other",
+                mime_type=da.mime_type or "application/x-sqlite3",
+                source_container="Decrypted Derived Exhibit",
+                status="Decrypted Plaintext",
+                table_count=t_cnt if t_cnt > 0 else None,
+                tables=t_names,
+            )
+        )
+
+    # 4. Process all evidence files
+    for ev in evidence_items:
+        items_to_check = []
+        if ev.files:
+            for ef in ev.files:
+                items_to_check.append(("file", ef))
+        else:
+            # Standalone evidence file
+            items_to_check.append(("evidence", ev))
+
+        for it_type, item in items_to_check:
+            if it_type == "file":
+                ef_id = item.id
+                ev_id = ev.id
+                rel_path = item.relative_path
+                fname = rel_path.split("/")[-1]
+                sz = item.file_size or 0
+                h_sha256 = item.sha256
+                mime = item.mime_type
+            else:
+                ef_id = None
+                ev_id = ev.id
+                rel_path = item.original_filename
+                fname = item.original_filename
+                sz = item.file_size_bytes or 0
+                h_sha256 = item.sha256
+                mime = item.mime_type
+
+            fn_lower = fname.lower()
+            is_enc = any(fn_lower.endswith(ext) for ext in [".crypt", ".crypt12", ".crypt14", ".crypt15", ".enc"])
+
+            if is_enc:
+                # Determine format
+                detected_fmt = "crypt15" if fn_lower.endswith(".crypt15") else ("crypt14" if fn_lower.endswith(".crypt14") else ("crypt12" if fn_lower.endswith(".crypt12") else "encrypted"))
+                fmt_name = "WhatsApp Crypt15 (AES-256-GCM)" if detected_fmt == "crypt15" else ("WhatsApp Crypt14 (AES-256-CTR)" if detected_fmt == "crypt14" else "Encrypted Database")
+
+                # Match candidate keys from discovered keys
+                cand_keys: List[CandidateKeyInfo] = []
+                autofill_key: Optional[CandidateKeyInfo] = None
+
+                for dk in discovered_keys:
+                    matched = False
+                    if detected_fmt == "crypt15" and ("crypt15" in dk.key_type or "test_backup" in dk.filename.lower() or dk.filename.endswith(".key")):
+                        matched = True
+                    elif detected_fmt in ("crypt14", "crypt12") and ("crypt14" in dk.key_type or "key" in dk.filename.lower()):
+                        matched = True
+
+                    cki = CandidateKeyInfo(
+                        key_file_id=dk.key_file_id,
+                        filename=dk.filename,
+                        relative_path=dk.relative_path,
+                        key_type=dk.key_type,
+                        key_format="Hex String / Enclave Key",
+                        size_bytes=dk.size_bytes,
+                        preview_hex=dk.preview_hex,
+                        autofill_value=dk.autofill_value,
+                        is_matched=matched,
+                    )
+                    cand_keys.append(cki)
+                    if matched and not autofill_key:
+                        autofill_key = cki
+
+                # Check if already decrypted
+                existing_da = derived_parent_file_ids.get(ef_id) if ef_id else derived_parent_ev_ids.get(ev_id)
+                status_str = "DECRYPTED" if existing_da else "AWAITING_KEY"
+
+                encrypted_files.append(
+                    EncryptedFileInfo(
+                        id=f"file_{ef_id}" if ef_id else f"ev_{ev_id}",
+                        evidence_id=ev_id,
+                        file_id=ef_id,
+                        filename=fname,
+                        relative_path=rel_path,
+                        size_bytes=sz,
+                        sha256=h_sha256,
+                        detected_format=detected_fmt,
+                        format_name=fmt_name,
+                        source_container=ev.original_filename,
+                        status=status_str,
+                        derived_artifact_id=existing_da.id if existing_da else None,
+                        candidate_keys=cand_keys,
+                        autofill_key=autofill_key,
+                    )
+                )
+            else:
+                cat = _detect_file_category(fname, mime)
+                t_cnt, t_names = (0, [])
+                if cat == "database":
+                    raw_bytes = item.content_bytes
+                    t_cnt, t_names = _inspect_sqlite_tables(raw_bytes)
+                directly_usable.append(
+                    DirectlyUsableFileInfo(
+                        id=f"file_{ef_id}" if ef_id else f"ev_{ev_id}",
+                        is_derived=False,
+                        artifact_id=None,
+                        evidence_id=ev_id,
+                        file_id=ef_id,
+                        filename=fname,
+                        relative_path=rel_path,
+                        size_bytes=sz,
+                        sha256=h_sha256,
+                        category=cat,
+                        mime_type=mime,
+                        source_container=ev.original_filename,
+                        status="Directly Usable (Plaintext)",
+                        table_count=t_cnt if t_cnt > 0 else None,
+                        tables=t_names,
+                    )
+                )
+
+    stats = DecryptionInventoryStats(
+        total_identified_files=len(encrypted_files) + len(directly_usable),
+        encrypted_count=len(encrypted_files),
+        directly_usable_count=len(directly_usable),
+        discovered_keys_count=len(discovered_keys),
+        decrypted_count=len([e for e in encrypted_files if e.status == "DECRYPTED"]) + len(derived_artifacts),
+    )
+
+    return DecryptionInventoryResponse(
+        case_id=case_id,
+        encrypted_files=encrypted_files,
+        directly_usable_files=directly_usable,
+        discovered_keys=discovered_keys,
+        stats=stats,
+    )
+
+
+@router.post(
+    "/cases/{case_id}/decryption/execute",
+    response_model=DecryptionOperationResponse,
+    status_code=status.HTTP_200_OK,
+)
+def execute_case_decryption(
+    case_id: int,
+    req: DecryptionRunRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Execute decryption targeting an encrypted exhibit file within a case.
+    Accepts candidate_file_id or evidence_id, with manual key or autofilled key_file_id.
+    """
+    ev_id = req.evidence_id
+    if not ev_id and req.candidate_file_id:
+        ef = db.query(EvidenceFile).filter(EvidenceFile.id == req.candidate_file_id).first()
+        if ef:
+            ev_id = ef.evidence_id
+    if not ev_id:
+        first_ev = db.query(Evidence).filter(Evidence.case_id == case_id).first()
+        if first_ev:
+            ev_id = first_ev.id
+    if not ev_id:
+        raise HTTPException(status_code=400, detail="Could not resolve target evidence item for decryption.")
+    return run_decryption(evidence_id=ev_id, req=req, db=db)
+

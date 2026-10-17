@@ -29,6 +29,16 @@ export const decryptionService = {
     return res.data;
   },
 
+  getInventory: async (caseId) => {
+    const res = await axios.get(`${API_BASE}/cases/${caseId}/decryption/inventory`);
+    return res.data;
+  },
+
+  executeDecryption: async (caseId, payload) => {
+    const res = await axios.post(`${API_BASE}/cases/${caseId}/decryption/execute`, payload);
+    return res.data;
+  },
+
   getStreamUrl: (caseId, artifactId) => {
     return `${API_BASE}/cases/${caseId}/derived-artifacts/${artifactId}/stream`;
   },
