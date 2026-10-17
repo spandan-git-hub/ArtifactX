@@ -97,8 +97,12 @@ class Evidence(Base):
     def _get_evidence_bytes(self):
         if self._content_bytes is not None:
             return self._content_bytes
-        from backend.utils.file_storage import resolve_evidence_path
+        from backend.utils.file_storage import resolve_evidence_path, BASE_DIR
         p = resolve_evidence_path(self.storage_path)
+        if (not p or not p.is_file()) and self.original_filename:
+            input_cand = BASE_DIR / "INPUTS" / self.original_filename
+            if input_cand.is_file():
+                p = input_cand
         if p and p.is_file():
             try:
                 return p.read_bytes()
@@ -110,6 +114,29 @@ class Evidence(Base):
         self._content_bytes = value
 
     content_bytes = synonym("_content_bytes", descriptor=property(_get_evidence_bytes, _set_evidence_bytes))
+
+    @property
+    def file_size_bytes(self) -> int:
+        if self.metadata_ and isinstance(self.metadata_, dict):
+            sz = self.metadata_.get("upload_size") or self.metadata_.get("file_size")
+            if sz is not None:
+                try:
+                    return int(sz)
+                except Exception:
+                    pass
+        if self._content_bytes is not None:
+            return len(self._content_bytes)
+        try:
+            cb = self.content_bytes
+            if cb is not None:
+                return len(cb)
+        except Exception:
+            pass
+        return 0
+
+    @property
+    def mime_type(self) -> str:
+        return self.declared_mime or self.content_type or "application/octet-stream"
 
     def get_content_bytes(self):
         """Retrieve raw bytes from in-memory content_bytes or local disk in uploads/."""
@@ -187,7 +214,23 @@ class EvidenceFile(Base):
             try:
                 return p.read_bytes()
             except Exception:
-                return None
+                pass
+        # Fallback: check if parent evidence is a zip file
+        ev = self.evidence
+        if ev:
+            ev_bytes = ev.content_bytes
+            if ev_bytes and ev_bytes.startswith(b"PK\x03\x04"):
+                import io, zipfile
+                try:
+                    with zipfile.ZipFile(io.BytesIO(ev_bytes)) as z:
+                        clean_rel = self.relative_path.replace("\\", "/")
+                        if clean_rel in z.namelist():
+                            return z.read(clean_rel)
+                        for name in z.namelist():
+                            if name.endswith(clean_rel) or clean_rel.endswith(name):
+                                return z.read(name)
+                except Exception:
+                    pass
         return None
 
     def _set_file_bytes(self, value):

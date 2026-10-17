@@ -714,9 +714,9 @@ def get_case_decryption_inventory(
                 ev_id = ev.id
                 rel_path = item.original_filename
                 fname = item.original_filename
-                sz = item.file_size_bytes or 0
+                sz = getattr(item, 'file_size_bytes', 0)
                 h_sha256 = item.sha256
-                mime = item.mime_type
+                mime = getattr(item, 'mime_type', None) or getattr(item, 'declared_mime', None) or getattr(item, 'content_type', 'application/octet-stream')
 
             fn_lower = fname.lower()
             is_enc = any(fn_lower.endswith(ext) for ext in [".crypt", ".crypt12", ".crypt14", ".crypt15", ".enc"])
@@ -753,8 +753,17 @@ def get_case_decryption_inventory(
                         autofill_key = cki
 
                 # Check if already decrypted
-                existing_da = derived_parent_file_ids.get(ef_id) if ef_id else derived_parent_ev_ids.get(ev_id)
-                status_str = "DECRYPTED" if existing_da else "AWAITING_KEY"
+                existing_da = None
+                if ef_id:
+                    existing_da = next((a for a in derived_artifacts if a.parent_file_id == ef_id), None)
+                else:
+                    existing_da = next((a for a in derived_artifacts if a.parent_evidence_id == ev_id and not a.parent_file_id), None)
+
+                if existing_da:
+                    # Once decrypted successfully, remove from found encrypted files list (it is now in directly usable)
+                    continue
+
+                status_str = "AWAITING_KEY"
 
                 encrypted_files.append(
                     EncryptedFileInfo(

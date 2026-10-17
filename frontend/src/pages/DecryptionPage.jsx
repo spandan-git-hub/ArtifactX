@@ -59,11 +59,16 @@ export default function DecryptionPage() {
           return next;
         });
 
-        // Also update selectedEncryptedFile if modal is open
+        // Also update selectedEncryptedFile if modal is open: remove it if now decrypted
         setSelectedEncryptedFile(prev => {
           if (!prev) return null;
-          return data.encrypted_files.find(f => f.id === prev.id) || prev;
+          const stillThere = data.encrypted_files.find(f => f.id === prev.id);
+          if (stillThere) return stillThere;
+          // Decrypted file was removed! If other encrypted files exist, show next; otherwise close modal
+          return data.encrypted_files.length > 0 ? data.encrypted_files[0] : null;
         });
+      } else {
+        setSelectedEncryptedFile(null);
       }
     } catch (err) {
       console.error('Error loading decryption inventory:', err);
@@ -170,6 +175,36 @@ export default function DecryptionPage() {
       setFeedback({
         type: 'success',
         message: `Successfully decrypted "${file.filename}"! Derived exhibit #${res.derived_artifact_id || ''} staged into memory and database records indexed.`
+      });
+
+      // Optimistically remove the decrypted file from found encrypted files list immediately
+      setInventory(prev => {
+        if (!prev) return prev;
+        const nextEncrypted = (prev.encrypted_files || []).filter(
+          ef => ef.id !== file.id && (file.file_id ? ef.file_id !== file.file_id : ef.evidence_id !== file.evidence_id)
+        );
+        return {
+          ...prev,
+          encrypted_files: nextEncrypted,
+          stats: {
+            ...prev.stats,
+            encrypted_count: nextEncrypted.length,
+            decrypted_count: (prev.stats?.decrypted_count || 0) + 1,
+            directly_usable_count: (prev.stats?.directly_usable_count || 0) + 1,
+          }
+        };
+      });
+
+      // Remove decrypted file from modal: if other encrypted files exist, switch to next, else close modal
+      setSelectedEncryptedFile(prev => {
+        if (!prev) return null;
+        if (prev.id === file.id || (file.file_id && prev.file_id === file.file_id)) {
+          const remaining = (inventory?.encrypted_files || []).filter(
+            ef => ef.id !== file.id && (file.file_id ? ef.file_id !== file.file_id : ef.evidence_id !== file.evidence_id)
+          );
+          return remaining.length > 0 ? remaining[0] : null;
+        }
+        return prev;
       });
 
       // Reload inventory silently to update directly usable section
@@ -837,16 +872,14 @@ export default function DecryptionPage() {
                         <span>Details</span>
                       </button>
 
-                      {item.category === 'database' && (
-                        <Link
-                          to={`/cases/${caseId}/messages`}
-                          className="px-2.5 py-1.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 text-[11px] font-sans font-medium flex items-center gap-1"
-                          title="Open database records"
-                        >
-                          <span className="material-symbols-outlined text-xs">open_in_new</span>
-                          <span>Parse</span>
-                        </Link>
-                      )}
+                      <Link
+                        to={`/cases/${caseId}/parsing?type=${item.target_type}&id=${item.target_id}`}
+                        className="px-2.5 py-1.5 rounded bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 text-[11px] font-sans font-medium flex items-center gap-1"
+                        title="Open in Parsing tab to inspect underlying tabular columns and rows"
+                      >
+                        <span className="material-symbols-outlined text-xs">table_view</span>
+                        <span>Parse</span>
+                      </Link>
                     </div>
                   </td>
                 </tr>
@@ -896,6 +929,32 @@ export default function DecryptionPage() {
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
+
+            {/* Found Encrypted Files Selection Bar (when multiple files discovered) */}
+            {inventory?.encrypted_files && inventory.encrypted_files.length > 1 && (
+              <div className="p-3 bg-surface-container-high/40 rounded-lg border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-on-surface font-medium">
+                  <span className="material-symbols-outlined text-sm text-amber-400">lock</span>
+                  <span>Found Encrypted Files ({inventory.encrypted_files.length} awaiting decryption):</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedEncryptedFile.id}
+                    onChange={(e) => {
+                      const match = inventory.encrypted_files.find(f => f.id === e.target.value);
+                      if (match) setSelectedEncryptedFile(match);
+                    }}
+                    className="bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                  >
+                    {inventory.encrypted_files.map((ef, idx) => (
+                      <option key={ef.id} value={ef.id}>
+                        [{idx + 1}/{inventory.encrypted_files.length}] {ef.filename} ({ef.format_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Container & Hash Information Card */}
             <div className="p-4 bg-surface-container-lowest border border-outline-variant rounded-lg space-y-3">
@@ -1195,15 +1254,14 @@ export default function DecryptionPage() {
             </div>
 
             <div className="pt-3 border-t border-outline-variant flex items-center justify-between">
-              {inspectModalFile.category === 'database' ? (
-                <Link
-                  to={`/cases/${caseId}/messages`}
-                  className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">open_in_new</span>
-                  <span>Open Database Records</span>
-                </Link>
-              ) : <div />}
+              <Link
+                to={`/cases/${caseId}/parsing?type=${inspectModalFile.target_type}&id=${inspectModalFile.target_id}`}
+                className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5"
+                onClick={() => setInspectModalFile(null)}
+              >
+                <span className="material-symbols-outlined text-sm">table_view</span>
+                <span>Inspect in Parsing Tab</span>
+              </Link>
 
               <button
                 type="button"

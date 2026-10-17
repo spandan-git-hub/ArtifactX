@@ -11,6 +11,7 @@ import CaseOverviewPage from './pages/CaseOverviewPage';
 import EvidenceListPage from './pages/EvidenceListPage';
 import UploadEvidencePage from './pages/UploadEvidencePage';
 import DecryptionPage from './pages/DecryptionPage';
+import ParsingPage from './pages/ParsingPage';
 import PipelinePage from './pages/PipelinePage';
 import MessagesPage from './pages/MessagesPage';
 import TimelinePage from './pages/TimelinePage';
@@ -50,6 +51,7 @@ export default function App() {
                   <Route path="/cases/:caseId/evidence/:evidenceId" element={<EvidenceListPage />} />
                   <Route path="/cases/:caseId/upload" element={<UploadEvidencePage />} />
                   <Route path="/cases/:caseId/decryption" element={<DecryptionPage />} />
+                  <Route path="/cases/:caseId/parsing" element={<ParsingPage />} />
                   <Route path="/cases/:caseId/pipeline" element={<PipelinePage />} />
                   <Route path="/cases/:caseId/pipeline/history" element={<PipelinePage />} />
                   <Route path="/cases/:caseId/pipeline/quality" element={<PipelinePage />} />

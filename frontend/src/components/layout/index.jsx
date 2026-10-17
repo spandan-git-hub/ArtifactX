@@ -21,6 +21,7 @@ export function Layout({ children }) {
   else if (path.includes('/new') || path.includes('/create')) sectionName = 'New Case';
   else if (path.includes('/evidence')) sectionName = 'Evidence';
   else if (path.includes('/decryption')) sectionName = 'Decryption';
+  else if (path.includes('/parsing')) sectionName = 'Parsing';
   else if (path.includes('/pipeline')) sectionName = 'Pipeline';
   else if (path.includes('/messages') || path.includes('/chat')) sectionName = 'Messages';
   else if (path.includes('/timeline')) sectionName = 'Timeline';
@@ -38,6 +39,7 @@ export function Layout({ children }) {
     { name: 'Overview', icon: 'dashboard', path: caseId ? `/cases/${caseId}/overview` : '/cases', badge: activeCase ? 'LIVE' : undefined, badgeColor: 'bg-primary/20 text-primary' },
     { name: 'Evidence', icon: 'folder_open', path: caseId ? `/cases/${caseId}/evidence` : '/cases', count: activeCase?.evidenceCount },
     { name: 'Decryption', icon: 'key', path: caseId ? `/cases/${caseId}/decryption` : '/cases' },
+    { name: 'Parsing', icon: 'table_view', path: caseId ? `/cases/${caseId}/parsing` : '/cases' },
     // Temporarily disabled tabs:
     // { name: 'Pipeline', icon: 'alt_route', path: caseId ? `/cases/${caseId}/pipeline` : '/cases' },
     // { name: 'Messages', icon: 'chat', path: caseId ? `/cases/${caseId}/messages` : '/cases', count: activeCase?.recordCount && activeCase.recordCount !== '0' ? activeCase.recordCount : undefined },

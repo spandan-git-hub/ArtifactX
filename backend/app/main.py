@@ -12,10 +12,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app.config import settings
-from backend.app.database import Base, engine
 from backend.utils.logging_config import configure_logging
 from backend.middleware import ErrorLoggingMiddleware
-from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, chats, recovery, decryption, audit, pipeline
+from backend.api import cases, evidence, whatsapp, telegram, timeline, deleted, media, correlation, search, dashboard, reports, logs, chats, recovery, decryption, audit, pipeline, parsing
 
 
 @asynccontextmanager
@@ -84,6 +83,8 @@ app.include_router(decryption.router, prefix="/api", tags=["decryption"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(pipeline.case_pipeline_router, prefix="/api", tags=["pipeline"])
 app.include_router(pipeline.global_pipeline_router, prefix="/api", tags=["pipeline"])
+app.include_router(parsing.router, prefix="/api/cases", tags=["parsing"])
+
 
 
 @app.get("/api/health")
