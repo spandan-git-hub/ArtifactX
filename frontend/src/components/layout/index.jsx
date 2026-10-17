@@ -38,16 +38,17 @@ export function Layout({ children }) {
     { name: 'Overview', icon: 'dashboard', path: caseId ? `/cases/${caseId}/overview` : '/cases', badge: activeCase ? 'LIVE' : undefined, badgeColor: 'bg-primary/20 text-primary' },
     { name: 'Evidence', icon: 'folder_open', path: caseId ? `/cases/${caseId}/evidence` : '/cases', count: activeCase?.evidenceCount },
     { name: 'Decryption', icon: 'key', path: caseId ? `/cases/${caseId}/decryption` : '/cases' },
-    { name: 'Pipeline', icon: 'alt_route', path: caseId ? `/cases/${caseId}/pipeline` : '/cases' },
-    { name: 'Messages', icon: 'chat', path: caseId ? `/cases/${caseId}/messages` : '/cases', count: activeCase?.recordCount && activeCase.recordCount !== '0' ? activeCase.recordCount : undefined },
+    // Temporarily disabled tabs:
+    // { name: 'Pipeline', icon: 'alt_route', path: caseId ? `/cases/${caseId}/pipeline` : '/cases' },
+    // { name: 'Messages', icon: 'chat', path: caseId ? `/cases/${caseId}/messages` : '/cases', count: activeCase?.recordCount && activeCase.recordCount !== '0' ? activeCase.recordCount : undefined },
     { name: 'Timeline', icon: 'schedule', path: caseId ? `/cases/${caseId}/timeline` : '/cases' },
     { name: 'Recovery', icon: 'restore', path: caseId ? `/cases/${caseId}/recovery` : '/cases' },
     { name: 'Correlations', icon: 'hub', path: caseId ? `/cases/${caseId}/correlations` : '/cases' },
     { name: 'Reports', icon: 'description', path: caseId ? `/cases/${caseId}/reports` : '/cases' },
-    { name: 'Section 63', icon: 'gavel', path: caseId ? `/cases/${caseId}/section63` : '/cases' },
-    { name: 'Integrity & Audit', icon: 'verified_user', path: caseId ? `/cases/${caseId}/integrity` : '/cases' },
-    { name: 'Metrics', icon: 'analytics', path: caseId ? `/cases/${caseId}/metrics` : '/cases' },
-    { name: 'Limitations', icon: 'info', path: caseId ? `/cases/${caseId}/limitations` : '/cases' },
+    // { name: 'Section 63', icon: 'gavel', path: caseId ? `/cases/${caseId}/section63` : '/cases' },
+    // { name: 'Integrity & Audit', icon: 'verified_user', path: caseId ? `/cases/${caseId}/integrity` : '/cases' },
+    // { name: 'Metrics', icon: 'analytics', path: caseId ? `/cases/${caseId}/metrics` : '/cases' },
+    // { name: 'Limitations', icon: 'info', path: caseId ? `/cases/${caseId}/limitations` : '/cases' },
   ];
 
   const isTabActive = (tabPath) => {
@@ -237,6 +238,7 @@ export function Layout({ children }) {
                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant">settings</span>
                   <span>Workstation Settings</span>
                 </button>
+                {/* Temporarily disabled Section 63 link in examiner menu:
                 <Link
                   to={`/cases/${caseId}/section63`}
                   onClick={() => setExaminerMenuOpen(false)}
@@ -245,6 +247,7 @@ export function Layout({ children }) {
                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant">gavel</span>
                   <span>Section 63 Credential</span>
                 </Link>
+                */}
                 <div className="border-t border-outline-variant my-1" />
                 <Link
                   to="/login"
@@ -420,6 +423,7 @@ export function Layout({ children }) {
 
           {/* Sidebar Footers */}
           <div className="border-t border-outline-variant pt-2 space-y-0.5 text-body-sm font-body-sm shrink-0">
+            {/* Temporarily disabled Audit Trail footer link:
             <Link
               to={`/cases/${caseId}/integrity`}
               className="flex items-center space-x-2.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface px-space-sm py-1.5 rounded transition-colors"
@@ -428,6 +432,7 @@ export function Layout({ children }) {
               <span className="material-symbols-outlined text-[17px]">shield</span>
               {!sidebarCollapsed && <span className="text-label-ui font-label-ui">Audit Trail</span>}
             </Link>
+            */}
             <button
               type="button"
               onClick={() => setSettingsModalOpen(true)}

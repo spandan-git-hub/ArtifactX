@@ -101,12 +101,14 @@ export default function CaseOverviewPage() {
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
+                {/* Temporarily disabled Integrity link:
                 <Link
                   to={`/cases/${currentCase?.id}/integrity`}
                   className="px-3.5 py-2 rounded bg-error text-white font-semibold text-label-ui hover:bg-error/90 transition-colors shadow-sm"
                 >
                   Inspect Exception Ledger
                 </Link>
+                */}
                 <button
                   type="button"
                   onClick={() => setViewState('normal')}
@@ -399,10 +401,12 @@ export default function CaseOverviewPage() {
 
                 <div className="mt-3 pt-2 border-t border-outline-variant flex items-center justify-between text-label-mono-sm">
                   <span className="text-on-surface-variant">Engine: v4.8.2-rev9 (Deterministic)</span>
+                  {/* Temporarily disabled Pipeline link:
                   <Link to={`/cases/${currentCase?.id}/pipeline`} className="text-primary hover:underline flex items-center space-x-1">
                     <span>Manage Pipeline</span>
                     <span className="material-symbols-outlined text-[12px]">arrow_forward</span>
                   </Link>
+                  */}
                 </div>
               </div>
 
@@ -413,9 +417,11 @@ export default function CaseOverviewPage() {
                     <span className="material-symbols-outlined text-primary">analytics</span>
                     <h3 className="font-headline-sm text-headline-sm text-on-surface">Forensic Yield by App</h3>
                   </div>
+                  {/* Temporarily disabled Metrics link:
                   <Link to={`/cases/${currentCase?.id}/metrics`} className="text-primary text-xs hover:underline">
                     View Full Metrics →
                   </Link>
+                  */}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -449,10 +455,12 @@ export default function CaseOverviewPage() {
 
                 {/* Quick Shortcuts to Case Modules */}
                 <div className="pt-2 flex flex-wrap items-center gap-2">
+                  {/* Temporarily disabled Messages button:
                   <Link to={`/cases/${currentCase?.id}/messages`} className="btn-secondary text-xs">
                     <span className="material-symbols-outlined text-sm">chat</span>
                     <span>Messages</span>
                   </Link>
+                  */}
                   <Link to={`/cases/${currentCase?.id}/timeline`} className="btn-secondary text-xs">
                     <span className="material-symbols-outlined text-sm">schedule</span>
                     <span>Timeline</span>
@@ -465,10 +473,12 @@ export default function CaseOverviewPage() {
                     <span className="material-symbols-outlined text-sm">hub</span>
                     <span>Correlations</span>
                   </Link>
+                  {/* Temporarily disabled Section 63 button:
                   <Link to={`/cases/${currentCase?.id}/section63`} className="btn-secondary text-xs">
                     <span className="material-symbols-outlined text-sm">gavel</span>
                     <span>Section 63</span>
                   </Link>
+                  */}
                   <Link to={`/cases/${currentCase?.id}/reports`} className="btn-primary text-xs ml-auto">
                     <span className="material-symbols-outlined text-sm">description</span>
                     <span>Generate Court Report</span>
@@ -523,9 +533,11 @@ export default function CaseOverviewPage() {
 
                 <div className="pt-1 border-t border-outline-variant flex justify-between items-center text-[11px]">
                   <span className="text-on-surface-variant font-mono">Signer: Node-04 ECDSA-P256</span>
+                  {/* Temporarily disabled Integrity link:
                   <Link to={`/cases/${currentCase?.id}/integrity`} className="text-primary hover:underline">
                     View Ledger →
                   </Link>
+                  */}
                 </div>
               </div>
             </div>

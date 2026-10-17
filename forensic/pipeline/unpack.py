@@ -92,11 +92,24 @@ def unpack_evidence_inputs(
                             seen_key_fps.add(km.fingerprint())
                             discovered_keys.append(km)
 
+                    elif "passcode" in base_name and base_name.endswith(".txt"):
+                        role = "key_file"
+                        for line in member_bytes.decode("utf-8", errors="ignore").splitlines():
+                            clean_line = line.strip()
+                            if clean_line and not clean_line.startswith("#") and not clean_line.startswith("SYNTHETIC"):
+                                km = KeyMaterial(raw_key=clean_line.encode("utf-8"), key_type="passcode")
+                                if km.fingerprint() not in seen_key_fps:
+                                    seen_key_fps.add(km.fingerprint())
+                                    discovered_keys.append(km)
+                                break
+
                     elif any(base_name.endswith(ext) for ext in (".crypt14", ".crypt15", ".crypt12")):
                         role = "primary"
                     elif "msgstore.db" in base_name and not any(base_name.endswith(ext) for ext in ("-wal", "-shm")):
                         role = "primary"
                     elif "cache4.db" in base_name and not any(base_name.endswith(ext) for ext in ("-wal", "-shm")):
+                        role = "primary"
+                    elif "tdata" in m_lower or base_name in ("key_datas", "maps") or base_name.startswith("d877f783d5d3ef8c") or "messagess" in base_name:
                         role = "primary"
                     elif base_name in ("wa.db", "contacts.db"):
                         role = "wa_contacts"
@@ -117,6 +130,48 @@ def unpack_evidence_inputs(
                             role=role,
                         )
                     )
+
+                    # Handle 1 level of nested archives (e.g. UPLOAD_TELEGRAM_TDATA.zip)
+                    if base_name.endswith(".zip") and len(member_bytes) < max_unpacked_bytes:
+                        try:
+                            with zipfile.ZipFile(io.BytesIO(member_bytes), "r") as sub_zf:
+                                for sub_info in sub_zf.infolist()[:500]:
+                                    if sub_info.is_dir():
+                                        continue
+                                    sub_rel = sub_info.filename.replace("\\", "/")
+                                    if sub_rel.startswith("../") or "/../" in sub_rel or sub_rel.startswith("/"):
+                                        continue
+                                    if sub_info.file_size > max_unpacked_bytes:
+                                        continue
+                                    sub_bytes = sub_zf.read(sub_info.filename)
+                                    sub_hash = sha256_hex(sub_bytes)
+                                    sub_bname = Path(sub_info.filename).name.lower()
+                                    sub_mlower = sub_info.filename.lower()
+                                    sub_role = "other"
+                                    if "tdata" in sub_mlower or sub_bname in ("key_datas", "maps") or sub_bname.startswith("d877f783d5d3ef8c") or "messagess" in sub_bname:
+                                        sub_role = "primary"
+                                    elif "msgstore.db" in sub_bname and not any(sub_bname.endswith(x) for x in ("-wal", "-shm")):
+                                        sub_role = "primary"
+                                    elif "cache4.db" in sub_bname and not any(sub_bname.endswith(x) for x in ("-wal", "-shm")):
+                                        sub_role = "primary"
+                                    elif sub_bname in ("wa.db", "contacts.db"):
+                                        sub_role = "wa_contacts"
+                                    elif sub_bname.endswith("-wal"):
+                                        sub_role = "wal"
+                                    elif sub_bname.endswith("-shm"):
+                                        sub_role = "shm"
+
+                                    expanded_inputs.append(
+                                        EvidenceInput(
+                                            evidence_id=f"{sub_id}:{sub_info.filename}",
+                                            sha256=sub_hash,
+                                            name=sub_info.filename,
+                                            data=sub_bytes,
+                                            role=sub_role,
+                                        )
+                                    )
+                        except Exception:
+                            pass
         except Exception:
             # Corrupt or unreadable zip fails safe without interrupting other inputs
             continue
