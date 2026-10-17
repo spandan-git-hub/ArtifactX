@@ -13,7 +13,7 @@ from typing import Dict, List, Set, Tuple
 from forensic.common.sqlite_open import quote_ident
 from forensic.telegram.models import TgSchemaInfo, UnsupportedSchemaError
 
-REQUIRED_CACHE4_TABLES: Set[str] = {"messages_v2", "dialogs", "users"}
+REQUIRED_CACHE4_TABLES: Set[str] = {"dialogs", "users"}
 
 
 def detect_tg_schema(
@@ -46,12 +46,16 @@ def detect_tg_schema(
     user_version = user_version_row[0] if user_version_row else 0
     cursor.close()
 
-    is_cache4 = REQUIRED_CACHE4_TABLES.issubset(tables_set)
+    has_messages = ("messages_v2" in tables_set) or ("messages" in tables_set)
+    is_cache4 = has_messages and REQUIRED_CACHE4_TABLES.issubset(tables_set)
 
     if not is_cache4:
+        missing = sorted(REQUIRED_CACHE4_TABLES - tables_set)
+        if not has_messages:
+            missing.append("messages/messages_v2")
         if raise_on_unknown:
             raise UnsupportedSchemaError(
-                f"SQLite database lacks required Telegram cache4 tables: {sorted(REQUIRED_CACHE4_TABLES - tables_set)}",
+                f"SQLite database lacks required Telegram cache4 tables: {missing}",
                 tables_seen=set(table_names),
             )
         return TgSchemaInfo(
@@ -59,7 +63,7 @@ def detect_tg_schema(
             tables=tuple(sorted(table_names)),
             columns=columns,
             capabilities={},
-            notes=(f"Missing required tables: {sorted(REQUIRED_CACHE4_TABLES - tables_set)}",),
+            notes=(f"Missing required tables: {missing}",),
         )
 
     capabilities = {

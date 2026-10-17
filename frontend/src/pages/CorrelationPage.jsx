@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import CaseWorkspacePage from './CaseWorkspacePage';
 import correlationService from '../services/correlationService';
 import {
   GitFork,
@@ -221,8 +220,8 @@ const CorrelationPage = () => {
   });
 
   return (
-    <CaseWorkspacePage>
-      <div className="space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto custom-scrollbar p-6">
+      <div className="space-y-6 max-w-7xl mx-auto w-full">
         {/* Status Notification Toast */}
         {statusNotification && (
           <div
@@ -1130,7 +1129,7 @@ const CorrelationPage = () => {
           </div>
         )}
       </div>
-    </CaseWorkspacePage>
+    </div>
   );
 };
 

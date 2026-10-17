@@ -46,6 +46,69 @@ def _parse_peer_channel(reader: TLReader) -> TgPeer:
     return TgPeer(peer_kind="channel", peer_id=channel_id)
 
 
+def _parse_peer_user_legacy(reader: TLReader) -> TgPeer:
+    user_id = reader.read_int()
+    return TgPeer(peer_kind="user", peer_id=user_id)
+
+
+def _parse_peer_chat_legacy(reader: TLReader) -> TgPeer:
+    chat_id = reader.read_int()
+    return TgPeer(peer_kind="chat", peer_id=chat_id)
+
+
+def _parse_peer_channel_legacy(reader: TLReader) -> TgPeer:
+    channel_id = reader.read_int()
+    return TgPeer(peer_kind="channel", peer_id=channel_id)
+
+
+def _parse_photo_size_legacy(reader: TLReader) -> Tuple[int, int, int]:
+    _ptype = reader.read_string()
+    _loc = reader.read_object()
+    w = reader.read_int()
+    h = reader.read_int()
+    sz = reader.read_int()
+    return (w, h, sz)
+
+
+def _parse_photo_stripped_size(reader: TLReader) -> Tuple[int, int, int]:
+    _ptype = reader.read_string()
+    b = reader.read_bytes()
+    return (0, 0, len(b))
+
+
+def _parse_file_location_to_be_deprecated(reader: TLReader) -> Tuple[int, int]:
+    vol = reader.read_long()
+    local_id = reader.read_int()
+    return (vol, local_id)
+
+
+def _parse_file_location(reader: TLReader) -> Tuple[int, int, int, int, bytes]:
+    dc_id = reader.read_int()
+    vol = reader.read_long()
+    local_id = reader.read_int()
+    secret = reader.read_long()
+    fref = reader.read_bytes()
+    return (dc_id, vol, local_id, secret, fref)
+
+
+def _parse_file_location_unavailable(reader: TLReader) -> Tuple[int, int, int]:
+    vol = reader.read_long()
+    local_id = reader.read_int()
+    secret = reader.read_long()
+    return (vol, local_id, secret)
+
+
+def _parse_action_phone_call(reader: TLReader) -> str:
+    flags = reader.read_int()
+    _video = bool(flags & 4)
+    _call_id = reader.read_long()
+    if flags & 1:
+        _reason = reader.read_object()
+    duration = reader.read_int() if (flags & 2) else None
+    return f"phone_call_{duration}s" if duration else "phone_call"
+
+
+
 def _parse_geo_point(reader: TLReader) -> TgMediaGeo:
     flags = reader.read_int()
     longitude = reader.read_double()
@@ -454,6 +517,95 @@ def _parse_message_service(reader: TLReader) -> TgMessageService:
     )
 
 
+def _parse_message_legacy(reader: TLReader) -> TgMessage:
+    flags = reader.read_int()
+    out = bool(flags & 2)
+    _mentioned = bool(flags & 16)
+    _media_unread = bool(flags & 32)
+    _silent = bool(flags & 8192)
+    _post = bool(flags & 16384)
+    _from_scheduled = bool(flags & 262144)
+    _legacy = bool(flags & 524288)
+    _edit_hide = bool(flags & 2097152)
+
+    msg_id = reader.read_int()
+    from_id = reader.read_int() if (flags & 256) else None
+    peer_id = reader.read_object()
+    fwd_from = reader.read_object() if (flags & 4) else None
+    if flags & 2048:
+        _via_bot = reader.read_int()
+    reply_to = reader.read_int() if (flags & 8) else None
+    date = reader.read_date()
+    message = reader.read_string()
+    media = reader.read_object() if (flags & 512) else None
+    if flags & 64:
+        _reply_markup = reader.read_object()
+    entities = reader.read_object() if (flags & 128) else None
+    if flags & 1024:
+        _views = reader.read_int()
+    edit_date = reader.read_date() if (flags & 32768) else None
+    if flags & 65536:
+        _author = reader.read_string()
+    grouped_id = reader.read_long() if (flags & 131072) else None
+    if flags & 4194304:
+        _restr = reader.read_object()
+
+    trailing = reader.remaining_bytes() if reader.remaining() > 0 else None
+
+    peer_obj = peer_id if isinstance(peer_id, TgPeer) else TgPeer("user", 0)
+    from_peer_obj = TgPeer("user", from_id) if from_id else None
+    reply_obj = TgReplyHeader(reply_to_msg_id=reply_to) if reply_to else None
+    fwd_obj = fwd_from if isinstance(fwd_from, TgForward) else None
+    ent_list = tuple(entities) if isinstance(entities, list) else None
+
+    return TgMessage(
+        id=msg_id,
+        peer=peer_obj,
+        from_peer=from_peer_obj,
+        reply_to=reply_obj,
+        date=date,
+        message=message,
+        out=out,
+        media=media if isinstance(media, (TgMediaPhoto, TgMediaDocument, TgMediaGeo)) else None,
+        fwd_from=fwd_obj,
+        entities=ent_list,
+        edit_date=edit_date,
+        grouped_id=grouped_id,
+        trailing_bytes=trailing,
+    )
+
+
+def _parse_message_service_legacy(reader: TLReader) -> TgMessageService:
+    flags = reader.read_int()
+    out = bool(flags & 2)
+    _mentioned = bool(flags & 16)
+    _media_unread = bool(flags & 32)
+    _silent = bool(flags & 8192)
+    _post = bool(flags & 16384)
+    msg_id = reader.read_int()
+    from_id = reader.read_int() if (flags & 256) else None
+    peer_id = reader.read_object()
+    if flags & 8:
+        _reply_to = reader.read_int()
+    date = reader.read_date()
+    action = reader.read_object()
+
+    trailing = reader.remaining_bytes() if reader.remaining() > 0 else None
+    peer_obj = peer_id if isinstance(peer_id, TgPeer) else TgPeer("user", 0)
+    from_peer_obj = TgPeer("user", from_id) if from_id else None
+    action_type = str(action) if action is not None else "service"
+
+    return TgMessageService(
+        id=msg_id,
+        peer=peer_obj,
+        from_peer=from_peer_obj,
+        date=date,
+        out=out,
+        action_type=action_type,
+        trailing_bytes=trailing,
+    )
+
+
 def _parse_message_empty(reader: TLReader) -> TgMessageEmpty:
     flags = reader.read_int()
     msg_id = reader.read_int()
@@ -650,12 +802,22 @@ def build_supported_registry() -> Dict[int, Callable[[TLReader], Any]]:
         0x59511722: _parse_peer_user,
         0x36C6019A: _parse_peer_chat,
         0xA2A5371E: _parse_peer_channel,
+        0x9DB1BC6D: _parse_peer_user_legacy,
+        0xBAD0E5BB: _parse_peer_chat_legacy,
+        0xBDDDE532: _parse_peer_channel_legacy,
+        0xBDDDE524: _parse_peer_channel_legacy,
         # Geo
         0xB2A2F663: _parse_geo_point,
         # Photos & Sizes
         0x75C78E60: _parse_photo_size,
+        0x77BFB61B: _parse_photo_size_legacy,
+        0xE0B0BC2E: _parse_photo_stripped_size,
+        0xBC7FC6CD: _parse_file_location_to_be_deprecated,
+        0x53D69076: _parse_file_location,
+        0x7C596578: _parse_file_location_unavailable,
         0x37C1011C: lambda r: None,  # ChatPhotoEmpty
         0xFB197A65: _parse_photo,
+        0xD07504A5: _parse_photo,
         # Documents & Attributes
         0x9852F9C6: _parse_doc_attr_audio,
         0x15590068: _parse_doc_attr_filename,
@@ -665,6 +827,7 @@ def build_supported_registry() -> Dict[int, Callable[[TLReader], Any]]:
         0x8FD4C4D8: _parse_document,
         # Media Attachments
         0xE216EB63: _parse_media_photo,
+        0x695150D7: _parse_media_photo,
         0x52D8CCD9: _parse_media_document,
         0x56E0D474: _parse_media_geo,
         0x3DED6320: _parse_media_empty,
@@ -673,7 +836,9 @@ def build_supported_registry() -> Dict[int, Callable[[TLReader], Any]]:
         0x4E4DF4BB: _parse_fwd_header,
         # Messages
         0x7600B9D3: _parse_message,
+        0x452C0E65: _parse_message_legacy,
         0x7A800E0A: _parse_message_service,
+        0x9E19A1F6: _parse_message_service_legacy,
         0x90A6CA84: _parse_message_empty,
         # Users
         0xB1B8CC83: _parse_user,
@@ -710,6 +875,7 @@ def build_supported_registry() -> Dict[int, Callable[[TLReader], Any]]:
         0x95D2AC92: _parse_generic_action("channel_create"),
         0x15CEFD00: _parse_generic_action("chat_add_user"),
         0xA43F30CC: _parse_generic_action("chat_delete_user"),
+        0x80E11A7F: _parse_action_phone_call,
     }
     return registry
 

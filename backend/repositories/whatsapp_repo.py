@@ -111,7 +111,7 @@ class WhatsAppRepository:
                 key_id=m.key_id,
                 chat_row_id=m.chat_row_id,
                 key_remote_jid=m.chat_jid,
-                sender_jid=m.sender_jid,
+                sender_jid="me" if m.from_me == 1 else (m.sender_jid or m.chat_jid),
                 participant_jid=m.chat_jid if m.from_me == 1 else "me",
                 body=m.text,
                 timestamp=m.ts_utc_ms,

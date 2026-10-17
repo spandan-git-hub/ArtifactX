@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, load_only
 
 from backend.models.models import (
     Evidence,
+    DerivedArtifact,
     MediaItem,
     RecoveredFinding,
     TelegramMessage,
@@ -93,26 +94,58 @@ class TimelineService:
                 if ev.sha256:
                     ingest_time_map[ev.sha256] = up_ms
 
+            # Query derived artifacts (decrypted databases from exhibits)
+            derived_artifacts = db.query(DerivedArtifact).filter(DerivedArtifact.case_id == case_id).all()
+            derived_ids = [str(da.id) for da in derived_artifacts]
+
+            from backend.services.whatsapp_service import whatsapp_service
+            from backend.services.telegram_service import telegram_service
+
+            # Ensure decrypted SQLite databases in DerivedArtifact are parsed
+            for da in derived_artifacts:
+                if da.artifact_type == "decrypted_sqlite":
+                    has_msgs = db.query(WhatsAppMessage).filter(WhatsAppMessage.derived_artifact_id == str(da.id)).first()
+                    if not has_msgs:
+                        try:
+                            whatsapp_service.parse_evidence_sync(
+                                evidence_id=da.parent_evidence_id,
+                                db=db,
+                                derived_artifact_id=str(da.id),
+                            )
+                        except Exception:
+                            pass
+
+            # Ensure evidence items with missing WhatsApp/Telegram parsed messages are extracted
+            for eid in evidence_ids:
+                has_wa = db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id == eid).first()
+                if not has_wa:
+                    try:
+                        whatsapp_service.parse_evidence_sync(eid, db)
+                    except Exception:
+                        pass
+
+                has_tg = db.query(TelegramMessage).filter(TelegramMessage.evidence_id == eid).first()
+                if not has_tg:
+                    try:
+                        telegram_service.parse_evidence_sync(eid, db)
+                    except Exception:
+                        pass
+
             # 2. Query WhatsApp messages, revocations, and edits
-            wa_messages = []
-            wa_revocations = []
-            wa_edits = []
-            if evidence_ids:
-                wa_messages = (
-                    db.query(WhatsAppMessage)
-                    .filter(WhatsAppMessage.evidence_id.in_(evidence_ids))
-                    .all()
-                )
-                wa_revocations = (
-                    db.query(WhatsAppRevocation)
-                    .filter(WhatsAppRevocation.evidence_id.in_(evidence_ids))
-                    .all()
-                )
-                wa_edits = (
-                    db.query(WhatsAppEdit)
-                    .filter(WhatsAppEdit.evidence_id.in_(evidence_ids))
-                    .all()
-                )
+            wa_cond = WhatsAppMessage.evidence_id.in_(evidence_ids) if evidence_ids else False
+            if derived_ids:
+                wa_cond = wa_cond | WhatsAppMessage.derived_artifact_id.in_(derived_ids)
+            wa_messages = db.query(WhatsAppMessage).filter(wa_cond).all()
+
+            wa_rev_cond = WhatsAppRevocation.evidence_id.in_(evidence_ids) if evidence_ids else False
+            if derived_ids:
+                wa_rev_cond = wa_rev_cond | WhatsAppRevocation.derived_artifact_id.in_(derived_ids)
+            wa_revocations = db.query(WhatsAppRevocation).filter(wa_rev_cond).all()
+
+            wa_edit_cond = WhatsAppEdit.evidence_id.in_(evidence_ids) if evidence_ids else False
+            if derived_ids:
+                wa_edit_cond = wa_edit_cond | WhatsAppEdit.derived_artifact_id.in_(derived_ids)
+            wa_edits = db.query(WhatsAppEdit).filter(wa_edit_cond).all()
 
             # 3. Query Telegram messages
             tg_messages = []
@@ -254,9 +287,9 @@ class TimelineService:
             raise
 
     def get_timeline_for_case(self, db: Session, case_id: int) -> List[dict]:
-        """Get timeline events for a case, auto-building if no events exist yet."""
+        """Get timeline events for a case, auto-building if no events exist yet or if only ingestion events exist."""
         events = self.timeline_repo.get_events_by_case_id(db, case_id)
-        if not events:
+        if not events or all(e.event_type == "system" for e in events):
             self.build_timeline_for_case(db, case_id)
             events = self.timeline_repo.get_events_by_case_id(db, case_id)
 
@@ -313,7 +346,7 @@ class TimelineService:
             entity_type=entity_type,
             search=search,
         )
-        if not events and not start_date and not end_date and not search:
+        if (not events or all(e.event_type == "system" for e in events)) and not start_date and not end_date and not search:
             self.build_timeline_for_case(db, case_id)
             events = self.timeline_repo.filter_events(
                 db,

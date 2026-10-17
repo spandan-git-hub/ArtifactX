@@ -342,17 +342,18 @@ class PureTimelineBuilder:
                 evidence_ingest_time_ms=ingest_ms,
                 config=self.config,
             )
+            src_tbl = _dict_val(msg, "source_table") or "messages_v2"
             sref = SourceRef(
                 evidence_id=ev_id,
                 evidence_sha256=sha256,
-                source_table="messages_v2",
+                source_table=src_tbl,
                 source_row_id=msg_id,
             )
             summary = body if body else f"Telegram message {msg_id}"
             eid = compute_canonical_event_id(
                 kind="message",
                 evidence_sha256=sha256,
-                source_table="messages_v2",
+                source_table=src_tbl,
                 row_or_offset=msg_id,
                 raw_time=raw_date,
                 key_facts={"dialog_id": dialog_id or 0, "view": view},

@@ -163,14 +163,16 @@ class TelegramParser:
 
         # If post-WAL view was parsed, also inspect main_view to pass any deleted/superseded history
         if post_wal_bytes is not None:
-            main_conn = open_sqlite_ro(main_bytes)
             try:
-                _m_msgs, _m_diag, _m_users, _m_chats, _m_unparsed, _ = self._parse_view(
-                    main_conn, "main_view"
-                )
-                # Keep main_view records available for future Tier-2 WAL history comparisons
-            finally:
-                main_conn.close()
+                main_conn = open_sqlite_ro(main_bytes)
+                try:
+                    _m_msgs, _m_diag, _m_users, _m_chats, _m_unparsed, _ = self._parse_view(
+                        main_conn, "main_view"
+                    )
+                finally:
+                    main_conn.close()
+            except Exception:
+                pass
 
         return TgParseResult(
             schema_info=schema_info,
@@ -500,10 +502,20 @@ class TelegramParser:
         self_uids = {u.uid for u in users if u.is_self}
         default_self_uid = min(self_uids) if self_uids else 1001
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        tables_seen = {r[0].lower() for r in cursor.fetchall()}
+        table_name = "messages_v2" if "messages_v2" in tables_seen else ("messages" if "messages" in tables_seen else None)
+        if not table_name:
+            return messages, unparsed, limitations
+
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        cols = {r[1].lower() for r in cursor.fetchall()}
+        reply_col = "reply_to_message_id" if "reply_to_message_id" in cols else "0"
+
         cursor.execute(
-            """
-            SELECT rowid, mid, uid, read_state, send_state, date, data, out, media, reply_to_message_id
-            FROM messages_v2
+            f"""
+            SELECT rowid, mid, uid, read_state, send_state, date, data, out, media, {reply_col}
+            FROM {table_name}
             ORDER BY mid ASC
             """
         )
@@ -524,7 +536,7 @@ class TelegramParser:
             prov = Provenance(
                 evidence_id=self.evidence_id,
                 evidence_sha256=self.evidence_sha256,
-                source_table="messages_v2",
+                source_table=table_name,
                 row_id=rowid,
                 method=f"cache4_{view_name}",
                 derived_from_artifact_id=self.derived_from_artifact_id,
@@ -532,7 +544,7 @@ class TelegramParser:
             fid = deterministic_finding_id(
                 f"cache4_{view_name}",
                 self.evidence_sha256,
-                "messages_v2",
+                table_name,
                 rowid,
                 {"mid": col_mid, "uid": col_uid},
             )

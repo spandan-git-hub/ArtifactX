@@ -322,7 +322,18 @@ def list_recovered_findings(
     if kind:
         q = q.filter(RecoveredFinding.kind == kind)
 
-    return q.order_by(RecoveredFinding.id.desc()).offset(offset).limit(limit).all()
+    findings = q.order_by(RecoveredFinding.id.desc()).offset(offset).limit(limit).all()
+    if not findings and offset == 0 and tier is None and strength is None and kind is None and run_id is None:
+        has_ev = db.query(Evidence).filter(Evidence.case_id == case_id).count() > 0
+        has_run = db.query(RecoveryRun).filter(RecoveryRun.case_id == case_id, RecoveryRun.status == "SUCCEEDED").count() > 0
+        if has_ev and not has_run:
+            try:
+                run_physical_recovery(case_id, db)
+                findings = q.order_by(RecoveredFinding.id.desc()).offset(offset).limit(limit).all()
+            except Exception:
+                pass
+
+    return findings
 
 
 def get_recovered_finding(

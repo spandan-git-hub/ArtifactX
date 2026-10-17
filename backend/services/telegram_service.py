@@ -60,19 +60,36 @@ class TelegramService:
             .options(load_only(EvidenceFile.id, EvidenceFile.relative_path, EvidenceFile.content_bytes))
             .all()
         )
+        by_path: Dict[str, bytes] = {}
         for ef in ef_list:
-            if not ef.content_bytes:
-                continue
-            rp_lower = ef.relative_path.lower()
-            if rp_lower.endswith("-wal") or rp_lower.endswith(".db-wal"):
-                if wal_bytes is None:
-                    wal_bytes = ef.content_bytes
-            elif rp_lower.endswith("-shm") or rp_lower.endswith(".db-shm"):
-                if shm_bytes is None:
-                    shm_bytes = ef.content_bytes
-            elif rp_lower.endswith("cache4.db") or rp_lower.endswith(".db") or rp_lower.endswith(".sqlite"):
-                if db_bytes is None:
-                    db_bytes = ef.content_bytes
+            cb = ef.content_bytes
+            if cb:
+                by_path[ef.relative_path.replace("\\", "/")] = cb
+
+        db_candidates = [
+            p for p in by_path.keys()
+            if p.lower().endswith("cache4.db") or p.lower().endswith(".db") or p.lower().endswith(".sqlite")
+        ]
+
+        def _candidate_score(p: str) -> int:
+            score = 0
+            p_low = p.lower()
+            if "files/cache4.db" in p_low:
+                score += 1000000000
+            elif "cache4.db" in p_low:
+                score += 500000000
+            wal_p = p + "-wal"
+            if wal_p in by_path:
+                score += len(by_path[wal_p])
+            score += len(by_path[p])
+            return score
+
+        db_candidates.sort(key=_candidate_score, reverse=True)
+        if db_candidates:
+            best_db = db_candidates[0]
+            db_bytes = by_path[best_db]
+            wal_bytes = by_path.get(best_db + "-wal")
+            shm_bytes = by_path.get(best_db + "-shm")
 
         # 2. Check sibling evidence items in the same evidence_set_id (B9.5)
         if evidence.evidence_set_id:
