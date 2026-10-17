@@ -84,7 +84,7 @@ export default function UploadEvidencePage() {
         }
       }
       if (refreshCases) await refreshCases();
-      navigate(`/cases/${activeId}/evidence`);
+      navigate(`/cases/${activeId}/overview`);
     } catch (err) {
       console.error('Evidence upload failed:', err);
       setUploadError(err.response?.data?.detail || err.message || 'Evidence ingestion failed.');

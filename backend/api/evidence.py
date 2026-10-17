@@ -892,11 +892,16 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
         expected_md5 = (evidence.metadata_ or {}).get("md5")
         expected_sha1 = (evidence.metadata_ or {}).get("sha1")
 
-        is_legacy = (evidence.content_bytes is None) or (getattr(evidence, "integrity_state", "OK") == "LEGACY_UNVERIFIABLE")
+        disk_path = resolve_evidence_path(evidence)
+        raw_bytes = evidence.content_bytes
+        if not raw_bytes and disk_path and disk_path.is_file():
+            raw_bytes = disk_path.read_bytes()
+
+        is_legacy = (raw_bytes is None) or (getattr(evidence, "integrity_state", "OK") == "LEGACY_UNVERIFIABLE")
 
         main_file_match = False
         actual_hashes = {}
-        if is_legacy or not evidence.content_bytes:
+        if not raw_bytes or is_legacy:
             actual_hashes = {
                 "sha256": "LEGACY_UNVERIFIABLE",
                 "md5": "LEGACY_UNVERIFIABLE",
@@ -904,7 +909,7 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
             }
             main_file_match = False
         else:
-            actual_hashes = compute_multi_hashes_bytes(evidence.content_bytes)
+            actual_hashes = compute_multi_hashes_bytes(raw_bytes)
             sha256_match = actual_hashes["sha256"].lower() == expected_sha256.lower()
             md5_match = True if not expected_md5 else actual_hashes["md5"].lower() == expected_md5.lower()
             sha1_match = True if not expected_sha1 else actual_hashes["sha1"].lower() == expected_sha1.lower()
@@ -922,10 +927,15 @@ def verify_evidence_hashes(evidence_id: int, db: Session = Depends(get_db)):
             exp_md5 = f_metadata.get("md5")
             exp_sha1 = f_metadata.get("sha1")
 
+            f_disk_path = resolve_evidence_file_path(f)
+            f_bytes = f.content_bytes
+            if not f_bytes and f_disk_path and f_disk_path.is_file():
+                f_bytes = f_disk_path.read_bytes()
+
             f_match = False
             act_hashes = {}
-            if f.content_bytes:
-                act_hashes = compute_multi_hashes_bytes(f.content_bytes)
+            if f_bytes:
+                act_hashes = compute_multi_hashes_bytes(f_bytes)
                 s_match = act_hashes["sha256"].lower() == exp_sha256.lower()
                 m_match = True if not exp_md5 else act_hashes["md5"].lower() == exp_md5.lower()
                 sh_match = True if not exp_sha1 else act_hashes["sha1"].lower() == exp_sha1.lower()

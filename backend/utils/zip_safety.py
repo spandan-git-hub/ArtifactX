@@ -158,10 +158,10 @@ def extract_zip_safe_in_memory(
             if unix_mode == 0o120000:
                 continue
 
-            # Per-member compression ratio check
+            # Per-member compression ratio check (only for members >= 1 MiB to avoid false positives on zero-padded shm/sparse stubs)
             compressed_size = max(1, info.compress_size)
             ratio = info.file_size / compressed_size
-            if ratio > max_member_ratio:
+            if ratio > max_member_ratio and info.file_size > 1024 * 1024:
                 raise ZipLimitExceeded(
                     f"Member {info.filename} compression ratio {ratio:.1f} exceeds limit {max_member_ratio}",
                     reason="COMPRESSION_RATIO_EXCEEDED",

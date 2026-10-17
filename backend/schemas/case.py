@@ -38,6 +38,7 @@ class CaseUpdate(BaseModel):
 class CaseRead(CaseBase):
     id: int
     status: str
+    evidence_count: int = 0
     created_at: datetime
     updated_at: datetime
 

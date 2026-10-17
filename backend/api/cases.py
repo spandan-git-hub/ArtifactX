@@ -90,7 +90,10 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[CaseRead])
 def get_cases(db: Session = Depends(get_db)):
-    return db.query(Case).all()
+    cases = db.query(Case).all()
+    for c in cases:
+        c.evidence_count = db.query(Evidence).filter(Evidence.case_id == c.id).count()
+    return cases
 
 
 @router.get("/{case_id}/workspace", response_model=CaseWorkspaceRead)
@@ -183,6 +186,7 @@ def get_case(case_id: int, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    case.evidence_count = db.query(Evidence).filter(Evidence.case_id == case.id).count()
     return case
 
 
