@@ -206,3 +206,43 @@ def test_pdf_report_full_generation(db_session):
     assert len(pdf_bytes) > 5000  # Substantial forensic multi-page document
     assert result["total_pages"] >= 4
     assert result["sha256"] is not None
+
+def test_report_hash_comparison_recomputes_bytes(db_session):
+    import hashlib
+    from backend.repositories.report_repo import ReportRepository
+    db_session.add_all([
+        Evidence(id=21, case_id=999, original_filename='valid.db', storage_path='', content_bytes=b'valid', sha256=hashlib.sha256(b'valid').hexdigest()),
+        Evidence(id=22, case_id=999, original_filename='tampered.db', storage_path='', content_bytes=b'changed', sha256='0' * 64),
+        Evidence(id=23, case_id=999, original_filename='empty.db', storage_path='', content_bytes=b'', sha256=hashlib.sha256(b'').hexdigest()),
+    ])
+    db_session.commit()
+    result = ReportRepository(db_session).get_integrity_verification_metrics(999)
+    assert result['intact_items'] == 2
+    assert result['mismatch_items'] == 1
+    assert result['unverifiable_items'] == 1
+    assert result['verification_percentage'] == 50.0
+    assert next(x for x in result['items'] if x['id'] == 22)['match_status'] == 'MISMATCH (FAIL)'
+
+
+def test_recovery_metrics_are_exclusive_and_do_not_invent_confidence(db_session):
+    from backend.repositories.report_repo import ReportRepository
+    for finding in db_session.query(RecoveredFinding):
+        finding.strength = 'moderate'
+        finding.confidence_score = None
+    db_session.commit()
+    result = ReportRepository(db_session).get_recovery_findings_metrics(999)
+    assert sum(result[f'tier{i}_count'] for i in range(1, 5)) == result['total_findings']
+    assert sum(result['by_strength'].values()) == result['total_findings']
+    assert all(x['confidence'] is None for x in result['findings'])
+    assert result['by_strength'] == {'moderate': 4}
+
+def test_report_includes_all_timeline_and_recovery_rows(db_session):
+    from backend.repositories.report_repo import ReportRepository
+    db_session.add_all([TimelineEvent(case_id=999, timestamp=i, utc_ms=i, event_type='message', source_app='whatsapp', description=f'event-{i}') for i in range(300)])
+    db_session.add_all([RecoveredFinding(case_id=999, evidence_id=1, tier=3, method='slack', raw_payload_hash=str(i), confidence_score=None) for i in range(80)])
+    db_session.commit()
+    repo = ReportRepository(db_session)
+    assert len(repo.get_timeline_data(999)['events']) == 303
+    assert len(repo.get_recovery_findings_metrics(999)['findings']) == 84
+    result = get_report_service(db_session).generate_report_bytes(999)
+    assert result['pdf_bytes'].startswith(b'%PDF')

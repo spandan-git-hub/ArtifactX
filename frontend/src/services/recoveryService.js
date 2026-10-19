@@ -17,8 +17,18 @@ export const recoveryService = {
 
   // List physically carved findings
   getRecoveryFindings: async (caseId, params = {}) => {
-    const response = await axios.get(`${API_BASE}/cases/${caseId}/recovery/findings`, { params });
-    return response.data;
+    const findings = [];
+    const limit = 1000;
+    let offset = 0;
+    while (true) {
+      const response = await axios.get(`${API_BASE}/cases/${caseId}/recovery/findings`, {
+        params: { ...params, limit, offset },
+      });
+      const page = response.data;
+      findings.push(...page);
+      if (page.length < limit) return findings;
+      offset += page.length;
+    }
   },
 
   // Get specific carved finding detail

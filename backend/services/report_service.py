@@ -379,6 +379,10 @@ class ReportService:
 
         # Case & Examiner Summary Grid
         gen_time_formatted = gen_timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+        integrity_metrics = self.repo.get_integrity_verification_metrics(case.id)
+        integrity_label = (f"{integrity_metrics['intact_items']}/{integrity_metrics['total_items']} matched; "
+                           f"{integrity_metrics['mismatch_items']} mismatch; "
+                           f"{integrity_metrics['unverifiable_items']} unverifiable")
         case_info_data = [
             [
                 Paragraph("<b>CASE IDENTIFIER:</b>", table_cell),
@@ -396,7 +400,7 @@ class ReportService:
                 Paragraph("<b>REPORT TYPE:</b>", table_cell),
                 Paragraph(f"{report_type.upper()} EXAMINATION", table_cell),
                 Paragraph("<b>INTEGRITY STATUS:</b>", table_cell),
-                Paragraph("VERIFIED INTACT (100%)", badge_verified),
+                Paragraph(integrity_label, table_cell),
             ],
             [
                 Paragraph("<b>REPORT ID:</b>", table_cell),
@@ -491,58 +495,28 @@ class ReportService:
         # =========================================================================
         elements.append(Paragraph("1. Forensic Analysis Methodology & Examination Process", section_h1))
         elements.append(Paragraph(
-            "This investigation was conducted under strictly documented digital forensic protocols "
-            "complying with ISO/IEC 27037 standards for digital evidence preservation and examination. "
-            "All procedures guarantee bitstream preservation, zero modification to source media, "
-            "and deterministic, fully reproducible results.",
+            "The following methods and process records come from this case's stored pipeline and audit history. "
+            "Skipped and failed stages are shown as recorded; an audit entry alone does not establish successful completion.",
             body_text
         ))
         elements.append(Spacer(1, 8))
 
         elements.append(Paragraph("<b>1.1 Forensic Analysis Methods Used</b>", section_h2))
-        methods_data = [
-            [
-                Paragraph("<b>Forensic Method</b>", table_header),
-                Paragraph("<b>Technical Implementation</b>", table_header),
-                Paragraph("<b>Forensic Purpose & Soundness</b>", table_header),
-            ],
-            [
-                Paragraph("<b>Cryptographic Bitstream Verification</b>", table_cell),
-                Paragraph("FIPS 180-4 SHA-256 dual intake and extraction digest computation", mono_text),
-                Paragraph("Guarantees bit-level integrity; proves no exhibit altered during lifecycle.", table_cell),
-            ],
-            [
-                Paragraph("<b>Decryption Enclave Processing</b>", table_cell),
-                Paragraph("In-memory AES-256-GCM / PBKDF2 key derivation and Protobuf schema parsing", mono_text),
-                Paragraph("Zero-disk memory enclave decrypts msgstore.db.crypt14/15 without file leakage.", table_cell),
-            ],
-            [
-                Paragraph("<b>AST & Schema-Guided SQLite Parsing</b>", table_cell),
-                Paragraph("Direct B-Tree page traversal, Cell record parsing for WhatsApp & Telegram", mono_text),
-                Paragraph("Deterministic extraction of messages, chats, contacts, groups, and timestamps.", table_cell),
-            ],
-            [
-                Paragraph("<b>4-Tier Physical Carving</b>", table_cell),
-                Paragraph("WAL frame analysis, B-Tree cell slack carving, and unallocated freelist inspection", mono_text),
-                Paragraph("Recovers deleted messages, pre-checkpoint versions, and tombstones.", table_cell),
-            ],
-            [
-                Paragraph("<b>Perceptual Media Correlation</b>", table_cell),
-                Paragraph("64-bit dHash / pHash perceptual hashing with Hamming distance <= 4", mono_text),
-                Paragraph("Links identical or slightly compressed media artifacts across evidence exhibits.", table_cell),
-            ],
-            [
-                Paragraph("<b>Multi-Modal Entity Resolution</b>", table_cell),
-                Paragraph("E.164 phone normalization, handle resolution, cross-app participant linking", mono_text),
-                Paragraph("Resolves unified person profiles across WhatsApp numbers and Telegram handles.", table_cell),
-            ],
-            [
-                Paragraph("<b>Deterministic Artifact Extraction</b>", table_cell),
-                Paragraph("High-precision regex matching for Crypto addresses, Banking UPI/IBAN, Codewords", mono_text),
-                Paragraph("Extracts corroborated evidentiary entities from message text payloads.", table_cell),
-            ],
-        ]
-        methods_table = Table(methods_data, colWidths=[130, 202, 200])
+        executions = self.repo.get_execution_records(case.id)
+        methods_data = [[Paragraph("<b>Recorded Method</b>", table_header),
+                         Paragraph("<b>Status</b>", table_header),
+                         Paragraph("<b>Execution Details</b>", table_header)]]
+        for entry in executions:
+            methods_data.append([
+                Paragraph(html.escape(entry["method"]), table_cell),
+                Paragraph(html.escape(entry["status"]), table_cell),
+                Paragraph(html.escape(entry["details"]), table_cell),
+            ])
+        if not executions:
+            methods_data.append([Paragraph("No execution records", table_cell),
+                                 Paragraph("Not established", table_cell),
+                                 Paragraph("Run analysis to record methods and outcomes.", table_cell)])
+        methods_table = Table(methods_data, repeatRows=1, colWidths=[130, 202, 200])
         methods_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
@@ -557,45 +531,19 @@ class ReportService:
         elements.append(Spacer(1, 10))
 
         elements.append(Paragraph("<b>1.2 Standard Operating Process Followed</b>", section_h2))
-        process_data = [
-            [
-                Paragraph("<b>Stage</b>", table_header),
-                Paragraph("<b>Phase Name</b>", table_header),
-                Paragraph("<b>Forensic Actions Executed</b>", table_header),
-                Paragraph("<b>Audit Ledger</b>", table_header),
-            ],
-            [
-                Paragraph("<b>Stage 1</b>", table_cell),
-                Paragraph("<b>Intake & Preservation</b>", table_cell),
-                Paragraph("Seized exhibit ingestion into memory, SHA-256 baseline hashing, custody seal.", table_cell),
-                Paragraph("EVID_INGEST", mono_bold),
-            ],
-            [
-                Paragraph("<b>Stage 2</b>", table_cell),
-                Paragraph("<b>Cryptographic Decryption</b>", table_cell),
-                Paragraph("Zero-disk key matching, AES-GCM payload validation, derived artifact storage.", table_cell),
-                Paragraph("KEY_DERIVE", mono_bold),
-            ],
-            [
-                Paragraph("<b>Stage 3</b>", table_cell),
-                Paragraph("<b>Universal Parsing</b>", table_cell),
-                Paragraph("Full schema extraction across WhatsApp msgstore.db and Telegram cache4.db.", table_cell),
-                Paragraph("DB_PARSED", mono_bold),
-            ],
-            [
-                Paragraph("<b>Stage 4</b>", table_cell),
-                Paragraph("<b>Carving & Deep Correlation</b>", table_cell),
-                Paragraph("4-tier residual excavation (WAL, Freelist, Slack), entity resolution, handover detection.", table_cell),
-                Paragraph("CORRELATE_RUN", mono_bold),
-            ],
-            [
-                Paragraph("<b>Stage 5</b>", table_cell),
-                Paragraph("<b>Deterministic Certification</b>", table_cell),
-                Paragraph("Total chronological ordering, integrity audit verification, in-memory PDF manifest.", table_cell),
-                Paragraph("REPORT_SEAL", mono_bold),
-            ],
-        ]
-        process_table = Table(process_data, colWidths=[55, 120, 267, 90])
+        process_data = [[Paragraph("<b>Order</b>", table_header),
+                         Paragraph("<b>Recorded Time UTC</b>", table_header),
+                         Paragraph("<b>Action</b>", table_header),
+                         Paragraph("<b>Status</b>", table_header)]]
+        for index, entry in enumerate(sorted(executions, key=lambda item: item["time"]), 1):
+            process_data.append([Paragraph(str(index), table_cell),
+                                 Paragraph(html.escape(entry["time"]), table_cell),
+                                 Paragraph(html.escape(entry["method"]), table_cell),
+                                 Paragraph(html.escape(entry["status"]), table_cell)])
+        if not executions:
+            process_data.append([Paragraph("—", table_cell), Paragraph("—", table_cell),
+                                 Paragraph("No recorded analysis process", table_cell), Paragraph("Unknown", table_cell)])
+        process_table = Table(process_data, repeatRows=1, colWidths=[55, 120, 267, 90])
         process_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
@@ -618,12 +566,11 @@ class ReportService:
             elements.append(Paragraph(
                 "Digital evidence integrity is continuously validated by re-computing cryptographic hashes "
                 "prior to every analytical stage and comparing directly against intake baseline signatures. "
-                "Any discrepancy triggers an immediate pipeline abort.",
+                "This report recomputes SHA-256 from retained bytes and compares it with the intake digest; missing bytes or digests are unverifiable.",
                 body_text
             ))
             elements.append(Spacer(1, 8))
 
-            integrity_metrics = self.repo.get_integrity_verification_metrics(case.id)
             ev_items = integrity_metrics.get("items", [])
 
             # Metrics Summary Bar
@@ -670,14 +617,14 @@ class ReportService:
                         Paragraph("<b>Verification Result</b>", table_header),
                     ]
                 ]
-                for item in ev_items[:25]:
+                for item in ev_items:
                     size_disp = f"{item['size_bytes'] / 1024:.1f} KB" if item['size_bytes'] > 1024 else f"{item['size_bytes']} B"
                     manifest_rows.append([
                         Paragraph(f"<b>{html.escape(Path(item['filename']).name)}</b>", table_cell),
                         Paragraph(html.escape(item["type"]), table_cell),
-                        Paragraph(html.escape(item["sha256"]), mono_text),
+                        Paragraph("Expected: " + html.escape(item["sha256"]) + "<br/>Computed: " + html.escape(item["actual_sha256"] or "Unavailable"), mono_text),
                         Paragraph(size_disp, table_cell),
-                        Paragraph("<b>VERIFIED (PASS)</b>", badge_verified),
+                        Paragraph(html.escape(item["match_status"]), table_cell),
                     ])
 
                 hash_table = Table(manifest_rows, colWidths=[120, 80, 222, 50, 60])
@@ -712,6 +659,8 @@ class ReportService:
 
         rec_metrics = self.repo.get_recovery_findings_metrics(case.id)
         strength_counts = rec_metrics.get("by_strength", {})
+        elements.append(Paragraph("Recorded strengths: " + html.escape(", ".join(f"{key}: {value}" for key, value in sorted(strength_counts.items())) or "No findings"), body_text))
+        elements.append(Paragraph("Tier 1 can identify markers without recovering original content. Tier 4 gaps are indicators only, not recovered messages. Confidence scores are recorded algorithm scores, not calibrated probabilities.", body_text))
 
         # 4-Tier Forensic Metrics Overview Table
         tier_overview_data = [
@@ -725,29 +674,29 @@ class ReportService:
             [
                 Paragraph("<b>Tier 1: Explicit Deletions</b>", table_cell),
                 Paragraph("Protocol message revocations, tombstones & edits in message stores", table_cell),
-                Paragraph("<b>Deterministic</b>", badge_verified),
-                Paragraph("100% (Absolute)", mono_text),
+                Paragraph("Per finding", table_cell),
+                Paragraph("Per finding", mono_text),
                 Paragraph(f"<b>{rec_metrics.get('tier1_count', 0)}</b>", table_cell),
             ],
             [
                 Paragraph("<b>Tier 2: WAL History Frames</b>", table_cell),
                 Paragraph("Uncheckpointed Write-Ahead Log frames; pre-overwrite cell versions", table_cell),
                 Paragraph("<b>High / Strong</b>", ParagraphStyle("T2Badge", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.HexColor("#0284c7"))),
-                Paragraph("90% – 99%", mono_text),
+                Paragraph("Per finding", mono_text),
                 Paragraph(f"<b>{rec_metrics.get('tier2_count', 0)}</b>", table_cell),
             ],
             [
                 Paragraph("<b>Tier 3: Freelist & Slack Carving</b>", table_cell),
                 Paragraph("Unallocated B-Tree cells, page slack space, schema-guided payload carving", table_cell),
                 Paragraph("<b>Strong / Moderate</b>", ParagraphStyle("T3Badge", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.HexColor("#d97706"))),
-                Paragraph("75% – 90%", mono_text),
+                Paragraph("Per finding", mono_text),
                 Paragraph(f"<b>{rec_metrics.get('tier3_count', 0)}</b>", table_cell),
             ],
             [
                 Paragraph("<b>Tier 4: Sequence Gap Indicators</b>", table_cell),
                 Paragraph("Primary key / RowID discontinuities, message counter gaps", table_cell),
                 Paragraph("<b>Heuristic Hint</b>", badge_warning),
-                Paragraph("40% – 70%", mono_text),
+                Paragraph("Per finding", mono_text),
                 Paragraph(f"<b>{rec_metrics.get('tier4_count', 0)}</b>", table_cell),
             ],
             [
@@ -786,8 +735,8 @@ class ReportService:
                     Paragraph("<b>Reconstructed Payload / Residual Content</b>", table_header),
                 ]
             ]
-            for f in rec_findings[:20]:
-                conf_pct = f"{int(f['confidence'] * 100)}%"
+            for f in rec_findings:
+                conf_pct = f"{int(f['confidence'] * 100)}%" if f["confidence"] is not None else "Not assessed"
                 badge_style = badge_verified if f['tier'] == 1 else (
                     ParagraphStyle("T2B", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.HexColor("#0284c7")) if f['tier'] == 2 else badge_warning
                 )
@@ -799,7 +748,7 @@ class ReportService:
                     Paragraph(html.escape(f["preview"]), table_cell),
                 ])
 
-            finding_table = Table(finding_rows, colWidths=[65, 95, 75, 62, 235])
+            finding_table = Table(finding_rows, repeatRows=1, colWidths=[65, 95, 75, 62, 235])
             finding_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fef2f2")]),
@@ -875,11 +824,11 @@ class ReportService:
                     Paragraph("<b>Confidence Score</b>", table_header),
                 ]
             ]
-            for p in persons[:15]:
+            for p in persons:
                 label = p.get("label") or p.get("name") or "Subject"
                 phones = ", ".join(p.get("phone_numbers", [])) or "—"
                 handles = ", ".join(p.get("handles", [])) or "—"
-                conf = f"{(p.get('confidence_score', 0.95) * 100):.0f}%"
+                conf = f"{p['confidence_score'] * 100:.0f}%" if p.get("confidence_score") is not None else "Not assessed"
                 person_rows.append([
                     Paragraph(f"<b>{html.escape(label)}</b>", table_cell),
                     Paragraph(html.escape(phones), mono_text),
@@ -912,7 +861,7 @@ class ReportService:
                     Paragraph("<b>Transition Keywords / Cue</b>", table_header),
                 ]
             ]
-            for h in handovers[:10]:
+            for h in handovers:
                 ho_rows.append([
                     Paragraph(f"<b>{h.get('from_app', 'WA').upper()}:</b> {html.escape(str(h.get('from_body', ''))[:45])}", table_cell),
                     Paragraph(f"<b>{h.get('to_app', 'TG').upper()}:</b> {html.escape(str(h.get('to_body', ''))[:45])}", table_cell),
@@ -958,7 +907,7 @@ class ReportService:
                         Paragraph("<b>Conversation Content / Description</b>", table_header),
                     ]
                 ]
-                for ev in events[:40]:
+                for ev in events:
                     ts = str(ev.get("timestamp") or "")[:19]
                     app_badge = "WhatsApp" if ev.get("app") == "whatsapp" else ("Telegram" if ev.get("app") == "telegram" else "System")
                     timeline_rows.append([
@@ -969,7 +918,7 @@ class ReportService:
                         Paragraph(html.escape(str(ev.get("description") or "—")[:120]), table_cell),
                     ])
 
-                timeline_table = Table(timeline_rows, colWidths=[95, 55, 60, 110, 212])
+                timeline_table = Table(timeline_rows, repeatRows=1, colWidths=[95, 55, 60, 110, 212])
                 timeline_table.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
@@ -1090,10 +1039,10 @@ class ReportService:
                     ),
                     Paragraph(
                         "<br/>[ ARTIFACTX FORENSIC ENGINE ]<br/>"
-                        f"ROOT SHA-256 MANIFEST VERIFIED<br/>"
+                        "SHA-256 COMPARISON: SEE MANIFEST<br/>"
                         f"REPORT ID: {report_id[:20]}...<br/>"
-                        "INTEGRITY STATUS: 100% BITSTREAM PRESERVED<br/>"
-                        "STATUTORY CERTIFICATE: FORM B VERIFIED",
+                        f"INTEGRITY: {html.escape(integrity_label)}<br/>"
+                        "EXAMINER REVIEW AND SIGNATURE REQUIRED",
                         mono_bold
                     ),
                 ]

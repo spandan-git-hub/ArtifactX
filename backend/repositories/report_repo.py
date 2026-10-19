@@ -1,6 +1,8 @@
 """Report repository for data access."""
 
 from datetime import datetime
+import hashlib
+from collections import Counter
 from typing import Dict, Any, List, Optional
 
 from sqlalchemy import func
@@ -23,6 +25,9 @@ from backend.models.models import (
     CorrelationEdge,
     ActivityLog,
     GeneratedReport,
+    AuditLog,
+    PipelineRun,
+    PipelineStageRun,
 )
 
 
@@ -140,7 +145,7 @@ class ReportRepository:
         """Get timeline data for a report."""
         events = self.db.query(TimelineEvent).filter(
             TimelineEvent.case_id == case_id
-        ).order_by(TimelineEvent.normalized_timestamp.asc()).all()
+        ).order_by(TimelineEvent.utc_ms.is_(None), TimelineEvent.utc_ms.asc(), TimelineEvent.id.asc()).all()
 
         total_events = len(events)
         events_by_type: Dict[str, int] = {}
@@ -198,7 +203,7 @@ class ReportRepository:
                 "end": date_range_end,
             } if date_range_start or date_range_end else None,
             "app_breakdown": app_breakdown,
-            "events": event_list[:200],  # Limit for PDF
+            "events": event_list,
         }
 
     def get_timeline_summary(self, case_id: int) -> Dict[str, Any]:
@@ -326,28 +331,34 @@ class ReportRepository:
             .all()
         )
 
-        tier1_list = [f for f in findings if (f.tier == 1 or f.kind in ("revocation", "edit"))]
-        tier2_list = [f for f in findings if (f.tier == 2 or f.kind == "wal_resident" or f.method == "wal")]
-        tier3_list = [f for f in findings if (f.tier == 3 or f.kind in ("freelist", "slack") or f.method in ("freelist", "slack"))]
-        tier4_list = [f for f in findings if (f.tier == 4 or f.kind == "id_gap")]
+        def tier_for(f):
+            if f.tier in (1, 2, 3, 4):
+                return f.tier
+            if f.kind in ("revocation", "edit"):
+                return 1
+            if f.kind == "id_gap":
+                return 4
+            if f.method == "wal" or f.kind == "wal_resident":
+                return 2
+            return 3
 
+        tiers = Counter(tier_for(f) for f in findings)
+        strengths = Counter(
+            "weak_heuristic" if f.strength in ("weak_hint", "heuristic")
+            else (f.strength or "unassessed") for f in findings
+        )
         total_findings = len(findings)
-        deterministic_count = sum(1 for f in findings if f.strength == "deterministic" or (f.confidence_score and f.confidence_score >= 0.95))
-        strong_count = sum(1 for f in findings if f.strength == "strong" or (f.confidence_score and 0.80 <= f.confidence_score < 0.95))
-        moderate_count = sum(1 for f in findings if f.strength == "moderate" or (f.confidence_score and 0.50 <= f.confidence_score < 0.80))
-        weak_count = sum(1 for f in findings if f.strength in ("weak_hint", "heuristic") or (f.confidence_score and f.confidence_score < 0.50))
-
         # Format rows for tabular PDF presentation
         formatted_findings = []
-        for f in findings[:60]:
-            tier_num = f.tier or (1 if f.kind in ("revocation", "edit") else (2 if f.method == "wal" else 3))
+        for f in findings:
+            tier_num = tier_for(f)
             formatted_findings.append({
                 "id": f.id,
                 "tier": tier_num,
                 "tier_name": f"Tier {tier_num}",
                 "kind": f.kind or f.method or "carved",
-                "strength": f.strength or ("deterministic" if tier_num == 1 else "strong"),
-                "confidence": f.confidence_score if f.confidence_score is not None else (1.0 if tier_num == 1 else 0.85),
+                "strength": f.strength or "unassessed",
+                "confidence": f.confidence_score,
                 "source_table": f.table_name or "SQLite Table",
                 "offset": f"0x{f.byte_offset:04x}" if f.byte_offset else (f"Frame {f.frame_index}" if f.frame_index else "Cell"),
                 "timestamp": f.timestamp,
@@ -357,16 +368,11 @@ class ReportRepository:
 
         return {
             "total_findings": total_findings,
-            "tier1_count": len(tier1_list),
-            "tier2_count": len(tier2_list),
-            "tier3_count": len(tier3_list),
-            "tier4_count": len(tier4_list),
-            "by_strength": {
-                "deterministic": deterministic_count,
-                "strong": strong_count,
-                "moderate": moderate_count,
-                "weak_heuristic": weak_count,
-            },
+            "tier1_count": tiers[1],
+            "tier2_count": tiers[2],
+            "tier3_count": tiers[3],
+            "tier4_count": tiers[4],
+            "by_strength": dict(strengths),
             "findings": formatted_findings,
         }
 
@@ -395,23 +401,8 @@ class ReportRepository:
                 "rendezvous_events": rendezvous,
                 "rendezvous_count": len(rendezvous),
             }
-        except Exception:
-            # Fallback to direct table count
-            edges = self.db.query(CorrelationEdge).filter(CorrelationEdge.case_id == case_id).all()
-            return {
-                "total_nodes": 0,
-                "total_edges": len(edges),
-                "resolved_persons": [],
-                "person_count": 0,
-                "handovers": [],
-                "handover_count": 0,
-                "media_matches": [],
-                "media_match_count": 0,
-                "shared_artifacts": [],
-                "artifact_count": 0,
-                "rendezvous_events": [],
-                "rendezvous_count": 0,
-            }
+        except Exception as exc:
+            raise RuntimeError("Correlation metrics could not be loaded; report generation stopped to avoid reporting false zero counts.") from exc
 
     def get_integrity_verification_metrics(self, case_id: int) -> Dict[str, Any]:
         """Get exact hash comparison and integrity verification metrics."""
@@ -422,10 +413,14 @@ class ReportRepository:
 
         for ev in evidences:
             meta = ev.metadata_ or {}
-            size = meta.get("size_bytes") or (len(ev.content_bytes) if ev.content_bytes else 0)
-            total_bytes += size
-            # Current SHA-256 vs intake SHA-256
-            is_intact = ev.integrity_state != "LEGACY_UNVERIFIABLE"
+            content = ev.content_bytes
+            size = len(content) if content is not None else 0
+            actual = hashlib.sha256(content).hexdigest() if content is not None else None
+            verifiable = actual is not None and bool(ev.sha256)
+            is_intact = verifiable and actual.lower() == ev.sha256.lower()
+            state = "VERIFIED_INTACT" if is_intact else ("HASH_MISMATCH" if verifiable else "LEGACY_UNVERIFIABLE")
+            if verifiable:
+                total_bytes += size
             if is_intact:
                 intact_count += 1
 
@@ -435,21 +430,37 @@ class ReportRepository:
                 "type": ev.evidence_type or "Container",
                 "sha256": ev.sha256 or "—",
                 "size_bytes": size,
-                "match_status": "MATCH (PASS)" if is_intact else "UNVERIFIABLE",
-                "integrity_state": ev.integrity_state or "OK",
+                "match_status": "MATCH (PASS)" if is_intact else ("MISMATCH (FAIL)" if verifiable else "UNVERIFIABLE"),
+                "actual_sha256": actual,
+                "integrity_state": state,
                 "uploaded_at": ev.uploaded_at.strftime("%Y-%m-%d %H:%M:%S UTC") if ev.uploaded_at else "—",
             })
 
-        pct = (intact_count / len(evidences) * 100.0) if evidences else 100.0
+        pct = (intact_count / len(evidences) * 100.0) if evidences else 0.0
         return {
             "total_items": len(evidences),
             "intact_items": intact_count,
+            "mismatch_items": sum(i["integrity_state"] == "HASH_MISMATCH" for i in items),
+            "unverifiable_items": sum(i["integrity_state"] == "LEGACY_UNVERIFIABLE" for i in items),
             "verification_percentage": pct,
             "total_bytes_verified": total_bytes,
             "algorithm": "FIPS 180-4 SHA-256",
             "items": items,
         }
 
+
+    def get_execution_records(self, case_id: int) -> List[Dict[str, Any]]:
+        records = []
+        for stage, run in (self.db.query(PipelineStageRun, PipelineRun)
+                           .join(PipelineRun, PipelineStageRun.run_id == PipelineRun.id)
+                           .filter(PipelineRun.case_id == case_id)
+                           .order_by(PipelineRun.started_at, PipelineStageRun.id).all()):
+            records.append({"time": str(run.started_at), "method": stage.stage,
+                            "status": stage.status, "details": str(stage.counts_json or stage.skip_reason or stage.error_code or "")})
+        for event in self.db.query(AuditLog).filter(AuditLog.case_id == case_id).order_by(AuditLog.seq).all():
+            records.append({"time": str(event.ts_utc), "method": event.action,
+                            "status": "Recorded audit event", "details": str(event.details_json or {})})
+        return records
 
     def _get_apps_for_case(self, case_id: int) -> List[str]:
         """Get list of apps with data in the case."""

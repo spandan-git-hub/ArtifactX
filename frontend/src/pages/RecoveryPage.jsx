@@ -37,10 +37,10 @@ export default function RecoveryPage() {
           3: 'Tier 3: Freelist & Slack Carving',
           4: 'Tier 4: Sequence Gap Indicator',
         };
-        const strength = f.strength || (tier === 1 ? 'deterministic' : (tier === 2 ? 'strong' : (tier === 3 ? 'moderate' : 'heuristic')));
+        const strength = f.strength || 'unassessed';
         const confidence = f.confidence_score !== undefined && f.confidence_score !== null
           ? f.confidence_score
-          : (tier === 1 ? 1.0 : (tier === 2 ? 0.92 : (tier === 3 ? 0.82 : 0.60)));
+          : null;
 
         return {
           id: f.id || `rec-${i}`,
@@ -410,7 +410,7 @@ export default function RecoveryPage() {
 
                 <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-outline border-t border-outline-variant/40">
                   <span>{r.sourceTable} • {r.offset}</span>
-                  <span className="font-semibold text-on-surface">{(r.confidence * 100).toFixed(0)}% Certainty</span>
+                  <span className="font-semibold text-on-surface">{r.confidence == null ? 'Not assessed' : `${(r.confidence * 100).toFixed(0)}% score`}</span>
                 </div>
               </div>
             );
@@ -432,7 +432,7 @@ export default function RecoveryPage() {
                     {selectedRecord.tierName}
                   </span>
                   <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-surface-container border border-outline-variant text-on-surface font-medium">
-                    Confidence: {(selectedRecord.confidence * 100).toFixed(1)}% ({selectedRecord.strength})
+                    Confidence: {selectedRecord.confidence == null ? 'Not assessed' : `${(selectedRecord.confidence * 100).toFixed(1)}%`} ({selectedRecord.strength})
                   </span>
                 </div>
                 <h3 className="text-headline-md font-semibold text-on-surface mt-2">

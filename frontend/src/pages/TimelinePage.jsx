@@ -89,6 +89,7 @@ export default function TimelinePage() {
 
   // --- Core State ---
   const [events, setEvents] = useState([]);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
 
@@ -111,7 +112,9 @@ export default function TimelinePage() {
       return;
     }
     setLoading(true);
+    setErrorMessage(null);
     try {
+      await timelineService.buildTimeline(caseId);
       const data = await timelineService.getTimeline(caseId);
       const list = Array.isArray(data) ? data : (data?.events || []);
       setEvents(list);
@@ -128,6 +131,7 @@ export default function TimelinePage() {
       }
     } catch (err) {
       console.warn('Error fetching timeline events:', err);
+      setErrorMessage(err.response?.data?.detail || 'Timeline could not be rebuilt. Check evidence integrity and retry.');
       setEvents([]);
     } finally {
       setLoading(false);
@@ -146,6 +150,7 @@ export default function TimelinePage() {
       await loadTimeline();
     } catch (err) {
       console.error('Failed to rebuild timeline:', err);
+      setErrorMessage(err.response?.data?.detail || 'Timeline rebuild failed.');
     } finally {
       setRebuilding(false);
     }
@@ -335,6 +340,7 @@ export default function TimelinePage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
+      {errorMessage && <div role="alert" className="p-3 text-red-600">{String(errorMessage)}</div>}
       {/* Top Header & Platform Switcher Bar */}
       <header className="border-b border-outline-variant bg-surface-container px-4 py-2.5 space-y-2 shrink-0">
         <div className="flex flex-wrap justify-between items-center gap-3">

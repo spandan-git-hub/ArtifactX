@@ -100,16 +100,16 @@ const CorrelationPage = () => {
         rendezvousData,
         graphRes,
       ] = await Promise.all([
-        correlationService.getCorrelationEdges(caseId).catch(() => []),
-        correlationService.getEntityResolutions(caseId).catch(() => []),
-        correlationService.getMessageMatrix(caseId, windowSeconds).catch(() => []),
-        correlationService.getCorrelationStatus(caseId).catch(() => ({ has_whatsapp: false, has_telegram: false, evidence_count: 0 })),
-        correlationService.getResolvedPersons(caseId).catch(() => []),
-        correlationService.getPlatformHandovers(caseId).catch(() => []),
-        correlationService.getMediaCorrelations(caseId).catch(() => []),
-        correlationService.getSharedArtifacts(caseId).catch(() => []),
-        correlationService.getRendezvousEvents(caseId).catch(() => []),
-        correlationService.getCorrelationGraph(caseId).catch(() => ({ nodes: [], edges: [], metadata: {} })),
+        correlationService.getCorrelationEdges(caseId),
+        correlationService.getEntityResolutions(caseId),
+        correlationService.getMessageMatrix(caseId, windowSeconds),
+        correlationService.getCorrelationStatus(caseId),
+        correlationService.getResolvedPersons(caseId),
+        correlationService.getPlatformHandovers(caseId),
+        correlationService.getMediaCorrelations(caseId),
+        correlationService.getSharedArtifacts(caseId),
+        correlationService.getRendezvousEvents(caseId),
+        correlationService.getCorrelationGraph(caseId),
       ]);
 
       setEdges(edgesData || []);
@@ -128,6 +128,7 @@ const CorrelationPage = () => {
       setHasTg(Boolean(status.has_telegram));
     } catch (err) {
       console.error('Failed to load correlation data:', err);
+      setStatusNotification({ type: 'error', message: 'Correlation data could not be loaded. Retry or run analysis; empty results have not been confirmed.' });
     } finally {
       setLoading(false);
     }
