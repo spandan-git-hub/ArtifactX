@@ -113,15 +113,25 @@ class PlatformHandoverDetector:
         all_events = []
         for m in wa_messages:
             ts = getattr(m, "timestamp", None)
+            if ts is None:
+                ts = getattr(m, "ts_utc_ms", None) or getattr(m, "date_utc_ms", None)
             if ts is not None and ts > 0:
                 ts_sec = ts // 1000 if ts > 10_000_000_000 else ts
-                all_events.append(("whatsapp", str(getattr(m, "message_id", "")), str(getattr(m, "sender_jid", "")), getattr(m, "body", "") or "", ts_sec))
+                mid = getattr(m, "message_id", None) or getattr(m, "key_id", None) or getattr(m, "row_id", "")
+                sender = getattr(m, "sender_jid", None) or getattr(m, "sender", "whatsapp_user")
+                body = getattr(m, "body", None) or getattr(m, "text", "") or ""
+                all_events.append(("whatsapp", str(mid), str(sender), body, ts_sec))
 
         for m in tg_messages:
             ts = getattr(m, "timestamp", None)
+            if ts is None:
+                ts = getattr(m, "date_utc_ms", None) or getattr(m, "ts_utc_ms", None)
             if ts is not None and ts > 0:
                 ts_sec = ts // 1000 if ts > 10_000_000_000 else ts
-                all_events.append(("telegram", str(getattr(m, "message_id", "")), str(getattr(m, "sender_id", "")), getattr(m, "body", "") or "", ts_sec))
+                mid = getattr(m, "message_id", None) or getattr(m, "mid", None) or getattr(m, "row_id", "")
+                sender = getattr(m, "sender_id", None) or getattr(m, "sender", "telegram_user")
+                body = getattr(m, "body", None) or getattr(m, "text", "") or ""
+                all_events.append(("telegram", str(mid), str(sender), body, ts_sec))
 
         # Sort chronologically
         all_events.sort(key=lambda x: x[4])

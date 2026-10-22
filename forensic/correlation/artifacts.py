@@ -203,6 +203,23 @@ def validate_iban(iban_str: str) -> Tuple[bool, str, str]:
     country = clean[:2]
     expected_len = IBAN_LENGTHS.get(country)
     if expected_len is not None and len(clean) != expected_len:
+        if len(clean) > expected_len:
+            candidate_prefix = clean[:expected_len]
+            rearranged_p = candidate_prefix[4:] + candidate_prefix[:4]
+            digits_p = []
+            for ch in rearranged_p:
+                if ch.isdigit():
+                    digits_p.append(ch)
+                elif ch.isupper():
+                    digits_p.append(str(ord(ch) - ord("A") + 10))
+                else:
+                    break
+            if len(digits_p) == len(rearranged_p):
+                try:
+                    if int("".join(digits_p)) % 97 == 1:
+                        return True, "VALIDATED_MOD97_OK", candidate_prefix
+                except ValueError:
+                    pass
         return False, f"INVALID_COUNTRY_LENGTH_{country}_{len(clean)}_EXP_{expected_len}", ""
 
     # Modulo 97 check
@@ -563,6 +580,148 @@ class ArtifactStitcher:
                     },
                 ))
 
+        # 6. Tron / TRC-20 addresses
+        tron_pattern = r"\b(T[1-9A-HJ-NP-Za-km-z]{33})\b"
+        for match in re.finditer(tron_pattern, text):
+            val = match.group(0)
+            if validate_tron_address(val):
+                artifacts.append(ExtractedArtifact(
+                    artifact_id=f"art_tron_{hashlib.sha256(val.encode()).hexdigest()[:12]}",
+                    artifact_category="CRYPTO",
+                    artifact_type="TRON",
+                    value=val,
+                    normalized_value=val,
+                    is_validated=True,
+                    validation_status="VALIDATED_TRON_BASE58CHECK",
+                    match_certainty=1.0,
+                    confidence_score=0.92,
+                    source_message_id=message_id,
+                    source_platform=platform,
+                    evidence_id=evidence_id,
+                    timestamp=timestamp,
+                    context_snippet=self._extract_context(text, val),
+                    limitations=["Public Tron blockchain address; custodial wallet reuse possible."],
+                    provenance={
+                        "algorithm": "ArtifactStitcher",
+                        "validator": "TRON_BASE58CHECK",
+                        "location": location or f"msg_{message_id}",
+                    },
+                ))
+
+        # 7. Monero addresses
+        xmr_pattern = r"\b([48][0-9AB][1-9A-HJ-NP-Za-km-z]{93})\b"
+        for match in re.finditer(xmr_pattern, text):
+            val = match.group(0)
+            if validate_monero_address(val):
+                artifacts.append(ExtractedArtifact(
+                    artifact_id=f"art_xmr_{hashlib.sha256(val.encode()).hexdigest()[:12]}",
+                    artifact_category="CRYPTO",
+                    artifact_type="MONERO",
+                    value=val,
+                    normalized_value=val,
+                    is_validated=True,
+                    validation_status="VALIDATED_MONERO_BASE58",
+                    match_certainty=1.0,
+                    confidence_score=0.92,
+                    source_message_id=message_id,
+                    source_platform=platform,
+                    evidence_id=evidence_id,
+                    timestamp=timestamp,
+                    context_snippet=self._extract_context(text, val),
+                    limitations=["Privacy coin address; stealth address or subaddress possible."],
+                    provenance={
+                        "algorithm": "ArtifactStitcher",
+                        "validator": "MONERO_BASE58",
+                        "location": location or f"msg_{message_id}",
+                    },
+                ))
+
+        # 8. UPI Virtual Payment Addresses
+        upi_pattern = r"\b([a-zA-Z0-9._\-]{2,50}@[a-zA-Z0-9]{2,30})\b"
+        for match in re.finditer(upi_pattern, text):
+            val = match.group(0)
+            if validate_upi_handle(val):
+                norm_upi = val.lower()
+                artifacts.append(ExtractedArtifact(
+                    artifact_id=f"art_upi_{hashlib.sha256(norm_upi.encode()).hexdigest()[:12]}",
+                    artifact_category="BANKING",
+                    artifact_type="UPI",
+                    value=val,
+                    normalized_value=norm_upi,
+                    is_validated=True,
+                    validation_status="VALIDATED_UPI_HANDLE",
+                    match_certainty=1.0,
+                    confidence_score=0.90,
+                    source_message_id=message_id,
+                    source_platform=platform,
+                    evidence_id=evidence_id,
+                    timestamp=timestamp,
+                    context_snippet=self._extract_context(text, val),
+                    limitations=["UPI virtual payment address."],
+                    provenance={
+                        "algorithm": "ArtifactStitcher",
+                        "validator": "UPI_HANDLE_VALIDATOR",
+                        "location": location or f"msg_{message_id}",
+                    },
+                ))
+
+        # 9. SWIFT / BIC codes
+        swift_pattern = r"(?:SWIFT|BIC|swift|bic)[\s:]*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b"
+        for match in re.finditer(swift_pattern, text):
+            val = match.group(1)
+            if validate_swift_bic(val):
+                artifacts.append(ExtractedArtifact(
+                    artifact_id=f"art_swift_{hashlib.sha256(val.encode()).hexdigest()[:12]}",
+                    artifact_category="BANKING",
+                    artifact_type="SWIFT",
+                    value=val,
+                    normalized_value=val.upper(),
+                    is_validated=True,
+                    validation_status="VALIDATED_SWIFT_BIC_ISO9362",
+                    match_certainty=1.0,
+                    confidence_score=0.90,
+                    source_message_id=message_id,
+                    source_platform=platform,
+                    evidence_id=evidence_id,
+                    timestamp=timestamp,
+                    context_snippet=self._extract_context(text, val),
+                    limitations=["Financial institution BIC code; shared routing identifier."],
+                    provenance={
+                        "algorithm": "ArtifactStitcher",
+                        "validator": "ISO_9362_BIC",
+                        "location": location or f"msg_{message_id}",
+                    },
+                ))
+
+        # 10. Credit Card Numbers (Luhn mod-10)
+        card_pattern = r"\b(?:\d{4}[ -]?){3}\d{4}\b"
+        for match in re.finditer(card_pattern, text):
+            val = match.group(0)
+            if validate_luhn(val):
+                norm_card = re.sub(r"[\s\-]", "", val)
+                artifacts.append(ExtractedArtifact(
+                    artifact_id=f"art_card_{hashlib.sha256(norm_card.encode()).hexdigest()[:12]}",
+                    artifact_category="BANKING",
+                    artifact_type="CREDIT_CARD",
+                    value=val,
+                    normalized_value=norm_card,
+                    is_validated=True,
+                    validation_status="VALIDATED_LUHN_MOD10",
+                    match_certainty=1.0,
+                    confidence_score=0.92,
+                    source_message_id=message_id,
+                    source_platform=platform,
+                    evidence_id=evidence_id,
+                    timestamp=timestamp,
+                    context_snippet=self._extract_context(text, val),
+                    limitations=["Payment card number validated via Luhn mod-10."],
+                    provenance={
+                        "algorithm": "ArtifactStitcher",
+                        "validator": "LUHN_MOD10",
+                        "location": location or f"msg_{message_id}",
+                    },
+                ))
+
         return artifacts
 
     def correlate_artifacts(
@@ -635,7 +794,12 @@ class ArtifactStitcher:
             kind_mapping = {
                 "BITCOIN": ("crypto_btc", "strong"),
                 "EVM": ("crypto_evm", "strong"),
+                "TRON": ("crypto_tron", "strong"),
+                "MONERO": ("crypto_monero", "strong"),
                 "IBAN": ("banking_iban", "strong"),
+                "SWIFT": ("banking_swift", "strong"),
+                "UPI": ("banking_upi", "strong"),
+                "CREDIT_CARD": ("banking_card", "strong"),
                 "CANONICAL_URL": ("canonical_url", "strong"),
                 "CODEWORD": ("custom_codeword", "moderate"),
             }

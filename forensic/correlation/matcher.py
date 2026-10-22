@@ -353,48 +353,61 @@ def correlate_cross_app_messages(
     edges = []
 
     # Map contacts to resolved phones for entity check
-    wa_contact_phones = {wa.jid: normalize_phone_number(wa.phone_number or wa.jid) for wa in wa_contacts}
-    tg_contact_phones = {str(tg.user_id): normalize_phone_number(tg.phone) for tg in tg_contacts}
+    wa_contact_phones = {
+        getattr(wa, "jid", ""): normalize_phone_number(getattr(wa, "phone_number", None) or getattr(wa, "number", None) or getattr(wa, "jid", ""))
+        for wa in wa_contacts
+    }
+    tg_contact_phones = {
+        str(getattr(tg, "user_id", None) or getattr(tg, "uid", "")): normalize_phone_number(getattr(tg, "phone", ""))
+        for tg in tg_contacts
+    }
 
     for wa_msg in wa_messages:
-        wa_ts = wa_msg.timestamp
+        wa_ts = getattr(wa_msg, "timestamp", None) or getattr(wa_msg, "ts_utc_ms", None)
         if not wa_ts:
             continue
         wa_sec = wa_ts // 1000 if wa_ts > 10_000_000_000 else wa_ts
-        wa_sender_phone = wa_contact_phones.get(wa_msg.sender_jid, "")
+        wa_mid = str(getattr(wa_msg, "message_id", None) or getattr(wa_msg, "key_id", None) or getattr(wa_msg, "row_id", ""))
+        wa_sender_jid = getattr(wa_msg, "sender_jid", None) or getattr(wa_msg, "sender", "")
+        wa_body = getattr(wa_msg, "body", None) or getattr(wa_msg, "text", "") or ""
+        wa_sender_phone = wa_contact_phones.get(wa_sender_jid, "")
 
         for tg_msg in tg_messages:
-            tg_ts = tg_msg.timestamp
+            tg_ts = getattr(tg_msg, "timestamp", None) or getattr(tg_msg, "date_utc_ms", None)
             if not tg_ts:
                 continue
             tg_sec = tg_ts // 1000 if tg_ts > 10_000_000_000 else tg_ts
 
             delta = abs(wa_sec - tg_sec)
             if delta <= time_window_seconds:
-                tg_sender_id = str(tg_msg.sender_id)
+                tg_mid = str(getattr(tg_msg, "message_id", None) or getattr(tg_msg, "mid", None) or getattr(tg_msg, "row_id", ""))
+                tg_sender_id = str(getattr(tg_msg, "sender_id", None) or getattr(tg_msg, "sender", ""))
+                tg_body = getattr(tg_msg, "body", None) or getattr(tg_msg, "text", "") or ""
                 tg_sender_phone = tg_contact_phones.get(tg_sender_id, "")
 
                 same_entity = bool(wa_sender_phone and tg_sender_phone and wa_sender_phone == tg_sender_phone)
                 confidence = 0.95 if same_entity else max(0.60, 0.90 - (delta / time_window_seconds) * 0.30)
 
+                ev_id = getattr(wa_msg, "evidence_id", None)
+
                 edges.append({
                     "source_type": "wa_message",
-                    "source_id": str(wa_msg.message_id),
+                    "source_id": wa_mid,
                     "target_type": "tg_message",
-                    "target_id": str(tg_msg.message_id),
+                    "target_id": tg_mid,
                     "relation_type": "time_window_correlated",
                     "metadata": {
                         "time_delta_seconds": delta,
                         "time_window_seconds": time_window_seconds,
                         "wa_timestamp": wa_sec,
                         "tg_timestamp": tg_sec,
-                        "wa_sender_jid": wa_msg.sender_jid,
-                        "tg_sender_id": tg_msg.sender_id,
-                        "wa_body": wa_msg.body,
-                        "tg_body": tg_msg.body,
+                        "wa_sender_jid": wa_sender_jid,
+                        "tg_sender_id": tg_sender_id,
+                        "wa_body": wa_body,
+                        "tg_body": tg_body,
                         "same_entity_pair": same_entity,
                         "confidence_score": round(confidence, 2),
-                        "evidence_id": wa_msg.evidence_id,
+                        "evidence_id": ev_id,
                     }
                 })
 

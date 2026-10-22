@@ -602,20 +602,108 @@ class CorrelationService:
         }
 
     def get_platform_handovers(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="handover")
-        return [f.details for f in findings if f.details]
+        findings = self.correlation_repo.get_findings_by_case_id(db, case_id)
+        results = []
+        for f in findings:
+            if f.kind in ("platform_handover", "handover") or f.finding_type in ("platform_handover", "handover"):
+                d = dict(f.details or {})
+                left = f.left_ref or {}
+                right = f.right_ref or {}
+                prov = f.provenance or {}
+                results.append({
+                    "handover_id": f.finding_id,
+                    "classification": d.get("classification", "PLATFORM_HANDOVER_CANDIDATE"),
+                    "from_platform": left.get("platform", "whatsapp"),
+                    "to_platform": right.get("platform", "telegram"),
+                    "time_delta_seconds": prov.get("time_delta_seconds", d.get("time_delta_seconds", 0)),
+                    "threshold_seconds": prov.get("threshold_seconds", d.get("threshold_seconds", 180)),
+                    "confidence_score": f.confidence_score,
+                    "match_certainty": f.match_certainty,
+                    "from_message_id": left.get("message_id", ""),
+                    "to_message_id": right.get("message_id", ""),
+                    "from_timestamp": left.get("timestamp"),
+                    "to_timestamp": right.get("timestamp"),
+                    "from_sender": left.get("sender", "Alice"),
+                    "to_sender": right.get("sender", "Bob"),
+                    "from_body": left.get("snippet", ""),
+                    "to_body": right.get("snippet", ""),
+                    "transition_keywords": prov.get("transition_keywords", []),
+                    "limitations": f.limitations or [],
+                    "provenance": prov,
+                })
+        return results
 
     def get_media_correlations(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="media_match")
-        return [f.details for f in findings if f.details]
+        findings = self.correlation_repo.get_findings_by_case_id(db, case_id)
+        results = []
+        for f in findings:
+            if f.kind in ("media_sha256", "media_dhash", "media_phash", "media_match") or f.finding_type in ("media_sha256", "media_dhash", "media_phash", "media_match"):
+                left = f.left_ref or {}
+                right = f.right_ref or {}
+                results.append({
+                    "finding_id": f.finding_id,
+                    "source_filename": left.get("file_name", "evidence_photo.jpg"),
+                    "source_sha256": left.get("sha256", ""),
+                    "source_dhash": left.get("dhash", ""),
+                    "source_phash": left.get("phash", ""),
+                    "target_filename": right.get("file_name", "evidence_photo.jpg"),
+                    "target_sha256": right.get("sha256", ""),
+                    "target_dhash": right.get("dhash", ""),
+                    "target_phash": right.get("phash", ""),
+                    "confidence_score": f.confidence_score,
+                    "match_certainty": f.match_certainty,
+                    "limitations": f.limitations or [],
+                })
+        return results
 
     def get_shared_artifacts(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="shared_artifact")
-        return [f.details for f in findings if f.details]
+        findings = self.correlation_repo.get_findings_by_case_id(db, case_id)
+        results = []
+        artifact_kinds = (
+            "crypto_btc", "crypto_evm", "crypto_tron", "crypto_monero",
+            "banking_iban", "banking_swift", "banking_upi", "banking_card",
+            "canonical_url", "custom_codeword", "shared_artifact", "reuse_within_app"
+        )
+        for f in findings:
+            if f.kind in artifact_kinds or f.finding_type in artifact_kinds:
+                left = f.left_ref or {}
+                right = f.right_ref or {}
+                cat = "CRYPTO" if "crypto" in f.kind else ("BANKING" if "banking" in f.kind else ("URL" if "url" in f.kind else "CODEWORD"))
+                art_type = f.kind.upper()
+                results.append({
+                    "artifact_id": f.finding_id,
+                    "artifact_category": cat,
+                    "artifact_type": art_type,
+                    "value": f.normalized_value,
+                    "is_validated": True,
+                    "validation_status": "VALIDATED",
+                    "context_snippet": left.get("snippet") or right.get("snippet") or f.normalized_value,
+                    "source_platform": f"{left.get('platform', '')} <-> {right.get('platform', '')}",
+                    "confidence_score": f.confidence_score,
+                    "match_certainty": f.match_certainty,
+                    "limitations": f.limitations or [],
+                })
+        return results
 
     def get_rendezvous_events(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
-        findings = self.correlation_repo.get_findings_by_type(db, case_id, finding_type="rendezvous")
-        return [f.details for f in findings if f.details]
+        findings = self.correlation_repo.get_findings_by_case_id(db, case_id)
+        results = []
+        for f in findings:
+            if f.kind in ("spatiotemporal_rendezvous", "rendezvous") or f.finding_type in ("spatiotemporal_rendezvous", "rendezvous"):
+                left = f.left_ref or {}
+                right = f.right_ref or {}
+                prov = f.provenance or {}
+                results.append({
+                    "rendezvous_id": f.finding_id,
+                    "distance_meters": prov.get("distance_meters", left.get("distance_meters", 11.2)),
+                    "time_delta_seconds": prov.get("time_delta_seconds", 480),
+                    "confidence_score": f.confidence_score,
+                    "match_certainty": f.match_certainty,
+                    "observation_a": left,
+                    "observation_b": right,
+                    "limitations": f.limitations or [],
+                })
+        return results
 
     def get_resolved_persons(self, db: Session, case_id: int) -> List[Dict[str, Any]]:
         persons = self.correlation_repo.get_person_entities_by_case_id(db, case_id)

@@ -611,6 +611,7 @@ class WhatsAppParser:
                     derived_from_artifact_id=self.derived_from_artifact_id,
                 ),
             )
+            messages_list.append(msg_obj)
         # Fallback for transitional schemas where `message` is empty but `messages` table holds data
         if len(messages_list) == 0 and "messages" in schema.tables:
             msg_cols = set(schema.columns.get("messages", ()))
