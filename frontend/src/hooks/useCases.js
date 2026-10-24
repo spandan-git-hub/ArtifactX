@@ -43,9 +43,13 @@ export const useCases = () => {
   const deleteCase = async (id) => {
     try {
       await caseService.deleteCase(id);
-      setCases(prev => prev.filter(c => c.id !== id));
+      setCases(prev => prev.filter(c => String(c.id) !== String(id)));
     } catch (err) {
-      throw err;
+      if (err.response?.status === 404) {
+        setCases(prev => prev.filter(c => String(c.id) !== String(id)));
+      } else {
+        throw err;
+      }
     }
   };
 

@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useActiveCase } from '../context/CaseContext';
 
 export default function CaseListPage() {
   const navigate = useNavigate();
-  const { cases, activeCaseId, switchCase, deleteCase } = useActiveCase();
+  const { cases, activeCaseId, switchCase, deleteCase, refreshCases } = useActiveCase();
+
+  useEffect(() => {
+    refreshCases?.();
+  }, [refreshCases]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -39,12 +43,14 @@ export default function CaseListPage() {
 
   const handleConfirmDelete = async () => {
     if (!caseToDelete) return;
+    const targetId = caseToDelete.id;
+    setCaseToDelete(null);
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
-      await deleteCase(caseToDelete.id);
-      setCaseToDelete(null);
+      await deleteCase(targetId);
     } catch (err) {
       console.error('Failed to delete case:', err);
+      alert('Failed to delete case: ' + (err.response?.data?.detail || err.message));
     } finally {
       setIsDeleting(false);
     }

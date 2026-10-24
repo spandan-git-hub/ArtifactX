@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useCases } from '../hooks/useCases';
 import { useActiveCase } from '../context/CaseContext';
 import { Header } from '../components/layout';
 import { caseService } from '../services/caseService';
@@ -28,8 +27,7 @@ import {
 const CaseDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { deleteCase } = useCases();
-  const { deleteCase: deleteCaseContext } = useActiveCase();
+  const { deleteCase } = useActiveCase();
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,17 +59,13 @@ const CaseDetailPage = () => {
   }, [id]);
 
   const handleDelete = async () => {
-    if (window.confirm(`Delete case "${caseData?.name}"? This cannot be undone.`)) {
+    if (window.confirm(`Delete case "${caseData?.name || ''}"? This cannot be undone.`)) {
       setDeleteLoading(true);
       try {
-        if (deleteCaseContext) {
-          await deleteCaseContext(id);
-        } else {
-          await deleteCase(id);
-        }
+        await deleteCase(id);
         navigate('/cases');
       } catch (err) {
-        alert('Failed to delete case');
+        alert('Failed to delete case: ' + (err.response?.data?.detail || err.message));
         setDeleteLoading(false);
       }
     }

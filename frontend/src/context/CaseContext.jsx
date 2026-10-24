@@ -74,10 +74,12 @@ export function CaseProvider({ children }) {
   }, [fetchCases]);
 
   useEffect(() => {
-    if (cases.length > 0) {
+    if (cases && cases.length > 0) {
       localStorage.setItem('arx_cases', JSON.stringify(cases));
+    } else if (!loading) {
+      localStorage.removeItem('arx_cases');
     }
-  }, [cases]);
+  }, [cases, loading]);
 
   useEffect(() => {
     if (activeCaseId) {
@@ -121,26 +123,60 @@ export function CaseProvider({ children }) {
   };
 
   const deleteCase = async (id) => {
-    try {
-      await caseService.deleteCase(id);
-    } catch (err) {
-      console.error('Backend deleteCase error:', err);
-      throw err;
+    const stringId = String(id);
+    const prevCases = [...cases];
+    const prevActiveId = activeCaseId;
+
+    // 1. Optimistic update: immediately remove from local state and localStorage
+    const remaining = prevCases.filter(c => String(c.id) !== stringId && c.caseNumber !== stringId);
+    setCases(remaining);
+    if (remaining.length > 0) {
+      localStorage.setItem('arx_cases', JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem('arx_cases');
     }
 
-    setCases(prev => {
-      const remaining = prev.filter(c => String(c.id) !== String(id));
-      localStorage.setItem('arx_cases', JSON.stringify(remaining));
-      return remaining;
-    });
+    if (String(activeCaseId) === stringId || (activeCase && activeCase.caseNumber === stringId)) {
+      setActiveCaseId(remaining.length > 0 ? String(remaining[0].id) : null);
+    }
 
-    setActiveCaseId(prev => {
-      if (String(prev) === String(id)) {
-        const remaining = cases.filter(c => String(c.id) !== String(id));
-        return remaining.length > 0 ? String(remaining[0].id) : null;
+    const targetCase = prevCases.find(c => String(c.id) === stringId || c.caseNumber === stringId);
+    const backendId = targetCase?.id || id;
+
+    // 2. Perform backend deletion
+    try {
+      await caseService.deleteCase(backendId);
+    } catch (err) {
+      // 404 means case is already gone from DB (or was created locally only) - treat as successful local deletion
+      if (err.response?.status === 404) {
+        console.warn(`Case ${id} was not in DB, cleaned up locally.`);
+      } else {
+        // Real server error: rollback optimistic state
+        console.error('Backend deleteCase error:', err);
+        setCases(prevCases);
+        setActiveCaseId(prevActiveId);
+        if (prevCases.length > 0) {
+          localStorage.setItem('arx_cases', JSON.stringify(prevCases));
+        }
+        throw err;
       }
-      return prev;
-    });
+    }
+
+    // 3. Ground-truth background sync with DB to guarantee complete synchronization
+    try {
+      const freshData = await caseService.getCases();
+      if (Array.isArray(freshData)) {
+        const freshNormalized = freshData.map(normalizeCase);
+        setCases(freshNormalized);
+        if (freshNormalized.length > 0) {
+          localStorage.setItem('arx_cases', JSON.stringify(freshNormalized));
+        } else {
+          localStorage.removeItem('arx_cases');
+        }
+      }
+    } catch (syncErr) {
+      console.warn('Post-delete DB sync warning:', syncErr);
+    }
   };
 
   return (

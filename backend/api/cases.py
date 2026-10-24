@@ -4,6 +4,8 @@ import re
 import traceback
 from pathlib import Path
 
+from typing import Union
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -26,7 +28,7 @@ from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspace
 from backend.schemas.metrics import CaseMetricsResponse
 from backend.services.audit_service import AuditService
 from backend.services.log_service import get_log_service
-from backend.utils.file_storage import delete_file
+from backend.utils.file_storage import delete_file, cleanup_case_disk_data
 
 router = APIRouter()
 
@@ -228,99 +230,159 @@ def update_case(case_id: int, data: CaseUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/{case_id}")
-def delete_case(case_id: int, db: Session = Depends(get_db)):
+def delete_case(case_id: Union[int, str], db: Session = Depends(get_db)):
     try:
-        case = db.query(Case).filter(Case.id == case_id).first()
+        case = None
+        if str(case_id).isdigit():
+            case = db.query(Case).filter(Case.id == int(case_id)).first()
+        if not case:
+            case = db.query(Case).filter(Case.case_number == str(case_id)).first()
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
+        real_case_id = case.id
         case_name = case.name
-        case_number = case.case_number or f"Case #{case_id}"
+        case_number_raw = case.case_number
+        case_number = case.case_number or f"Case #{real_case_id}"
 
-        # 1. Fetch evidence items and clean up physical files on disk
-        evidence_rows = db.query(Evidence.id, Evidence.storage_path, Evidence.extracted_path).filter(Evidence.case_id == case_id).all()
+        # 1. Collect disk file paths before DB rows are deleted
+        evidence_rows = db.query(Evidence.id, Evidence.storage_path, Evidence.extracted_path).filter(Evidence.case_id == real_case_id).all()
         evidence_ids = [r[0] for r in evidence_rows]
+        disk_paths = []
         for _, storage_path, extracted_path in evidence_rows:
             if storage_path:
-                delete_file(storage_path)
+                disk_paths.append(storage_path)
             if extracted_path:
-                delete_file(extracted_path)
+                disk_paths.append(extracted_path)
 
-        # 1b. Clean up case uploads directory in uploads/ if present
-        if case.case_number:
-            case_folder = re.sub(r'[^\w\-.]', '_', str(case.case_number))
-            case_dir = UPLOADS_DIR / case_folder
-            if case_dir.exists():
-                delete_file(case_dir)
-        case_fallback_dir = UPLOADS_DIR / f"case_{case_id}"
-        if case_fallback_dir.exists():
-            delete_file(case_fallback_dir)
+        # 2. Fast single-round-trip database cascade
+        dialect_name = db.bind.dialect.name if db.bind else ""
+        if dialect_name == "postgresql":
+            sql = f"""
+            DO $$
+            BEGIN
+                -- 1. Evidence chat messages & contacts
+                DELETE FROM wa_revocations WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_edits WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_chats WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_jids WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_messages WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_contacts WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM wa_groups WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
 
-        # 2. Bulk delete all evidence-dependent tables
-        if evidence_ids:
-            db.query(WhatsAppRevocation).filter(WhatsAppRevocation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppEdit).filter(WhatsAppEdit.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppChat).filter(WhatsAppChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppJid).filter(WhatsAppJid.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                DELETE FROM tg_dialogs WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_users WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_chats WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_unparsed_blobs WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_messages WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_contacts WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM tg_groups WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
 
-            db.query(TelegramDialog).filter(TelegramDialog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramUser).filter(TelegramUser.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramChat).filter(TelegramChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramUnparsedBlob).filter(TelegramUnparsedBlob.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TelegramGroup).filter(TelegramGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                -- 2. Decryption operations, derived artifacts, and recovery (decryption_operations references derived_artifacts, which references evidence_files)
+                DELETE FROM decryption_operations WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
+                DELETE FROM derived_artifacts WHERE parent_evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
+                DELETE FROM recovered_findings WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
+                DELETE FROM recovery_runs WHERE case_id = {int(real_case_id)};
 
-            db.query(AnalysisResult).filter(AnalysisResult.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(EvidenceFile).filter(EvidenceFile.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(AnalysisLog).filter(AnalysisLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(ErrorLog).filter(ErrorLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(DerivedArtifact).filter(DerivedArtifact.parent_evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(DecryptionOperation).filter(DecryptionOperation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(RecoveredFinding).filter(RecoveredFinding.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(TimelineEvent).filter(TimelineEvent.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(DeletedMessage).filter(DeletedMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
-            db.query(MediaItem).filter(MediaItem.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                -- 3. Evidence files, analysis results, and logs
+                DELETE FROM analysis_results WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM evidence_files WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM analysis_logs WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)});
+                DELETE FROM error_logs WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
 
-        # 3. Clean up pipeline stage runs and runs
-        pipeline_runs = db.query(PipelineRun.id).filter(PipelineRun.case_id == case_id).all()
-        pipeline_run_ids = [pr[0] for pr in pipeline_runs]
-        if pipeline_run_ids:
-            db.query(PipelineStageRun).filter(PipelineStageRun.run_id.in_(pipeline_run_ids)).delete(synchronize_session=False)
-            db.query(PipelineRun).filter(PipelineRun.case_id == case_id).delete(synchronize_session=False)
+                -- 4. Case-level timeline, media, pipeline, and graph entities
+                DELETE FROM timeline_events WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
+                DELETE FROM deleted_messages WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
+                DELETE FROM media_items WHERE evidence_id IN (SELECT id FROM evidence WHERE case_id = {int(real_case_id)}) OR case_id = {int(real_case_id)};
 
-        # 4. Bulk delete case-dependent tables
-        db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete(synchronize_session=False)
-        db.query(DeletedMessage).filter(DeletedMessage.case_id == case_id).delete(synchronize_session=False)
-        db.query(MediaItem).filter(MediaItem.case_id == case_id).delete(synchronize_session=False)
-        db.query(CorrelationEdge).filter(CorrelationEdge.case_id == case_id).delete(synchronize_session=False)
-        db.query(CorrelationFinding).filter(CorrelationFinding.case_id == case_id).delete(synchronize_session=False)
-        db.query(PersonEntity).filter(PersonEntity.case_id == case_id).delete(synchronize_session=False)
-        db.query(DerivedArtifact).filter(DerivedArtifact.case_id == case_id).delete(synchronize_session=False)
-        db.query(RecoveredFinding).filter(RecoveredFinding.case_id == case_id).delete(synchronize_session=False)
-        db.query(RecoveryRun).filter(RecoveryRun.case_id == case_id).delete(synchronize_session=False)
-        db.query(DecryptionOperation).filter(DecryptionOperation.case_id == case_id).delete(synchronize_session=False)
-        db.query(ActivityLog).filter(ActivityLog.case_id == case_id).delete(synchronize_session=False)
-        db.query(ErrorLog).filter(ErrorLog.case_id == case_id).delete(synchronize_session=False)
-        db.query(GeneratedReport).filter(GeneratedReport.case_id == case_id).delete(synchronize_session=False)
-        db.query(Evidence).filter(Evidence.case_id == case_id).delete(synchronize_session=False)
+                DELETE FROM pipeline_stage_runs WHERE run_id IN (SELECT id FROM pipeline_runs WHERE case_id = {int(real_case_id)});
+                DELETE FROM pipeline_runs WHERE case_id = {int(real_case_id)};
 
-        # 5. Delete Case object itself (AuditLog records remain immutable per DEC-010 / B5.5)
-        db.query(Case).filter(Case.id == case_id).delete(synchronize_session=False)
-        db.commit()
+                DELETE FROM correlation_edges WHERE case_id = {int(real_case_id)};
+                DELETE FROM correlation_findings WHERE case_id = {int(real_case_id)};
+                DELETE FROM person_entities WHERE case_id = {int(real_case_id)};
+                DELETE FROM activity_logs WHERE case_id = {int(real_case_id)};
+                DELETE FROM generated_reports WHERE case_id = {int(real_case_id)};
 
-        # 7. Record append-only audit trail entry for deletion
+                -- 5. Parent Evidence items and Case
+                DELETE FROM evidence WHERE case_id = {int(real_case_id)};
+                DELETE FROM cases WHERE id = {int(real_case_id)};
+            END $$;
+            """
+            db.execute(text(sql))
+            db.commit()
+        else:
+            # Fallback for SQLite in local test suites
+            if evidence_ids:
+                db.query(WhatsAppRevocation).filter(WhatsAppRevocation.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppEdit).filter(WhatsAppEdit.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppChat).filter(WhatsAppChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppJid).filter(WhatsAppJid.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+
+                db.query(TelegramDialog).filter(TelegramDialog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramUser).filter(TelegramUser.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramChat).filter(TelegramChat.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramUnparsedBlob).filter(TelegramUnparsedBlob.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramMessage).filter(TelegramMessage.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(TelegramGroup).filter(TelegramGroup.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+
+                # Delete decryption operations, derived artifacts, and recovery before evidence files
+                db.query(DecryptionOperation).filter((DecryptionOperation.evidence_id.in_(evidence_ids)) | (DecryptionOperation.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(DerivedArtifact).filter((DerivedArtifact.parent_evidence_id.in_(evidence_ids)) | (DerivedArtifact.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(RecoveredFinding).filter((RecoveredFinding.evidence_id.in_(evidence_ids)) | (RecoveredFinding.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(RecoveryRun).filter(RecoveryRun.case_id == real_case_id).delete(synchronize_session=False)
+
+                db.query(AnalysisResult).filter(AnalysisResult.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(EvidenceFile).filter(EvidenceFile.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(AnalysisLog).filter(AnalysisLog.evidence_id.in_(evidence_ids)).delete(synchronize_session=False)
+                db.query(ErrorLog).filter((ErrorLog.evidence_id.in_(evidence_ids)) | (ErrorLog.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(TimelineEvent).filter((TimelineEvent.evidence_id.in_(evidence_ids)) | (TimelineEvent.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(DeletedMessage).filter((DeletedMessage.evidence_id.in_(evidence_ids)) | (DeletedMessage.case_id == real_case_id)).delete(synchronize_session=False)
+                db.query(MediaItem).filter((MediaItem.evidence_id.in_(evidence_ids)) | (MediaItem.case_id == real_case_id)).delete(synchronize_session=False)
+
+            pipeline_runs = db.query(PipelineRun.id).filter(PipelineRun.case_id == real_case_id).all()
+            pipeline_run_ids = [pr[0] for pr in pipeline_runs]
+            if pipeline_run_ids:
+                db.query(PipelineStageRun).filter(PipelineStageRun.run_id.in_(pipeline_run_ids)).delete(synchronize_session=False)
+                db.query(PipelineRun).filter(PipelineRun.case_id == real_case_id).delete(synchronize_session=False)
+
+            db.query(TimelineEvent).filter(TimelineEvent.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(DeletedMessage).filter(DeletedMessage.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(MediaItem).filter(MediaItem.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(CorrelationEdge).filter(CorrelationEdge.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(CorrelationFinding).filter(CorrelationFinding.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(PersonEntity).filter(PersonEntity.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(DerivedArtifact).filter(DerivedArtifact.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(RecoveredFinding).filter(RecoveredFinding.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(RecoveryRun).filter(RecoveryRun.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(DecryptionOperation).filter(DecryptionOperation.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(ActivityLog).filter(ActivityLog.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(ErrorLog).filter(ErrorLog.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(GeneratedReport).filter(GeneratedReport.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(Evidence).filter(Evidence.case_id == real_case_id).delete(synchronize_session=False)
+            db.query(Case).filter(Case.id == real_case_id).delete(synchronize_session=False)
+            db.commit()
+
+        # 3. Clean up physical files and directories on disk after successful DB commit
+        cleanup_case_disk_data(
+            case_id=real_case_id,
+            case_number=case_number_raw,
+            extra_paths=disk_paths,
+        )
+
+        # 4. Record append-only audit trail entry for deletion
         try:
             AuditService.append(
                 db=db,
                 action="CASE_DELETED",
                 actor="system",
-                case_id=case_id,
+                case_id=real_case_id,
                 details={
-                    "deleted_case_id": case_id,
+                    "deleted_case_id": real_case_id,
                     "case_name": case_name,
                     "case_number": case_number
                 }
@@ -328,21 +390,24 @@ def delete_case(case_id: int, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-        return {"message": f"Case '{case_name}' deleted successfully", "case_id": case_id}
+        return {"message": f"Case '{case_name}' deleted successfully", "case_id": real_case_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        log_service = get_log_service(db)
-        log_service.log_error(
-            error_type="case_deletion_error",
-            message=f"Error deleting case: {str(e)}",
-            case_id=case_id,
-            evidence_id=None,
-            stack_trace=traceback.format_exc(),
-            endpoint=f"/api/cases/{case_id}",
-            method="DELETE"
-        )
+        try:
+            log_service = get_log_service(db)
+            log_service.log_error(
+                error_type="case_deletion_error",
+                message=f"Error deleting case: {str(e)}",
+                case_id=None,
+                evidence_id=None,
+                stack_trace=traceback.format_exc(),
+                endpoint=f"/api/cases/{case_id}",
+                method="DELETE"
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to delete case: {str(e)}")
 
 

@@ -1,9 +1,11 @@
 """File storage utilities for keeping uploaded files on local disk (in uploads directory)."""
 
 import os
+import re
 import shutil
+import stat
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 from backend.app.config import BASE_DIR, UPLOADS_DIR
 
@@ -60,6 +62,15 @@ def save_extracted_members(extract_dir: Path, members: list) -> None:
             dest.write_bytes(content)
 
 
+def _handle_remove_readonly(func, path, exc_info):
+    """Clear Windows readonly attribute and retry deletion."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
 def delete_file(filepath: Union[Path, str, None]) -> None:
     """Delete a file or directory from storage if it exists on disk."""
     if not filepath or str(filepath).startswith("db://"):
@@ -77,11 +88,42 @@ def delete_file(filepath: Union[Path, str, None]) -> None:
                     p = candidate_base
         if p.exists():
             if p.is_dir():
-                shutil.rmtree(p, ignore_errors=True)
+                try:
+                    shutil.rmtree(p, onerror=_handle_remove_readonly)
+                except Exception:
+                    shutil.rmtree(p, ignore_errors=True)
             else:
+                try:
+                    os.chmod(p, stat.S_IWRITE)
+                except Exception:
+                    pass
                 p.unlink(missing_ok=True)
     except Exception:
         pass
+
+
+def cleanup_case_disk_data(
+    case_id: int,
+    case_number: Optional[str] = None,
+    extra_paths: Optional[List[Union[Path, str, None]]] = None,
+) -> None:
+    """Thoroughly remove all local disk directories and files associated with a case."""
+    if extra_paths:
+        for ep in extra_paths:
+            if ep:
+                delete_file(ep)
+
+    target_names = set()
+    if case_number:
+        target_names.add(str(case_number))
+        target_names.add(re.sub(r'[^\w\-.]', '_', str(case_number)))
+    target_names.add(f"case_{case_id}")
+    target_names.add(str(case_id))
+
+    for name in target_names:
+        case_dir = UPLOADS_DIR / name
+        if case_dir.exists():
+            delete_file(case_dir)
 
 
 def resolve_evidence_path(storage_path: Optional[str]) -> Optional[Path]:
