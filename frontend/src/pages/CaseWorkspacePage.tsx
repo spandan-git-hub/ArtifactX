@@ -5,7 +5,13 @@ import { Header } from '../components/layout';
 import ForensicWorkflowStepper from '../components/workspace/ForensicWorkflowStepper';
 import { Loader2, AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 
-const CaseWorkspacePage = ({ children }) => {
+interface CaseWorkspacePageProps {
+  children?: React.ReactNode;
+  activeTab?: string;
+  [key: string]: any;
+}
+
+const CaseWorkspacePage = ({ children }: CaseWorkspacePageProps) => {
   const params = useParams();
   const caseId = params.id || params.caseId;
 

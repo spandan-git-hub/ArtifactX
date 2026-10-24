@@ -3,7 +3,23 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useActiveCase } from '../../context/CaseContext';
 
-export function Layout({ children }) {
+interface NavTab {
+  name: string;
+  icon: string;
+  path: string;
+  badge?: string;
+  badgeColor?: string;
+  count?: any;
+  dot?: string;
+}
+
+export interface LayoutProps {
+  children?: React.ReactNode;
+  activeTab?: string;
+  [key: string]: any;
+}
+
+export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
@@ -35,7 +51,7 @@ export function Layout({ children }) {
 
   const caseId = activeCase?.id || '';
 
-  const navTabs = [
+  const navTabs: NavTab[] = [
     { name: 'Overview', icon: 'dashboard', path: caseId ? `/cases/${caseId}/overview` : '/cases', badge: activeCase ? 'LIVE' : undefined, badgeColor: 'bg-primary/20 text-primary' },
     { name: 'Evidence', icon: 'folder_open', path: caseId ? `/cases/${caseId}/evidence` : '/cases', count: activeCase?.evidenceCount },
     { name: 'Decryption', icon: 'key', path: caseId ? `/cases/${caseId}/decryption` : '/cases' },

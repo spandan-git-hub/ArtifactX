@@ -1,13 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import timelineService from '../services/timelineService';
 
-export const useTimeline = (caseId, initialFilters = {}) => {
-  const [events, setEvents] = useState([]);
-  const [histogram, setHistogram] = useState(null);
+export const useTimeline = (caseId: any, initialFilters: any = {}) => {
+  const [events, setEvents] = useState<any[]>([]);
+  const [histogram, setHistogram] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [histogramLoading, setHistogramLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -24,7 +24,7 @@ export const useTimeline = (caseId, initialFilters = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const params = {};
+      const params: Record<string, any> = {};
       if (filters.search) params.search = filters.search;
       if (filters.sourceApp && filters.sourceApp !== 'all') params.source_app = filters.sourceApp;
       if (filters.eventType && filters.eventType !== 'all') params.event_type = filters.eventType;
@@ -33,7 +33,7 @@ export const useTimeline = (caseId, initialFilters = {}) => {
 
       const data = await timelineService.getTimeline(caseId, params);
       setEvents(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching timeline events:', err);
       setError(err.response?.data?.detail || err.message || 'Failed to fetch timeline');
       setEvents([]);
@@ -46,7 +46,7 @@ export const useTimeline = (caseId, initialFilters = {}) => {
     if (!caseId) return;
     setHistogramLoading(true);
     try {
-      const params = { interval: filters.interval };
+      const params: Record<string, any> = { interval: filters.interval };
       if (filters.search) params.search = filters.search;
       if (filters.sourceApp && filters.sourceApp !== 'all') params.source_app = filters.sourceApp;
       if (filters.eventType && filters.eventType !== 'all') params.event_type = filters.eventType;
@@ -69,7 +69,7 @@ export const useTimeline = (caseId, initialFilters = {}) => {
     try {
       await timelineService.buildTimeline(caseId);
       await Promise.all([fetchTimeline(), fetchHistogram()]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error rebuilding timeline:', err);
       setError(err.response?.data?.detail || err.message || 'Failed to rebuild timeline');
     } finally {
@@ -77,7 +77,7 @@ export const useTimeline = (caseId, initialFilters = {}) => {
     }
   }, [caseId, fetchTimeline, fetchHistogram]);
 
-  const updateFilters = useCallback((newFilters) => {
+  const updateFilters = useCallback((newFilters: any) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   }, []);
 

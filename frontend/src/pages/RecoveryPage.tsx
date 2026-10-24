@@ -26,7 +26,7 @@ export default function RecoveryPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const data = await recoveryService.getRecoveryFindings(caseId);
+      const data: any = await recoveryService.getRecoveryFindings(caseId);
       const findings = Array.isArray(data) ? data : (data?.findings || []);
 
       const mapped = findings.map((f, i) => {

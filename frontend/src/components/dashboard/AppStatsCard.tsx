@@ -1,10 +1,17 @@
+import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { MessageSquare, Users, Layers, Image } from 'lucide-react';
 
-const AppStatsCard = ({ app, stats }) => {
+interface AppStatsCardProps {
+  app: string;
+  stats: any;
+  icon?: string;
+}
+
+const AppStatsCard = ({ app, stats, icon }: AppStatsCardProps) => {
   if (!stats) return null;
 
-  const appColors = {
+  const appColors: Record<string, string> = {
     WhatsApp: 'text-accent-emerald',
     Telegram: 'text-accent-blue',
   };

@@ -34,7 +34,7 @@ export const formatContactLabel = (rawRef) => {
 };
 
 /** Formats UTC milliseconds into structured date, time, and day-group key */
-export const formatEventDateTime = (utcMs, rawTs, normTs) => {
+export const formatEventDateTime = (utcMs?: any, rawTs?: any, normTs?: any) => {
   let ms = utcMs;
   if (!ms && normTs) {
     const d = new Date(normTs);

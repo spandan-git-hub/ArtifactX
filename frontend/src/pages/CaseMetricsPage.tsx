@@ -31,7 +31,7 @@ export default function CaseMetricsPage() {
   }, [loadStats]);
 
   const evidenceCount = stats?.evidence_count ?? activeCase?.evidenceCount ?? 0;
-  const totalMessages = stats?.total_messages ?? (activeCase?.recordCount ? parseInt(activeCase.recordCount.replace(/,/g, ''), 10) : 0);
+  const totalMessages = stats?.total_messages ?? (activeCase?.recordCount ? parseInt(String(activeCase.recordCount).replace(/,/g, ''), 10) : 0);
   const waMessages = stats?.whatsapp_messages ?? 0;
   const tgMessages = stats?.telegram_messages ?? 0;
   const carvedCount = stats?.deleted_messages ?? 0;

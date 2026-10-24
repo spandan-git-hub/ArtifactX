@@ -307,7 +307,7 @@ const CorrelationPage = () => {
                     type="number"
                     value={configParams.handover_threshold_seconds}
                     onChange={(e) =>
-                      setConfigParams({ ...configParams, handover_threshold_seconds: e.target.value })
+                      setConfigParams({ ...configParams, handover_threshold_seconds: Number(e.target.value) })
                     }
                     className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-2 text-forensic-100"
                   />
@@ -324,7 +324,7 @@ const CorrelationPage = () => {
                     type="number"
                     value={configParams.media_hamming_distance}
                     onChange={(e) =>
-                      setConfigParams({ ...configParams, media_hamming_distance: e.target.value })
+                      setConfigParams({ ...configParams, media_hamming_distance: Number(e.target.value) })
                     }
                     className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-2 text-forensic-100"
                   />
@@ -340,7 +340,7 @@ const CorrelationPage = () => {
                       type="number"
                       value={configParams.rendezvous_distance_meters}
                       onChange={(e) =>
-                        setConfigParams({ ...configParams, rendezvous_distance_meters: e.target.value })
+                        setConfigParams({ ...configParams, rendezvous_distance_meters: Number(e.target.value) })
                       }
                       className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-2 text-forensic-100"
                     />
@@ -351,7 +351,7 @@ const CorrelationPage = () => {
                       type="number"
                       value={configParams.rendezvous_time_seconds}
                       onChange={(e) =>
-                        setConfigParams({ ...configParams, rendezvous_time_seconds: e.target.value })
+                        setConfigParams({ ...configParams, rendezvous_time_seconds: Number(e.target.value) })
                       }
                       className="w-full bg-forensic-950 border border-forensic-700 rounded-lg p-2 text-forensic-100"
                     />

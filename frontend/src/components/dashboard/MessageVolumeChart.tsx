@@ -117,13 +117,13 @@ const MessageVolumeChart = ({ events = [] }) => {
     ],
   };
 
-  const options = {
+  const options: any = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
-        align: 'end',
+        position: 'top' as const,
+        align: 'end' as const,
         labels: {
           color: '#cbd5e1',
           usePointStyle: true,

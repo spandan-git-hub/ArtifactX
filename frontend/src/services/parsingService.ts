@@ -7,7 +7,7 @@ export const parsingService = {
    * Fetch all accessible files for a given case (standalone evidence items,
    * unencrypted archive members, and decrypted derived artifacts).
    */
-  getAccessibleFiles: async (caseId) => {
+  getAccessibleFiles: async (caseId: any) => {
     const res = await axios.get(`${API_BASE}/cases/${caseId}/parsing/files`);
     return res.data;
   },
@@ -19,7 +19,7 @@ export const parsingService = {
    * - Media: returns preview data URI.
    * - Binary: returns hex dump representation.
    */
-  inspectFile: async (caseId, {
+  inspectFile: async (caseId: any, {
     target_type,
     target_id,
     table_name = null,
@@ -28,8 +28,17 @@ export const parsingService = {
     sort_order = 'asc',
     limit = 100,
     offset = 0,
+  }: {
+    target_type: any;
+    target_id: any;
+    table_name?: string | null;
+    search?: string | null;
+    sort_by?: string | null;
+    sort_order?: string;
+    limit?: number;
+    offset?: number;
   }) => {
-    const params = {
+    const params: Record<string, any> = {
       target_type,
       target_id,
       limit,
@@ -49,11 +58,11 @@ export const parsingService = {
   /**
    * Helper to export table rows as CSV download directly in browser.
    */
-  exportTableCsv: (tableName, columns, rows) => {
+  exportTableCsv: (tableName: string, columns: any[], rows: any[]) => {
     if (!columns || columns.length === 0 || !rows || rows.length === 0) return;
 
     const headers = columns.map(c => typeof c === 'string' ? c : c.name);
-    const escapeCsv = (val) => {
+    const escapeCsv = (val: any) => {
       if (val === null || val === undefined) return '';
       const str = String(val);
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {

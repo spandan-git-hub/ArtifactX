@@ -1,9 +1,42 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { caseService } from '../services/caseService';
 
-const CaseContext = createContext();
+export interface CaseData {
+  id: string | number;
+  caseNumber: string;
+  title: string;
+  examiner: string;
+  agency: string;
+  status: string;
+  integrityState: string;
+  evidenceCount: number;
+  recordCount: string | number;
+  lastPipeline: string;
+  updated: string;
+  createdDate: string;
+  headHash: string;
+  sha256Root: string;
+  blockId: string;
+  description: string;
+  deviceTarget: string;
+  [key: string]: any;
+}
 
-function normalizeCase(c) {
+export interface CaseContextType {
+  cases: CaseData[];
+  activeCaseId: string | null;
+  activeCase: CaseData | null;
+  loading: boolean;
+  switchCase: (id: string | number) => void;
+  addCase: (newCaseData: any) => Promise<CaseData>;
+  deleteCase: (id: string | number) => Promise<void>;
+  setCases: React.Dispatch<React.SetStateAction<CaseData[]>>;
+  refreshCases: () => Promise<void>;
+}
+
+const CaseContext = createContext<CaseContextType>({} as CaseContextType);
+
+function normalizeCase(c: any): CaseData | null {
   if (!c) return null;
   const num = c.case_number || c.caseNumber || `ARX-2026-${String(c.id || '').padStart(3, '0')}`;
   return {
@@ -28,10 +61,10 @@ function normalizeCase(c) {
   };
 }
 
-export function CaseProvider({ children }) {
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeCaseId, setActiveCaseId] = useState(() => {
+export function CaseProvider({ children }: { children: ReactNode }) {
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(() => {
     return localStorage.getItem('arx_active_case_id') || null;
   });
 
@@ -39,7 +72,7 @@ export function CaseProvider({ children }) {
     try {
       const data = await caseService.getCases();
       if (Array.isArray(data)) {
-        const normalized = data.map(normalizeCase);
+        const normalized = data.map(normalizeCase).filter((c): c is CaseData => c !== null);
         setCases(normalized);
         if (normalized.length > 0) {
           setActiveCaseId(prev => {
@@ -57,7 +90,7 @@ export function CaseProvider({ children }) {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          setCases(parsed.map(normalizeCase));
+          setCases(parsed.map(normalizeCase).filter((c: any): c is CaseData => c !== null));
         } catch (e) {
           setCases([]);
         }
@@ -91,11 +124,11 @@ export function CaseProvider({ children }) {
 
   const activeCase = cases.find(c => String(c.id) === String(activeCaseId) || c.caseNumber === activeCaseId) || cases[0] || null;
 
-  const switchCase = (id) => {
+  const switchCase = (id: string | number) => {
     setActiveCaseId(String(id));
   };
 
-  const addCase = async (newCaseData) => {
+  const addCase = async (newCaseData: any): Promise<CaseData> => {
     try {
       const payload = {
         name: newCaseData.title || newCaseData.name || 'Untitled Case',
@@ -105,7 +138,7 @@ export function CaseProvider({ children }) {
         case_number: newCaseData.caseNumber
       };
       const createdFromApi = await caseService.createCase(payload);
-      const normalized = normalizeCase({ ...createdFromApi, ...newCaseData });
+      const normalized = normalizeCase({ ...createdFromApi, ...newCaseData })!;
       setCases(prev => [normalized, ...prev]);
       setActiveCaseId(String(normalized.id));
       return normalized;
@@ -115,14 +148,14 @@ export function CaseProvider({ children }) {
       const localCase = normalizeCase({
         id: tempId,
         ...newCaseData
-      });
+      })!;
       setCases(prev => [localCase, ...prev]);
       setActiveCaseId(String(localCase.id));
       return localCase;
     }
   };
 
-  const deleteCase = async (id) => {
+  const deleteCase = async (id: string | number): Promise<void> => {
     const stringId = String(id);
     const prevCases = [...cases];
     const prevActiveId = activeCaseId;
@@ -146,7 +179,7 @@ export function CaseProvider({ children }) {
     // 2. Perform backend deletion
     try {
       await caseService.deleteCase(backendId);
-    } catch (err) {
+    } catch (err: any) {
       // 404 means case is already gone from DB (or was created locally only) - treat as successful local deletion
       if (err.response?.status === 404) {
         console.warn(`Case ${id} was not in DB, cleaned up locally.`);
@@ -166,7 +199,7 @@ export function CaseProvider({ children }) {
     try {
       const freshData = await caseService.getCases();
       if (Array.isArray(freshData)) {
-        const freshNormalized = freshData.map(normalizeCase);
+        const freshNormalized = freshData.map(normalizeCase).filter((c): c is CaseData => c !== null);
         setCases(freshNormalized);
         if (freshNormalized.length > 0) {
           localStorage.setItem('arx_cases', JSON.stringify(freshNormalized));
@@ -196,7 +229,7 @@ export function CaseProvider({ children }) {
   );
 }
 
-export function useActiveCase() {
+export function useActiveCase(): CaseContextType {
   const context = useContext(CaseContext);
   if (!context) {
     throw new Error('useActiveCase must be used within a CaseProvider');

@@ -75,7 +75,7 @@ export const useMessageSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const search = useCallback(async (caseId, options = {}) => {
+  const search = useCallback(async (caseId: any, options: any = {}) => {
     setLoading(true);
     setError(null);
 
@@ -139,7 +139,7 @@ export const useContactSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const search = useCallback(async (caseId, options = {}) => {
+  const search = useCallback(async (caseId: any, options: any = {}) => {
     setLoading(true);
     setError(null);
 
@@ -201,7 +201,7 @@ export const useMediaSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const search = useCallback(async (caseId, options = {}) => {
+  const search = useCallback(async (caseId: any, options: any = {}) => {
     setLoading(true);
     setError(null);
 

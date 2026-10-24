@@ -93,7 +93,7 @@ const EvidenceInventory = ({ caseId, refreshToken = 0, selectedEvidenceId: propS
     }
   };
 
-  const handleVerifyHashes = async (evidenceId, e) => {
+  const handleVerifyHashes = async (evidenceId: any, e?: any) => {
     if (e) e.stopPropagation();
     setVerifyingEvidenceId(evidenceId);
     setVerificationModalOpen(true);

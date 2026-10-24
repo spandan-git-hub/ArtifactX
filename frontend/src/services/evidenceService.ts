@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_BASE = '/api';
 
 // Upload evidence for a case
-export const uploadEvidence = async (caseId, file) => {
+export const uploadEvidence = async (caseId: any, file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   const response = await axios.post(`${API_BASE}/evidence/upload?case_id=${caseId}`, formData, {
@@ -15,31 +15,31 @@ export const uploadEvidence = async (caseId, file) => {
 };
 
 // List evidences for a case
-export const getEvidences = async (caseId) => {
+export const getEvidences = async (caseId: any) => {
   const response = await axios.get(`${API_BASE}/evidence?case_id=${caseId}`);
   return response.data;
 };
 
 // Get evidence by ID
-export const getEvidence = async (evidenceId) => {
+export const getEvidence = async (evidenceId: any) => {
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}`);
   return response.data;
 };
 
 // List files within an evidence
-export const getEvidenceFiles = async (evidenceId) => {
+export const getEvidenceFiles = async (evidenceId: any) => {
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/files`);
   return response.data;
 };
 
 // Verify evidence cryptographic hashes (SHA-256, MD5, SHA-1)
-export const verifyEvidenceHashes = async (evidenceId) => {
+export const verifyEvidenceHashes = async (evidenceId: any) => {
   const response = await axios.post(`${API_BASE}/evidence/${evidenceId}/verify-hashes`);
   return response.data;
 };
 
 // Download a specific file from evidence
-export const downloadEvidenceFile = async (evidenceId, fileId) => {
+export const downloadEvidenceFile = async (evidenceId: any, fileId: any) => {
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/files/${fileId}`, {
     responseType: 'blob',
   });
@@ -47,26 +47,26 @@ export const downloadEvidenceFile = async (evidenceId, fileId) => {
 };
 
 // Extract EXIF metadata for an evidence file or all images in evidence
-export const getExifMetadata = async (evidenceId, fileId = null) => {
+export const getExifMetadata = async (evidenceId: any, fileId: any = null) => {
   const query = fileId ? `?file_id=${fileId}` : '';
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/exif${query}`);
   return response.data;
 };
 
 // Inspect raw SQLite database tables, schemas, and rows
-export const inspectSqliteDatabase = async (evidenceId, { fileId = null, tableName = null, limit = 50, offset = 0 } = {}) => {
+export const inspectSqliteDatabase = async (evidenceId: any, { fileId = null, tableName = null, limit = 50, offset = 0 }: { fileId?: any; tableName?: any; limit?: number; offset?: number } = {}) => {
   const params = new URLSearchParams();
-  if (fileId) params.append('file_id', fileId);
-  if (tableName) params.append('table_name', tableName);
-  params.append('limit', limit);
-  params.append('offset', offset);
+  if (fileId) params.append('file_id', String(fileId));
+  if (tableName) params.append('table_name', String(tableName));
+  params.append('limit', String(limit));
+  params.append('offset', String(offset));
 
   const response = await axios.get(`${API_BASE}/evidence/${evidenceId}/sqlite-inspect?${params.toString()}`);
   return response.data;
 };
 
 // Delete evidence
-export const deleteEvidence = async (evidenceId) => {
+export const deleteEvidence = async (evidenceId: any) => {
   await axios.delete(`${API_BASE}/evidence/${evidenceId}`);
 };
 

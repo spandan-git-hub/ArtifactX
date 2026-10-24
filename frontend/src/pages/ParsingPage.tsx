@@ -895,8 +895,8 @@ export default function ParsingPage() {
                             alt={inspectData.filename}
                             onLoad={(e) => {
                               setMediaDimensions({
-                                width: e.target.naturalWidth,
-                                height: e.target.naturalHeight
+                                width: e.currentTarget.naturalWidth,
+                                height: e.currentTarget.naturalHeight
                               });
                             }}
                             style={{

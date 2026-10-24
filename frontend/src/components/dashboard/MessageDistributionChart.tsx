@@ -31,13 +31,13 @@ const MessageDistributionChart = ({ stats }) => {
     [waCount, tgCount]
   );
 
-  const options = {
+  const options: any = {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '72%',
     plugins: {
       legend: {
-        position: 'bottom',
+        position: 'bottom' as const,
         labels: {
           color: '#cbd5e1',
           usePointStyle: true,

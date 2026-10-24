@@ -6,7 +6,7 @@ const API_BASE = '/api';
  * Generate a Forensic Evidence Report PDF streamed directly into the browser
  * with zero files stored on the workspace disk.
  */
-export const generateReportStream = async (caseId, options = {}) => {
+export const generateReportStream = async (caseId: any, options: any = {}) => {
   const payload = {
     case_id: parseInt(caseId, 10),
     report_type: options.reportType || 'full',
@@ -63,7 +63,7 @@ export const generateReportStream = async (caseId, options = {}) => {
 /**
  * Fetch past generated report history metadata from database
  */
-export const getReportHistory = async (caseId) => {
+export const getReportHistory = async (caseId: any) => {
   const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/history`);
   return response.data;
 };
@@ -71,7 +71,7 @@ export const getReportHistory = async (caseId) => {
 /**
  * Download a past generated report by report ID via direct streaming
  */
-export const downloadHistoricalReport = async (caseId, reportId, suggestedFilename) => {
+export const downloadHistoricalReport = async (caseId: any, reportId: any, suggestedFilename?: string) => {
   const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/${reportId}/download`, {
     responseType: 'blob',
   });
@@ -97,17 +97,17 @@ export const downloadHistoricalReport = async (caseId, reportId, suggestedFilena
 };
 
 // Summary endpoints
-export const getEvidenceSummary = async (caseId) => {
+export const getEvidenceSummary = async (caseId: any) => {
   const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/summary`);
   return response.data;
 };
 
-export const getTimelineSummary = async (caseId) => {
+export const getTimelineSummary = async (caseId: any) => {
   const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/timeline`);
   return response.data;
 };
 
-export const getDeletedSummary = async (caseId) => {
+export const getDeletedSummary = async (caseId: any) => {
   const response = await axios.get(`${API_BASE}/cases/${caseId}/reports/deleted`);
   return response.data;
 };
@@ -115,7 +115,7 @@ export const getDeletedSummary = async (caseId) => {
 // Backward-compatibility aliases
 export const generateReport = generateReportStream;
 export const generateCourtReportStream = generateReportStream;
-export const downloadReport = (caseId, filename) => {
+export const downloadReport = (caseId: any, filename: string) => {
   window.open(`${API_BASE}/reports/download/${caseId}/${filename}`, '_blank');
 };
 

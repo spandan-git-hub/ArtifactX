@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   MessageSquare,
   Users,
@@ -7,8 +8,16 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-const StatsCard = ({ title, value, icon: Icon, description, color = 'cyan' }) => {
-  const colorMap = {
+interface StatsCardProps {
+  title: string;
+  value: any;
+  icon?: any;
+  description?: string;
+  color?: string;
+}
+
+const StatsCard = ({ title, value, icon: Icon, description, color = 'cyan' }: StatsCardProps) => {
+  const colorMap: Record<string, string> = {
     cyan: 'text-accent-cyan bg-accent-cyan/10',
     emerald: 'text-accent-emerald bg-accent-emerald/10',
     violet: 'text-accent-violet bg-accent-violet/10',
