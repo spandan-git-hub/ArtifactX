@@ -56,8 +56,8 @@ export const formatContactLabel = (rawRef: any): string => {
     return 'Titan Investigation TG Group';
   }
 
-  if (str.startsWith('tg_dialog_')) return `Telegram Dialog #${str.replace('tg_dialog_', '')}`;
-  if (str.startsWith('tg_user_')) return `Telegram User #${str.replace('tg_user_', '')}`;
+  if (str.startsWith('tg_dialog_')) return str.replace('tg_dialog_', '');
+  if (str.startsWith('tg_user_')) return str.replace('tg_user_', '');
 
   // Format WhatsApp numbers: e.g. 19195790479@s.whatsapp.net -> +1 (919) 579-0479
   if (str.endsWith('@s.whatsapp.net')) {

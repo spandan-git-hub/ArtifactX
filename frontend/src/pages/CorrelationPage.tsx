@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import correlationService from '../services/correlationService';
+import { formatContactLabel } from './TimelinePage';
 import {
   GitFork,
   Users,
@@ -644,7 +645,7 @@ const CorrelationPage = () => {
                                 <span className="text-[11px] text-on-surface-variant">{formatDate(h.from_timestamp)}</span>
                               </div>
                               <div className="text-[11px] font-mono text-on-surface-variant">
-                                Sender / Key: <span className="text-on-surface font-semibold">{h.from_sender}</span>
+                                Sender / Key: <span className="text-on-surface font-semibold">{formatContactLabel(h.from_sender)}</span>
                               </div>
                               <div className="text-xs text-on-surface font-sans p-2.5 rounded-lg bg-surface border border-outline-variant/80">
                                 {h.from_body ? (
@@ -665,7 +666,7 @@ const CorrelationPage = () => {
                                 <span className="text-[11px] text-on-surface-variant">{formatDate(h.to_timestamp)}</span>
                               </div>
                               <div className="text-[11px] font-mono text-on-surface-variant">
-                                Recipient / User: <span className="text-on-surface font-semibold">{h.to_sender}</span>
+                                Recipient / User: <span className="text-on-surface font-semibold">{formatContactLabel(h.to_sender)}</span>
                               </div>
                               <div className="text-xs text-on-surface font-sans p-2.5 rounded-lg bg-surface border border-outline-variant/80">
                                 {h.to_body ? (
@@ -1139,7 +1140,7 @@ const CorrelationPage = () => {
                               </span>
                             </div>
                             <div className="text-xs font-mono text-on-surface-variant mb-1.5">
-                              From: <span className="text-on-surface font-semibold">{item.wa_sender_jid}</span>
+                              From: <span className="text-on-surface font-semibold">{formatContactLabel(item.wa_sender_jid)}</span>
                             </div>
                             <div className="text-xs text-on-surface bg-surface p-2.5 rounded-lg border border-outline-variant/60 font-sans">
                               {item.wa_body || <span className="italic text-on-surface-variant">[Media attachment / binary payload]</span>}
@@ -1174,7 +1175,7 @@ const CorrelationPage = () => {
                               </span>
                             </div>
                             <div className="text-xs font-mono text-on-surface-variant mb-1.5">
-                              From User ID: <span className="text-on-surface font-semibold">{item.tg_sender_id}</span>
+                              From: <span className="text-on-surface font-semibold">{formatContactLabel(item.tg_sender_id)}</span>
                             </div>
                             <div className="text-xs text-on-surface bg-surface p-2.5 rounded-lg border border-outline-variant/60 font-sans">
                               {item.tg_body || <span className="italic text-on-surface-variant">[Media attachment / binary payload]</span>}
