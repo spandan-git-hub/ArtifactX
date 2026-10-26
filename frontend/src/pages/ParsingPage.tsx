@@ -82,9 +82,24 @@ export default function ParsingPage() {
     setLoadingFiles(true);
     try {
       const data = await parsingService.getAccessibleFiles(caseId);
-      const files = data?.files || [];
+      const rawFiles = data?.files || [];
+
+      // Ensure strict uniqueness on client side as an extra safeguard
+      const seen = new Set();
+      const files = rawFiles.filter(item => {
+        const key = item.sha256 ? `${item.sha256}_${item.filename}` : (item.id || item.relative_path || item.filename);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       setFileList(files);
-      setCounts(data?.counts || { databases: 0, documents: 0, media: 0, other: 0 });
+      setCounts({
+        databases: files.filter(f => f.category === 'database').length,
+        documents: files.filter(f => f.category === 'document').length,
+        media: files.filter(f => f.category === 'media').length,
+        other: files.filter(f => !['database', 'document', 'media'].includes(f.category)).length,
+      });
 
       // Auto-select once if not selected or if URL specifies target
       if (!autoSelectedRef.current && files.length > 0) {

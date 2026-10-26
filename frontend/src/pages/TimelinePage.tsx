@@ -8,7 +8,15 @@ import { timelineService } from '../services/timelineService';
 export const formatContactLabel = (rawRef: any): string => {
   if (!rawRef) return 'System / Unassigned';
   const str = String(rawRef).trim();
-  if (str === 'me' || str === 'from_me' || str === 'self') return 'Me (Device Owner)';
+  if (
+    str === 'me' ||
+    str === 'from_me' ||
+    str === 'self' ||
+    str === 'tg_user_1001' ||
+    str === '1001'
+  ) {
+    return 'Me (Device Owner)';
+  }
   if (str === 'status@broadcast') return 'WhatsApp Status';
   if (str === '-1') return 'Unassigned Contact';
 
@@ -113,9 +121,18 @@ export const formatEventDateTime = (utcMs?: any, rawTs?: any, normTs?: any) => {
 /** Checks if an event is an outgoing message from the device owner */
 export const isOutgoingEvent = (event: any): boolean => {
   const actor = String(event.actor_ref || '').toLowerCase();
-  if (actor === 'me' || actor === 'from_me' || actor === 'self') return true;
-  if (event.metadata_?.from_me === 1 || event.metadata_?.from_me === true) return true;
-  if (event.metadata_?.is_outgoing === true) return true;
+  if (
+    actor === 'me' ||
+    actor === 'from_me' ||
+    actor === 'self' ||
+    actor === 'tg_user_1001' ||
+    actor === '1001'
+  ) {
+    return true;
+  }
+  const meta = event.metadata_ || event.metadata || {};
+  if (meta.from_me === 1 || meta.from_me === true) return true;
+  if (meta.is_outgoing === true || meta.out === 1 || meta.out === true) return true;
   return false;
 };
 
@@ -725,6 +742,11 @@ export default function TimelinePage() {
 
                       // Revocation Alert Card
                       if (isRevocation) {
+                        const hasRecoveredText = content.includes('[Recovered: "') || (item.metadata_?.recovered_text);
+                        const displayContent = hasRecoveredText
+                          ? content.replace(/.*\[Recovered:\s*"(.*)"\].*/s, '$1') || content
+                          : content;
+
                         return (
                           <div key={idx} className={`flex ${outgoing ? 'justify-end' : 'justify-start'} my-1`}>
                             <div className="max-w-[85%] md:max-w-[75%] rounded-xl p-3 bg-red-500/10 border border-red-500/30 text-on-surface text-xs shadow-xs space-y-2">
@@ -732,15 +754,21 @@ export default function TimelinePage() {
                                 <span className="material-symbols-outlined text-[16px]">delete_forever</span>
                                 <span className="font-bold">This message was deleted ("Revoked for everyone")</span>
                               </div>
-                              <div className="p-2.5 rounded-lg bg-surface border border-outline-variant select-text space-y-1">
-                                <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[13px]">verified</span>
-                                  Forensic Carved Payload Excavated
-                                </span>
-                                <p className="text-xs font-semibold text-on-surface font-sans leading-relaxed">
-                                  {content}
-                                </p>
-                              </div>
+                              {hasRecoveredText ? (
+                                <div className="p-2.5 rounded-lg bg-surface border border-outline-variant select-text space-y-1">
+                                  <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[13px]">verified</span>
+                                    Forensic Carved Payload Excavated
+                                  </span>
+                                  <p className="text-xs font-semibold text-on-surface font-sans leading-relaxed">
+                                    {displayContent}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="p-2 rounded bg-surface/60 border border-outline-variant text-[11px] font-mono text-on-surface-variant italic">
+                                  Deletion marker verified in SQLite evidence. Original payload content was deleted and unrecovered.
+                                </div>
+                              )}
                               <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1 border-t border-outline-variant">
                                 <span>Sender: {formatContactLabel(item.actor_ref)}</span>
                                 <div className="flex items-center gap-2">

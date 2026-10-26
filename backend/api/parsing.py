@@ -152,9 +152,15 @@ def list_accessible_parsing_files(
     )
 
     files_list = []
+    seen_file_sigs = set()
 
     # 1. Add all decrypted derived exhibits (e.g. msgstore_decrypted.db)
     for da in derived_artifacts:
+        sig = (da.sha256, da.original_filename) if da.sha256 else (da.id, da.original_filename)
+        if sig in seen_file_sigs:
+            continue
+        seen_file_sigs.add(sig)
+
         files_list.append({
             "id": f"art_{da.id}",
             "target_type": "derived_artifact",
@@ -180,6 +186,11 @@ def list_accessible_parsing_files(
                 if any(fn_lower.endswith(ext) for ext in [".crypt", ".crypt12", ".crypt14", ".crypt15"]):
                     continue
 
+                sig = (ef.sha256, ef.relative_path.split("/")[-1]) if ef.sha256 else (ef.id, ef.relative_path)
+                if sig in seen_file_sigs:
+                    continue
+                seen_file_sigs.add(sig)
+
                 cat, spec_type = _detect_file_type(ef.relative_path, ef.mime_type)
                 files_list.append({
                     "id": f"file_{ef.id}",
@@ -200,6 +211,11 @@ def list_accessible_parsing_files(
             fn_lower = ev.original_filename.lower()
             if any(fn_lower.endswith(ext) for ext in [".crypt", ".crypt12", ".crypt14", ".crypt15"]):
                 continue
+
+            sig = (ev.sha256, ev.original_filename) if ev.sha256 else (ev.id, ev.original_filename)
+            if sig in seen_file_sigs:
+                continue
+            seen_file_sigs.add(sig)
 
             cat, spec_type = _detect_file_type(ev.original_filename, ev.mime_type)
             files_list.append({
@@ -292,6 +308,26 @@ def inspect_case_file(
         if not ef:
             raise HTTPException(status_code=404, detail="Evidence file member not found.")
         target_bytes = ef.content_bytes
+        if not target_bytes:
+            from backend.utils.file_storage import get_evidence_file_bytes
+            target_bytes = get_evidence_file_bytes(ef)
+        if not target_bytes and ef.evidence:
+            # Fallback to reading from parent evidence archive if zip
+            ev_b = ef.evidence.content_bytes
+            if ev_b and ev_b.startswith(b"PK\x03\x04"):
+                import io, zipfile
+                try:
+                    with zipfile.ZipFile(io.BytesIO(ev_b)) as z:
+                        clean_rel = ef.relative_path.replace("\\", "/")
+                        if clean_rel in z.namelist():
+                            target_bytes = z.read(clean_rel)
+                        else:
+                            for name in z.namelist():
+                                if name.endswith(clean_rel) or clean_rel.endswith(name):
+                                    target_bytes = z.read(name)
+                                    break
+                except Exception:
+                    pass
         filename = ef.relative_path.split("/")[-1]
         relative_path = ef.relative_path
         size_bytes = ef.file_size or (len(target_bytes) if target_bytes else 0)
@@ -308,6 +344,9 @@ def inspect_case_file(
         if not ev:
             raise HTTPException(status_code=404, detail="Evidence item not found.")
         target_bytes = ev.content_bytes
+        if not target_bytes:
+            from backend.utils.file_storage import get_evidence_bytes
+            target_bytes = get_evidence_bytes(ev)
         filename = ev.original_filename
         relative_path = ev.original_filename
         size_bytes = ev.file_size_bytes or (len(target_bytes) if target_bytes else 0)
@@ -319,7 +358,7 @@ def inspect_case_file(
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported target_type: {target_type}")
 
-    if not target_bytes:
+    if target_bytes is None:
         raise HTTPException(status_code=404, detail="Target file buffer is unavailable in storage.")
 
     # 2. Check if file is an SQLite database

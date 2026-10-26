@@ -415,6 +415,9 @@ class PureTimelineBuilder:
                 raw_time=raw_date,
                 key_facts={"dialog_id": dialog_id or 0, "view": view},
             )
+            out_val = _dict_val(msg, "out")
+            is_outgoing = bool(out_val == 1 or out_val is True)
+
             event = TimelineEvent(
                 event_id=eid,
                 kind="message",
@@ -427,7 +430,13 @@ class PureTimelineBuilder:
                 confidence_score=1.0,
                 strength="deterministic",
                 limitations=(),
-                metadata={"dialog_id": dialog_id, "sender_id": sender_id, "view": view},
+                metadata={
+                    "dialog_id": dialog_id,
+                    "sender_id": sender_id,
+                    "view": view,
+                    "out": 1 if is_outgoing else 0,
+                    "is_outgoing": is_outgoing,
+                },
             )
             events.append(event)
 

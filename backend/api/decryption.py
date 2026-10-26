@@ -276,34 +276,64 @@ def run_decryption(
         else:
             derived_filename = f"{base_name}_decrypted"
 
-        # 4. Persist derived artifact to PostgreSQL BYTEA (Zero disk writes, R4)
+        # 4. Persist derived artifact to PostgreSQL BYTEA (Zero disk writes, R4, Idempotent)
         comp_utc = datetime.now(timezone.utc)
-        derived = DerivedArtifact(
-            case_id=evidence.case_id,
-            parent_evidence_id=evidence.id,
-            parent_file_id=resolved_file_id,
-            original_filename=derived_filename,
-            artifact_type=artifact_type,
-            sha256=output_sha256,
-            size_bytes=len(decrypted_bytes),
-            mime_type=meta.get("operation_details", {}).get("mime_type") or ("application/x-sqlite3" if artifact_type == "decrypted_sqlite" else "application/octet-stream"),
-            content_bytes=decrypted_bytes,
-            provenance=_clean_pg_text({
-                "operation_id": op.id,
-                "source_evidence_id": evidence.id,
-                "source_sha256": input_sha256,
-                "format": meta.get("format"),
-                "method": f"{meta.get('format', '').upper()}_DECRYPT",
-                "tool_version": "ArtifactX-1.0.0",
-                "output_sha256": output_sha256,
-                "validation_report": meta.get("operation_details", {}).get("validation", {}),
-                "decrypted_at": comp_utc.isoformat(),
-            }),
-            created_at=comp_utc,
+        existing_derived = (
+            db.query(DerivedArtifact)
+            .filter(
+                DerivedArtifact.case_id == evidence.case_id,
+                (
+                    (DerivedArtifact.sha256 == output_sha256)
+                    | (
+                        (DerivedArtifact.parent_evidence_id == evidence.id)
+                        & (DerivedArtifact.parent_file_id == resolved_file_id)
+                        & (DerivedArtifact.artifact_type == artifact_type)
+                    )
+                ),
+            )
+            .first()
         )
-        db.add(derived)
-        db.commit()
-        db.refresh(derived)
+
+        provenance_payload = _clean_pg_text({
+            "operation_id": op.id,
+            "source_evidence_id": evidence.id,
+            "source_sha256": input_sha256,
+            "format": meta.get("format"),
+            "method": f"{meta.get('format', '').upper()}_DECRYPT",
+            "tool_version": "ArtifactX-1.0.0",
+            "output_sha256": output_sha256,
+            "validation_report": meta.get("operation_details", {}).get("validation", {}),
+            "decrypted_at": comp_utc.isoformat(),
+        })
+
+        if existing_derived:
+            derived = existing_derived
+            derived.original_filename = derived_filename
+            derived.sha256 = output_sha256
+            derived.size_bytes = len(decrypted_bytes)
+            derived.mime_type = meta.get("operation_details", {}).get("mime_type") or ("application/x-sqlite3" if artifact_type == "decrypted_sqlite" else "application/octet-stream")
+            derived.content_bytes = decrypted_bytes
+            derived.provenance = provenance_payload
+            derived.created_at = comp_utc
+            db.commit()
+            db.refresh(derived)
+        else:
+            derived = DerivedArtifact(
+                case_id=evidence.case_id,
+                parent_evidence_id=evidence.id,
+                parent_file_id=resolved_file_id,
+                original_filename=derived_filename,
+                artifact_type=artifact_type,
+                sha256=output_sha256,
+                size_bytes=len(decrypted_bytes),
+                mime_type=meta.get("operation_details", {}).get("mime_type") or ("application/x-sqlite3" if artifact_type == "decrypted_sqlite" else "application/octet-stream"),
+                content_bytes=decrypted_bytes,
+                provenance=provenance_payload,
+                created_at=comp_utc,
+            )
+            db.add(derived)
+            db.commit()
+            db.refresh(derived)
 
         # Attempt automatic forensic indexing of decrypted SQLite database
         if artifact_type == "decrypted_sqlite":
@@ -660,6 +690,17 @@ def get_case_decryption_inventory(
                         )
                     )
 
+    # Deduplicate discovered keys by sha256 or key file ID/filename
+    seen_key_sigs = set()
+    unique_discovered_keys: List[DiscoveredKeyInfo] = []
+    for dk in discovered_keys:
+        sig = (dk.key_file_id, dk.autofill_value, dk.filename)
+        if sig in seen_key_sigs:
+            continue
+        seen_key_sigs.add(sig)
+        unique_discovered_keys.append(dk)
+    discovered_keys = unique_discovered_keys
+
     # 2. Build map of existing DerivedArtifacts to mark encrypted files that have already been decrypted
     derived_parent_file_ids = {a.parent_file_id: a for a in derived_artifacts if a.parent_file_id}
     derived_parent_ev_ids = {a.parent_evidence_id: a for a in derived_artifacts if not a.parent_file_id}
@@ -667,8 +708,14 @@ def get_case_decryption_inventory(
     encrypted_files: List[EncryptedFileInfo] = []
     directly_usable: List[DirectlyUsableFileInfo] = []
 
-    # 3. Add derived artifacts directly to directly_usable section
+    # 3. Add derived artifacts directly to directly_usable section (deduplicated by sha256 and filename)
+    seen_derived_sha = set()
     for da in derived_artifacts:
+        sig = (da.sha256, da.original_filename) if da.sha256 else da.id
+        if sig in seen_derived_sha:
+            continue
+        seen_derived_sha.add(sig)
+
         t_cnt, t_names = _inspect_sqlite_tables(da.content_bytes) if da.artifact_type == "decrypted_sqlite" else (0, [])
         directly_usable.append(
             DirectlyUsableFileInfo(
@@ -691,6 +738,15 @@ def get_case_decryption_inventory(
         )
 
     # 4. Process all evidence files
+    seen_encrypted_sig = set()
+    seen_usable_sig = set()
+
+    # Pre-populate seen_usable_sig with derived artifacts to prevent duplicate plaintexts
+    for d in directly_usable:
+        if d.sha256:
+            seen_usable_sig.add(("sha", d.sha256))
+        seen_usable_sig.add(("path", d.filename))
+
     for ev in evidence_items:
         items_to_check = []
         if ev.files:
@@ -722,6 +778,12 @@ def get_case_decryption_inventory(
             is_enc = any(fn_lower.endswith(ext) for ext in [".crypt", ".crypt12", ".crypt14", ".crypt15", ".enc"])
 
             if is_enc:
+                # Deduplicate identical encrypted files
+                enc_sig = (h_sha256, fname) if h_sha256 else (ev_id, ef_id, rel_path)
+                if enc_sig in seen_encrypted_sig:
+                    continue
+                seen_encrypted_sig.add(enc_sig)
+
                 # Determine format
                 detected_fmt = "crypt15" if fn_lower.endswith(".crypt15") else ("crypt14" if fn_lower.endswith(".crypt14") else ("crypt12" if fn_lower.endswith(".crypt12") else "encrypted"))
                 fmt_name = "WhatsApp Crypt15 (AES-256-GCM)" if detected_fmt == "crypt15" else ("WhatsApp Crypt14 (AES-256-CTR)" if detected_fmt == "crypt14" else "Encrypted Database")
@@ -784,6 +846,11 @@ def get_case_decryption_inventory(
                     )
                 )
             else:
+                usable_sig = (h_sha256, fname) if h_sha256 else (ev_id, ef_id, rel_path)
+                if usable_sig in seen_usable_sig:
+                    continue
+                seen_usable_sig.add(usable_sig)
+
                 cat = _detect_file_category(fname, mime)
                 t_cnt, t_names = (0, [])
                 if cat == "database":

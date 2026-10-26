@@ -37,7 +37,26 @@ export default function DecryptionPage() {
     else setRefreshing(true);
 
     try {
-      const data = await decryptionService.getInventory(caseId);
+      const raw = await decryptionService.getInventory(caseId);
+      // Ensure strict uniqueness on client side as an extra safeguard
+      const dedupeByShaOrPath = (list) => {
+        if (!Array.isArray(list)) return [];
+        const seen = new Set();
+        return list.filter(item => {
+          const key = item.sha256 ? `${item.sha256}_${item.filename}` : (item.id || item.relative_path || item.filename);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      const data = raw ? {
+        ...raw,
+        encrypted_files: dedupeByShaOrPath(raw.encrypted_files),
+        directly_usable_files: dedupeByShaOrPath(raw.directly_usable_files),
+        discovered_keys: dedupeByShaOrPath(raw.discovered_keys),
+      } : raw;
+
       setInventory(data);
 
       // Pre-fill default autofill candidate keys if not already manually typed

@@ -149,10 +149,20 @@ def resolve_evidence_path(storage_path: Optional[str]) -> Optional[Path]:
         if c2.is_file() or c2.is_dir():
             return c2
 
-        # Check BASE_DIR / path
+        # Check UPLOADS_DIR / path
         c3 = BASE_DIR / p
         if c3.is_file() or c3.is_dir():
             return c3
+
+        # Check inside subdirectories of UPLOADS_DIR (e.g. case folders uploads/ARX-2026-001/...)
+        for sub in UPLOADS_DIR.iterdir():
+            if sub.is_dir():
+                sub_p = sub / p.name
+                if sub_p.is_file() or sub_p.is_dir():
+                    return sub_p
+                sub_rel = sub / p
+                if sub_rel.is_file() or sub_rel.is_dir():
+                    return sub_rel
     except Exception:
         pass
     return None
@@ -204,6 +214,33 @@ def resolve_evidence_file_path(evidence_file: Any) -> Optional[Path]:
     if c2.is_file():
         return c2
 
+    # 3. Check inside case folders / extract folders under UPLOADS_DIR
+    norm_name = Path(rel_path).name
+    safe_rel = rel_path.replace("::", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace('"', "_").replace("<", "_").replace(">", "_").replace("|", "_")
+    for case_sub in UPLOADS_DIR.iterdir():
+        if case_sub.is_dir():
+            sub_cand = case_sub / rel_path
+            if sub_cand.is_file():
+                return sub_cand
+            sub_cand_safe = case_sub / safe_rel
+            if sub_cand_safe.is_file():
+                return sub_cand_safe
+            sub_name = case_sub / norm_name
+            if sub_name.is_file():
+                return sub_name
+            # Check extract_* subdirectories inside case folder
+            for sub_extract in case_sub.glob("extract_*"):
+                if sub_extract.is_dir():
+                    ext_cand = sub_extract / rel_path
+                    if ext_cand.is_file():
+                        return ext_cand
+                    ext_cand_safe = sub_extract / safe_rel
+                    if ext_cand_safe.is_file():
+                        return ext_cand_safe
+                    ext_cand_name = sub_extract / norm_name
+                    if ext_cand_name.is_file():
+                        return ext_cand_name
+
     return None
 
 
@@ -233,7 +270,7 @@ def get_evidence_bytes(evidence: Any) -> Optional[bytes]:
 
 
 def get_evidence_file_bytes(evidence_file: Any) -> Optional[bytes]:
-    """Retrieve raw file bytes for EvidenceFile from in-memory bytes or disk in uploads."""
+    """Retrieve raw file bytes for EvidenceFile from in-memory bytes, disk in uploads, or parent archive."""
     if evidence_file is None:
         return None
 
@@ -241,14 +278,39 @@ def get_evidence_file_bytes(evidence_file: Any) -> Optional[bytes]:
     if internal_bytes is not None:
         return internal_bytes
 
-    cb = getattr(evidence_file, "content_bytes", None)
-    if cb is not None:
-        return cb
-
     p = resolve_evidence_file_path(evidence_file)
     if p and p.is_file():
         try:
             return p.read_bytes()
         except Exception:
-            return None
+            pass
+
+    # If the file record exists with file_size == 0 or empty hash, return empty bytes
+    sha = getattr(evidence_file, "sha256", None)
+    f_size = getattr(evidence_file, "file_size", None)
+    if f_size == 0 or sha == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855":
+        return b""
+
+    # Fallback to parent evidence archive if zip
+    evidence = getattr(evidence_file, "evidence", None)
+    if evidence:
+        ev_b = get_evidence_bytes(evidence)
+        if ev_b and ev_b.startswith(b"PK\x03\x04"):
+            import io, zipfile
+            try:
+                with zipfile.ZipFile(io.BytesIO(ev_b)) as z:
+                    rel_path = getattr(evidence_file, "relative_path", "")
+                    clean_rel = rel_path.replace("\\", "/")
+                    if clean_rel in z.namelist():
+                        return z.read(clean_rel)
+                    for name in z.namelist():
+                        if name.endswith(clean_rel) or clean_rel.endswith(name):
+                            return z.read(name)
+            except Exception:
+                pass
+
+    cb = getattr(evidence_file, "content_bytes", None)
+    if cb is not None:
+        return cb
+
     return None

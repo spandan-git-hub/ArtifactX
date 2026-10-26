@@ -29,7 +29,18 @@ export default function RecoveryPage() {
       const data: any = await recoveryService.getRecoveryFindings(caseId);
       const findings = Array.isArray(data) ? data : (data?.findings || []);
 
-      const mapped = findings.map((f, i) => {
+      // Ensure findings are strictly unique (prevent identical carved rows or duplicate runs from repeating)
+      const seenFindingKeys = new Set<string>();
+      const uniqueFindings = findings.filter((f: any) => {
+        const key = f.finding_id || `${f.source_app}_${f.table_name || ''}_${f.row_id || ''}_${f.raw_payload_hash || ''}_${f.byte_offset || ''}_${f.frame_index || ''}`;
+        if (seenFindingKeys.has(key)) {
+          return false;
+        }
+        seenFindingKeys.add(key);
+        return true;
+      });
+
+      const mapped = uniqueFindings.map((f: any, i: number) => {
         const tier = f.tier || (f.kind in { revocation: 1, edit: 1 } ? 1 : (f.method === 'wal' ? 2 : (f.kind === 'id_gap' ? 4 : 3)));
         const tierNames = {
           1: 'Tier 1: Explicit Deletion',
@@ -72,6 +83,20 @@ export default function RecoveryPage() {
             : `Physically carved from SQLite unallocated/freelist cell in '${sourceFile}' (Table '${sourceTable}', Page #${f.page_number || 0}, Offset ${offsetHex}) from Exhibit #${exhibitId}.`
         );
 
+        // Only treat as recovered text if candidate_original_text or body is actually non-empty
+        const actualText = f.candidate_original_text || f.body || null;
+        const hasPayload = Boolean(actualText && actualText.trim() && !actualText.startsWith('[Carved cell'));
+        const isGap = tier === 4 || f.kind === 'id_gap';
+        const isRevocationOnly = (tier === 1 && f.kind === 'revocation' && !hasPayload);
+
+        const defaultSnippet = isGap
+          ? `Sequence continuity gap detected (RowIDs #${recFields.gap_start || rowId}..#${recFields.gap_end || rowId}) — no payload preserved`
+          : isRevocationOnly
+          ? `Deletion marker recorded in '${sourceTable}' (RowID #${rowId}, Key '${keyId}') — original message body deleted and not preserved in SQLite evidence`
+          : f.raw_payload_preview || '[No message payload recovered]';
+
+        const snippet = actualText || defaultSnippet;
+
         return {
           id: f.id || `rec-${i}`,
           tier,
@@ -90,9 +115,10 @@ export default function RecoveryPage() {
           confidence,
           strength,
           timestamp: f.timestamp ? (new Date(typeof f.timestamp === 'number' && f.timestamp > 100000000000 ? f.timestamp : f.timestamp * 1000).toISOString().replace('T', ' ').substring(0, 19) + ' UTC') : 'Recorded in artifact',
-          sender: f.sender_id || f.chat_id || 'Recovered Fragment',
+          sender: f.sender_id || f.chat_id || (isRevocationOnly ? 'Revoked Message Marker' : isGap ? 'ID Sequence Gap' : 'Recovered Fragment'),
           chatId: f.chat_id || '—',
-          snippet: f.candidate_original_text || f.body || f.raw_payload_preview || '[Carved cell payload]',
+          hasPayload,
+          snippet,
           hexDump: f.raw_payload_preview || f.hex_dump || '',
           walFrameNumber: f.frame_index ? `Frame #${f.frame_index}` : (f.page_number ? `Page #${f.page_number}` : 'Slack Cell'),
           offset: offsetHex,
@@ -215,16 +241,6 @@ export default function RecoveryPage() {
           </div>
         )}
 
-        {/* Top Physical Excavation One-Liner Description Banner */}
-        <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
-          <div className="text-xs font-mono text-on-surface">
-            <span className="font-bold text-primary">Physical B-Tree &amp; WAL Carving Engine: </span>
-            Excavates revoked messages, uncheckpointed WAL transaction frames, and unallocated freelist cells directly from raw database files (<code className="text-emerald-400 font-bold">msgstore.db</code>, <code className="text-cyan-400 font-bold">cache4.db</code>) with exact byte offsets, table names, and row coordinates.
-          </div>
-          <span className="px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-            {records.length} Residual Findings
-          </span>
-        </div>
 
         {/* 4 Different Tiers Classification Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1 text-xs">
@@ -449,10 +465,24 @@ export default function RecoveryPage() {
 
                 <div className="text-body-sm font-semibold text-on-surface truncate flex items-center justify-between">
                   <span>{r.sender}</span>
-                  <span className="text-[10px] font-mono text-outline">{r.sourceApp.toUpperCase()}</span>
+                  <div className="flex items-center gap-1.5">
+                    {r.hasPayload ? (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[11px]">verified</span>
+                        Payload
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface border border-outline-variant text-on-surface-variant">
+                        Marker Only
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono text-outline">{r.sourceApp.toUpperCase()}</span>
+                  </div>
                 </div>
 
-                <p className="text-body-sm text-on-surface-variant line-clamp-2 select-text font-sans text-xs">
+                <p className={`text-body-sm line-clamp-2 select-text text-xs ${
+                  r.hasPayload ? 'font-sans text-on-surface font-medium' : 'font-mono text-on-surface-variant italic'
+                }`}>
                   {r.snippet}
                 </p>
 
@@ -540,9 +570,35 @@ export default function RecoveryPage() {
               </div>
 
               {/* Reconstructed Payload Box */}
-              <div className="p-3 bg-surface-container rounded-lg border border-outline-variant space-y-1">
-                <div className="text-[10px] font-mono text-outline uppercase tracking-wider">RECONSTRUCTED PAYLOAD CONTENT</div>
-                <div className="text-body-sm text-on-surface select-text whitespace-pre-wrap">{selectedRecord.snippet}</div>
+              <div className={`p-3.5 bg-surface-container rounded-lg border space-y-2 ${
+                selectedRecord.hasPayload
+                  ? 'border-emerald-500/40 bg-emerald-950/10'
+                  : 'border-outline-variant bg-surface-container'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className={`text-[10px] font-mono uppercase tracking-wider font-bold flex items-center gap-1.5 ${
+                    selectedRecord.hasPayload ? 'text-emerald-400' : 'text-on-surface-variant'
+                  }`}>
+                    <span className="material-symbols-outlined text-[15px]">
+                      {selectedRecord.hasPayload ? 'verified' : 'info'}
+                    </span>
+                    {selectedRecord.hasPayload
+                      ? 'EXCAVATED MESSAGE PAYLOAD (FOUND IN EVIDENCE)'
+                      : 'DELETION / GAP ARTIFACT (NO MESSAGE PAYLOAD)'}
+                  </div>
+                  {!selectedRecord.hasPayload && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-outline-variant text-amber-500">
+                      Zero Content Recovered
+                    </span>
+                  )}
+                </div>
+                <div className={`text-body-sm select-text whitespace-pre-wrap leading-relaxed ${
+                  selectedRecord.hasPayload
+                    ? 'text-on-surface font-sans text-sm font-medium'
+                    : 'text-on-surface-variant font-mono text-xs italic bg-surface/60 p-2.5 rounded border border-outline-variant/60'
+                }`}>
+                  {selectedRecord.snippet}
+                </div>
               </div>
 
               {/* Technical Provenance Grid */}

@@ -99,10 +99,6 @@ class Evidence(Base):
             return self._content_bytes
         from backend.utils.file_storage import resolve_evidence_path, BASE_DIR
         p = resolve_evidence_path(self.storage_path)
-        if (not p or not p.is_file()) and self.original_filename:
-            input_cand = BASE_DIR / "INPUTS" / self.original_filename
-            if input_cand.is_file():
-                p = input_cand
         if p and p.is_file():
             try:
                 return p.read_bytes()
@@ -231,6 +227,11 @@ class EvidenceFile(Base):
                                 return z.read(name)
                 except Exception:
                     pass
+
+        # If the file is recorded as 0 bytes or empty sha256 hash
+        if getattr(self, "file_size", None) == 0 or getattr(self, "sha256", None) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855":
+            return b""
+
         return None
 
     def _set_file_bytes(self, value):

@@ -17,7 +17,7 @@ export const recoveryService = {
 
   // List physically carved findings
   getRecoveryFindings: async (caseId: any, params: any = {}): Promise<any[]> => {
-    const findings: any[] = [];
+    const rawFindings: any[] = [];
     const limit = 1000;
     let offset = 0;
     while (true) {
@@ -26,15 +26,25 @@ export const recoveryService = {
       });
       const page = response.data;
       if (Array.isArray(page)) {
-        findings.push(...page);
-        if (page.length < limit) return findings;
+        rawFindings.push(...page);
+        if (page.length < limit) break;
         offset += page.length;
       } else if (page?.findings && Array.isArray(page.findings)) {
-        return page.findings;
+        rawFindings.push(...page.findings);
+        break;
       } else {
-        return findings;
+        break;
       }
     }
+
+    // Deduplicate findings by finding_id or composite identity
+    const seen = new Set<string>();
+    return rawFindings.filter((f: any) => {
+      const key = f.finding_id || (f.id ? `id_${f.id}` : `${f.source_app}_${f.table_name}_${f.byte_offset}_${f.raw_payload_hash}`);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   },
 
   // Get specific carved finding detail

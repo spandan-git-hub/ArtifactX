@@ -212,6 +212,9 @@ def run_physical_recovery(
             ev_tier_counts: Dict[int, int] = {}
             ev_rejected_count = 0
 
+            # Track seen finding identifiers within this evidence processing run to avoid repetitions
+            seen_finding_keys = set()
+
             for cand in db_candidates:
                 pipeline = RecoveryPipeline(
                     db_bytes=cand["bytes"],
@@ -225,13 +228,19 @@ def run_physical_recovery(
                 total_wal_pages += res.wal_pages_analyzed
                 total_freelist_pages += res.freelist_pages_analyzed
                 total_slack_spans += res.slack_spans_analyzed
-                ev_findings_count += res.total_findings_count
                 ev_rejected_count += res.invalid_rejected_count
-                for t, c in res.tier_counts.items():
-                    ev_tier_counts[t] = ev_tier_counts.get(t, 0) + c
 
                 for f in res.findings:
-                    rf = f.recovered_fields
+                    rf = f.recovered_fields or {}
+                    finding_key = f.finding_id or f"{cand['app_hint']}_{f.table_name}_{f.row_id or rf.get('message_row_id')}_{f.raw_payload_hash}_{f.byte_offset}_{f.frame_index}"
+                    if finding_key in seen_finding_keys:
+                        continue
+                    seen_finding_keys.add(finding_key)
+
+                    ev_findings_count += 1
+                    t = f.tier or 3
+                    ev_tier_counts[t] = ev_tier_counts.get(t, 0) + 1
+
                     body_val = rf.get("body")
                     key_val = rf.get("key_id") or str(rf.get("mid") or "")
                     chat_val = str(rf.get("chat_id") or rf.get("uid") or "")
