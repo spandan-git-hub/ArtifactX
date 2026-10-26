@@ -251,7 +251,7 @@ class CorrelationService:
 
         # 4. Perceptual Media Correlation (B12.4)
         orm_media = db.query(ORMMediaItem).filter(ORMMediaItem.case_id == case_id).all()
-        case_ev_ids = [e.id for e in db.query(Evidence).filter(Evidence.case_id == case_id).all()]
+        case_ev_ids = [e.id for e in db.query(Evidence.id).filter(Evidence.case_id == case_id).all()]
         
         # Load content_bytes only when necessary using load_only (R19)
         media_records = []
@@ -260,20 +260,30 @@ class CorrelationService:
             dhash_val = exif.get("dhash")
             phash_val = exif.get("phash")
 
-            if not dhash_val:
-                ef = db.query(EvidenceFile).options(
-                    load_only(EvidenceFile.id, EvidenceFile.content_bytes, EvidenceFile.sha256)
-                ).filter(EvidenceFile.sha256 == m.sha256).first()
+            if not dhash_val and m.sha256 and case_ev_ids:
+                raw_bytes = None
+                if m.file_path and os.path.isfile(m.file_path):
+                    try:
+                        raw_bytes = Path(m.file_path).read_bytes()
+                    except Exception:
+                        pass
 
-                if ef and ef.content_bytes:
+                if raw_bytes is None:
+                    ef = db.query(EvidenceFile).options(
+                        load_only(EvidenceFile.id, EvidenceFile.content_bytes, EvidenceFile.sha256)
+                    ).filter(EvidenceFile.evidence_id.in_(case_ev_ids), EvidenceFile.sha256 == m.sha256).first()
+                    if ef and ef.content_bytes:
+                        raw_bytes = ef.content_bytes
+
+                if raw_bytes:
                     try:
                         dhash_val = compute_dhash(
-                            ef.content_bytes,
+                            raw_bytes,
                             min_dimension=thresholds.min_image_dimension,
                             min_entropy=thresholds.min_image_entropy,
                         )
                         phash_val = compute_phash(
-                            ef.content_bytes,
+                            raw_bytes,
                             min_dimension=thresholds.min_image_dimension,
                             min_entropy=thresholds.min_image_entropy,
                         )
@@ -623,11 +633,12 @@ class CorrelationService:
                     "to_message_id": right.get("message_id", ""),
                     "from_timestamp": left.get("timestamp"),
                     "to_timestamp": right.get("timestamp"),
-                    "from_sender": left.get("sender", "Alice"),
-                    "to_sender": right.get("sender", "Bob"),
-                    "from_body": left.get("snippet", ""),
-                    "to_body": right.get("snippet", ""),
+                    "from_sender": left.get("sender", "WhatsApp User"),
+                    "to_sender": right.get("sender", "Telegram User"),
+                    "from_body": left.get("body_snippet") or left.get("snippet", ""),
+                    "to_body": right.get("body_snippet") or right.get("snippet", ""),
                     "transition_keywords": prov.get("transition_keywords", []),
+                    "rationale": prov.get("rationale", ""),
                     "limitations": f.limitations or [],
                     "provenance": prov,
                 })
@@ -807,23 +818,24 @@ class CorrelationService:
         has_whatsapp = bool(wa_msgs or wa_cnts)
         has_telegram = bool(tg_msgs or tg_cnts)
 
-        for e in evidences:
-            app = ((e.metadata_ or {}).get("app") or "").lower()
-            fn = (e.original_filename or "").lower()
-            sp = (e.storage_path or "").lower()
+        if not (has_whatsapp and has_telegram):
+            for e in evidences:
+                app = ((e.metadata_ or {}).get("app") or "").lower()
+                fn = (e.original_filename or "").lower()
+                sp = (e.storage_path or "").lower()
 
-            if app == "whatsapp" or "whatsapp" in fn or "msgstore" in fn or "wa.db" in sp:
-                has_whatsapp = True
-            if app == "telegram" or "telegram" in fn or "cache4" in fn or "tg.db" in sp or "userconf" in fn:
-                has_telegram = True
-
-            files = db.query(EvidenceFile).filter(EvidenceFile.evidence_id == e.id).all()
-            for f in files:
-                rp = (getattr(f, "relative_path", "") or getattr(f, "file_path", "") or "").lower()
-                if "msgstore" in rp or "wa.db" in rp or "whatsapp" in rp:
+                if app == "whatsapp" or "whatsapp" in fn or "msgstore" in fn or "wa.db" in sp:
                     has_whatsapp = True
-                if "cache4" in rp or "tg.db" in rp or "telegram" in rp or "userconf" in rp:
+                if app == "telegram" or "telegram" in fn or "cache4" in fn or "tg.db" in sp or "userconf" in fn:
                     has_telegram = True
+
+            if not (has_whatsapp and has_telegram):
+                paths = [p[0].lower() for p in db.query(EvidenceFile.relative_path).filter(EvidenceFile.evidence_id.in_(ev_ids)).all() if p[0]]
+                for rp in paths:
+                    if "msgstore" in rp or "wa.db" in rp or "whatsapp" in rp:
+                        has_whatsapp = True
+                    if "cache4" in rp or "tg.db" in rp or "telegram" in rp or "userconf" in rp:
+                        has_telegram = True
 
         return {
             "has_whatsapp": has_whatsapp,

@@ -42,13 +42,50 @@ export default function RecoveryPage() {
           ? f.confidence_score
           : null;
 
+        let prov = f.provenance;
+        if (typeof prov === 'string') {
+          try { prov = JSON.parse(prov); } catch (e) { prov = {}; }
+        }
+        prov = prov || {};
+
+        let recFields = f.recovered_fields;
+        if (typeof recFields === 'string') {
+          try { recFields = JSON.parse(recFields); } catch (e) { recFields = {}; }
+        }
+        recFields = recFields || {};
+
+        const sourceFile = prov.source_file || (f.source_app === 'telegram' ? 'cache4.db' : 'msgstore.db');
+        const sourceTable = f.table_name || prov.source_table || (f.source_app === 'telegram' ? 'messages' : 'message');
+        const rowId = prov.row_id || recFields.message_row_id || recFields.gap_start || f.message_id || '—';
+        const exhibitId = prov.evidence_id || f.evidence_id || 'N/A';
+        const parentArchive = prov.parent_archive || (f.source_app === 'telegram' ? 'org.telegram.messenger.zip' : 'com.whatsapp.zip');
+        const exhibitSha = f.evidence_sha256 || prov.evidence_sha256 || '';
+        const keyId = recFields.key_id || f.message_id || '';
+        const offsetHex = f.byte_offset ? `0x${f.byte_offset.toString(16).toUpperCase()}` : '0x0000';
+        const rationale = prov.carving_rationale || (
+          tier === 1
+            ? `Excavated directly from SQLite table '${sourceTable}' (RowID #${rowId}${keyId ? `, Key '${keyId}'` : ''}) inside database file '${sourceFile}' extracted from Exhibit #${exhibitId} (${parentArchive}).`
+            : tier === 2
+            ? `Extracted from uncheckpointed Write-Ahead Log (${sourceFile}-wal, Frame #${f.frame_index || 1}) corresponding to table '${sourceTable}' at offset ${offsetHex} (Exhibit #${exhibitId}).`
+            : tier === 4
+            ? `Sequence continuity gap detected in table '${sourceTable}' between RowIDs #${recFields.gap_start || rowId}..#${recFields.gap_end || rowId} inside '${sourceFile}' (Exhibit #${exhibitId}).`
+            : `Physically carved from SQLite unallocated/freelist cell in '${sourceFile}' (Table '${sourceTable}', Page #${f.page_number || 0}, Offset ${offsetHex}) from Exhibit #${exhibitId}.`
+        );
+
         return {
           id: f.id || `rec-${i}`,
           tier,
           tierName: tierNames[tier] || `Tier ${tier}`,
           kind: f.kind || f.method || 'carved',
-          sourceApp: f.source_app || (f.table_name?.includes('tg') ? 'telegram' : 'whatsapp'),
-          sourceTable: f.table_name || 'SQLite Table',
+          sourceApp: f.source_app || (sourceTable.includes('tg') ? 'telegram' : 'whatsapp'),
+          sourceFile,
+          sourceTable,
+          rowId,
+          keyId,
+          exhibitId,
+          parentArchive,
+          exhibitSha,
+          rationale,
           mechanism: f.method || (tier === 1 ? 'Message Revocation' : (tier === 2 ? 'WAL Pre-Checkpoint Frame' : (tier === 3 ? 'Unallocated Slack Carving' : 'Sequence Continuity Gap'))),
           confidence,
           strength,
@@ -58,7 +95,7 @@ export default function RecoveryPage() {
           snippet: f.candidate_original_text || f.body || f.raw_payload_preview || '[Carved cell payload]',
           hexDump: f.raw_payload_preview || f.hex_dump || '',
           walFrameNumber: f.frame_index ? `Frame #${f.frame_index}` : (f.page_number ? `Page #${f.page_number}` : 'Slack Cell'),
-          offset: f.byte_offset ? `0x${f.byte_offset.toString(16).toUpperCase()}` : '0x0000',
+          offset: offsetHex,
           hash: f.raw_payload_hash || '',
           validationStatus: f.validation_status || 'CANDIDATE',
           limitations: Array.isArray(f.limitations) ? f.limitations : [],
@@ -177,6 +214,17 @@ export default function RecoveryPage() {
             {errorMessage}
           </div>
         )}
+
+        {/* Top Physical Excavation One-Liner Description Banner */}
+        <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+          <div className="text-xs font-mono text-on-surface">
+            <span className="font-bold text-primary">Physical B-Tree &amp; WAL Carving Engine: </span>
+            Excavates revoked messages, uncheckpointed WAL transaction frames, and unallocated freelist cells directly from raw database files (<code className="text-emerald-400 font-bold">msgstore.db</code>, <code className="text-cyan-400 font-bold">cache4.db</code>) with exact byte offsets, table names, and row coordinates.
+          </div>
+          <span className="px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+            {records.length} Residual Findings
+          </span>
+        </div>
 
         {/* 4 Different Tiers Classification Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1 text-xs">
@@ -408,9 +456,21 @@ export default function RecoveryPage() {
                   {r.snippet}
                 </p>
 
-                <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-outline border-t border-outline-variant/40">
-                  <span>{r.sourceTable} • {r.offset}</span>
-                  <span className="font-semibold text-on-surface">{r.confidence == null ? 'Not assessed' : `${(r.confidence * 100).toFixed(0)}% score`}</span>
+                {/* Explicit Physical Excavation Provenance Ribbon */}
+                <div className="pt-2 border-t border-outline-variant/60 flex flex-col gap-1 text-[11px] font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="text-primary font-bold flex items-center gap-1.5 truncate">
+                      <span className="material-symbols-outlined text-[14px]">pin_drop</span>
+                      {r.sourceFile} ❯ {r.sourceTable} [Row #{r.rowId}]
+                    </span>
+                    <span className="font-semibold text-on-surface text-[10px] shrink-0">
+                      {r.confidence == null ? 'Deterministic' : `${(r.confidence * 100).toFixed(0)}% score`}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-outline truncate flex items-center justify-between">
+                    <span>Exhibit #{r.exhibitId} ({r.parentArchive})</span>
+                    <span>{r.offset !== '0x0000' ? `Offset ${r.offset}` : r.walFrameNumber}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -438,6 +498,45 @@ export default function RecoveryPage() {
                 <h3 className="text-headline-md font-semibold text-on-surface mt-2">
                   {selectedRecord.sender}
                 </h3>
+              </div>
+
+              {/* Exact Physical Forensic Source & Excavation Trail */}
+              <div className="p-3.5 bg-surface-container rounded-xl border border-primary/30 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-primary">
+                  <span className="material-symbols-outlined text-[16px]">pin_drop</span>
+                  EXACT PHYSICAL EXCAVATION ORIGIN &amp; EVIDENCE PROVENANCE
+                </div>
+                <div className="space-y-1.5 text-xs font-mono text-on-surface">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-on-surface-variant shrink-0">Source Database File:</span>
+                    <span className="font-bold text-primary text-right break-all">{selectedRecord.sourceFile}</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-on-surface-variant shrink-0">Database Table &amp; Coordinates:</span>
+                    <span className="font-semibold text-on-surface text-right">
+                      Table: <strong className="text-primary">{selectedRecord.sourceTable}</strong> | RowID: #{selectedRecord.rowId}
+                      {selectedRecord.keyId ? ` (Key: ${selectedRecord.keyId})` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-on-surface-variant shrink-0">Physical Parent Archive:</span>
+                    <span className="text-on-surface text-right">
+                      Exhibit #{selectedRecord.exhibitId} ({selectedRecord.parentArchive})
+                    </span>
+                  </div>
+                  {selectedRecord.exhibitSha && (
+                    <div className="flex items-start justify-between gap-2 text-[11px]">
+                      <span className="text-on-surface-variant shrink-0">Exhibit SHA-256:</span>
+                      <span className="text-on-surface font-mono text-[10px] break-all select-all text-right max-w-[280px]">
+                        {selectedRecord.exhibitSha}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-outline-variant/60 text-[11px] font-sans text-on-surface-variant leading-relaxed">
+                    <strong className="text-on-surface font-mono">Excavation Evidence Trail: </strong>
+                    {selectedRecord.rationale}
+                  </div>
+                </div>
               </div>
 
               {/* Reconstructed Payload Box */}

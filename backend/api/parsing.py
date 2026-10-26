@@ -27,13 +27,48 @@ from backend.models.models import Case, DerivedArtifact, Evidence, EvidenceFile
 router = APIRouter(tags=["parsing"])
 
 
-def _clean_text_preview(val: Any) -> Any:
+def _try_parse_tl_or_binary_blob(val: bytes, col_name: str = "") -> Any:
+    """Intelligently inspect and parse binary blobs (e.g. Telegram MTProto TL serialized blobs)."""
+    # 1. Try plain utf-8 decode
+    try:
+        decoded = val.decode("utf-8")
+        if all(ord(c) >= 32 or c in "\r\n\t" for c in decoded):
+            return decoded
+    except Exception:
+        pass
+
+    # 2. Try Telegram MTProto TL deserialization for data / TL blobs
+    try:
+        from forensic.telegram.tl.registry import deserialize_tl_blob
+        from forensic.telegram.tl.types import TgMessage, TgUser, TgChat, TgChannel
+
+        tl_obj = deserialize_tl_blob(val)
+        if isinstance(tl_obj, TgMessage):
+            parsed_text = tl_obj.message or ""
+            return parsed_text if parsed_text else f"[Message recorded on {tl_obj.date}]"
+        elif isinstance(tl_obj, TgUser):
+            name_parts = [p for p in (tl_obj.first_name, tl_obj.last_name) if p]
+            name = " ".join(name_parts)
+            handle = f" (@{tl_obj.username})" if tl_obj.username else ""
+            phone = f" {tl_obj.phone}" if tl_obj.phone else ""
+            user_str = f"{name}{handle}{phone}".strip()
+            return user_str if user_str else "Unknown User"
+        elif isinstance(tl_obj, (TgChat, TgChannel)):
+            title = getattr(tl_obj, "title", "")
+            return title if title else f"Chat ({getattr(tl_obj, 'id', '')})"
+        else:
+            return f"<{len(val)} bytes binary data>"
+    except Exception:
+        pass
+
+    # 3. Fallback: formatted BLOB identifier
+    return f"<{len(val)} bytes binary data>"
+
+
+def _clean_text_preview(val: Any, col_name: str = "") -> Any:
     """Format cell value for display, handling raw bytes or complex types."""
     if isinstance(val, bytes):
-        try:
-            return val.decode("utf-8")
-        except Exception:
-            return f"<BLOB {len(val)} bytes>"
+        return _try_parse_tl_or_binary_blob(val, col_name)
     elif isinstance(val, (dict, list)):
         try:
             return json.dumps(val, ensure_ascii=False)
@@ -413,7 +448,7 @@ def inspect_case_file(
                 for r in raw_rows:
                     row_dict = {}
                     for idx, col in enumerate(columns_meta):
-                        row_dict[col["name"]] = _clean_text_preview(r[idx])
+                        row_dict[col["name"]] = _clean_text_preview(r[idx], col["name"])
                     rows_data.append(row_dict)
 
             return {

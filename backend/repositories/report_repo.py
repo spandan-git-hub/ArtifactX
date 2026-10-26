@@ -56,14 +56,20 @@ class ReportRepository:
             Evidence.case_id == case_id
         ).all()
 
-        # Count extracted files
+        # Count extracted files efficiently using a single GROUP BY query
+        ev_ids = [ev.id for ev in evidence_items]
+        counts_by_ev = {}
+        if ev_ids:
+            grouped = self.db.query(
+                EvidenceFile.evidence_id, func.count(EvidenceFile.id)
+            ).filter(EvidenceFile.evidence_id.in_(ev_ids)).group_by(EvidenceFile.evidence_id).all()
+            counts_by_ev = dict(grouped)
+
         total_extracted = 0
         evidence_list = []
         legacy_unverifiable_count = 0
         for ev in evidence_items:
-            file_count = self.db.query(EvidenceFile).filter(
-                EvidenceFile.evidence_id == ev.id
-            ).count()
+            file_count = counts_by_ev.get(ev.id, 0)
             total_extracted += file_count
             ev_integrity = getattr(ev, "integrity_state", "OK") or "OK"
             if ev_integrity == "LEGACY_UNVERIFIABLE":

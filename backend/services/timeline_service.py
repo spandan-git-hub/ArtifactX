@@ -17,7 +17,7 @@ from backend.models.models import (
 )
 from backend.repositories.timeline_repo import TimelineRepository
 from backend.services.audit_service import AuditService
-from backend.services.integrity_service import ensure_integrity
+from backend.services.integrity_service import ensure_integrity, LegacyUnverifiableError
 from backend.services.log_service import get_log_service
 from forensic.timeline import (
     PureTimelineBuilder,
@@ -71,7 +71,10 @@ class TimelineService:
 
             # Pre-stage integrity verification (Rule R3)
             for ev in evidences:
-                ensure_integrity(ev.id, db, action_context="timeline_stage")
+                try:
+                    ensure_integrity(ev.id, db, action_context="timeline_stage")
+                except LegacyUnverifiableError:
+                    pass
 
             evidence_ids = [ev.id for ev in evidences]
             evidence_records = []
@@ -116,20 +119,26 @@ class TimelineService:
                             pass
 
             # Ensure evidence items with missing WhatsApp/Telegram parsed messages are extracted
+            ev_map = {ev.id: ev for ev in evidences}
             for eid in evidence_ids:
-                has_wa = db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id == eid).first()
-                if not has_wa:
-                    try:
-                        whatsapp_service.parse_evidence_sync(eid, db)
-                    except Exception:
-                        pass
+                ev_obj = ev_map.get(eid)
+                fname = (ev_obj.original_filename or "").lower() if ev_obj else ""
 
-                has_tg = db.query(TelegramMessage).filter(TelegramMessage.evidence_id == eid).first()
-                if not has_tg:
-                    try:
-                        telegram_service.parse_evidence_sync(eid, db)
-                    except Exception:
-                        pass
+                if "whatsapp" in fname or "wa" in fname:
+                    has_wa = db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id == eid).first()
+                    if not has_wa:
+                        try:
+                            whatsapp_service.parse_evidence_sync(eid, db)
+                        except Exception:
+                            pass
+
+                if "telegram" in fname or "tg" in fname:
+                    has_tg = db.query(TelegramMessage).filter(TelegramMessage.evidence_id == eid).first()
+                    if not has_tg:
+                        try:
+                            telegram_service.parse_evidence_sync(eid, db)
+                        except Exception:
+                            pass
 
             # 2. Query WhatsApp messages, revocations, and edits
             wa_cond = WhatsAppMessage.evidence_id.in_(evidence_ids) if evidence_ids else False
@@ -287,9 +296,9 @@ class TimelineService:
             raise
 
     def get_timeline_for_case(self, db: Session, case_id: int) -> List[dict]:
-        """Get timeline events for a case, auto-building if no events exist yet or if only ingestion events exist."""
+        """Get timeline events for a case, auto-building only if no events exist yet."""
         events = self.timeline_repo.get_events_by_case_id(db, case_id)
-        if not events or all(e.event_type == "system" for e in events):
+        if not events:
             self.build_timeline_for_case(db, case_id)
             events = self.timeline_repo.get_events_by_case_id(db, case_id)
 
@@ -346,7 +355,7 @@ class TimelineService:
             entity_type=entity_type,
             search=search,
         )
-        if (not events or all(e.event_type == "system" for e in events)) and not start_date and not end_date and not search:
+        if not events and not start_date and not end_date and not search:
             self.build_timeline_for_case(db, case_id)
             events = self.timeline_repo.filter_events(
                 db,

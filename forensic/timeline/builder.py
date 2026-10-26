@@ -198,16 +198,48 @@ class PureTimelineBuilder:
             )
             events.append(event)
 
+        # Index WhatsApp messages by source_row_id and key_id for precise forensic linkage
+        wa_msg_by_row = {}
+        wa_msg_by_key = {}
+        for m in whatsapp_messages:
+            rid = _dict_val(m, "source_row_id", "row_id", "id")
+            if rid is not None:
+                wa_msg_by_row[rid] = m
+                wa_msg_by_row[str(rid)] = m
+            kid = _dict_val(m, "key_id")
+            if kid:
+                wa_msg_by_key[kid] = m
+
+        # Index recovered findings by source_row_id
+        recovered_by_row = {}
+        for rec in recovered_records:
+            prov = _dict_val(rec, "provenance") or {}
+            rid = _dict_val(rec, "row_id") or prov.get("row_id")
+            if rid is not None:
+                recovered_by_row[rid] = rec
+                recovered_by_row[str(rid)] = rec
+
         # 3. WhatsApp Revocations ("Deleted for everyone")
         for rev in whatsapp_revocations:
             ev_id = _dict_val(rev, "evidence_id")
             sha256 = _dict_val(rev, "evidence_sha256") or ""
             rev_id = _dict_val(rev, "id", "revocation_id")
-            msg_id = _dict_val(rev, "message_id", "row_id")
-            key_id = _dict_val(rev, "key_id") or f"rev_{msg_id}"
-            chat_ref = _dict_val(rev, "chat_jid")
-            rev_ts = _dict_val(rev, "revoked_timestamp", "revoked_timestamp_ms", "timestamp_ms", "timestamp")
-            orig_ts = _dict_val(rev, "original_timestamp", "original_timestamp_ms")
+            msg_id = _dict_val(rev, "message_row_id", "message_id", "row_id")
+            key_id = _dict_val(rev, "revoked_key_id", "key_id") or (f"rev_{msg_id}" if msg_id else "rev_unknown")
+            matched_msg = wa_msg_by_row.get(msg_id) or wa_msg_by_key.get(key_id)
+
+            chat_ref = _dict_val(rev, "original_sender", "chat_jid")
+            if not chat_ref and matched_msg:
+                chat_ref = _dict_val(matched_msg, "key_remote_jid", "chat_jid")
+            
+            actor_ref = _dict_val(rev, "original_sender", "sender_jid")
+            if not actor_ref and matched_msg:
+                actor_ref = _dict_val(matched_msg, "sender_jid", "participant_jid") or chat_ref
+
+            rev_ts = _dict_val(rev, "revoke_ts", "revoked_timestamp", "revoked_timestamp_ms", "timestamp_ms", "timestamp")
+            if rev_ts is None and matched_msg:
+                rev_ts = _dict_val(matched_msg, "ts_utc_ms", "timestamp")
+            orig_ts = _dict_val(rev, "original_ts", "original_timestamp", "original_timestamp_ms") or rev_ts
 
             ingest_ms = ingest_time_map.get(sha256)
             tval = normalize_time_value(
@@ -236,14 +268,23 @@ class PureTimelineBuilder:
                 raw_time=rev_ts,
                 key_facts={"chat_ref": chat_ref or "", "key_id": key_id},
             )
+
+            # Check if there is carved payload text for this revocation
+            matched_rec = recovered_by_row.get(msg_id)
+            carved_text = _dict_val(matched_rec, "candidate_original_text", "body") if matched_rec else None
+            if carved_text:
+                summary = f"Revoked message ('Deleted for everyone') [Recovered: \"{carved_text}\"]"
+            else:
+                summary = f"Message revoked ('Deleted for everyone'): {key_id}"
+
             event = TimelineEvent(
                 event_id=eid,
                 kind="revocation",
                 app="whatsapp",
                 time=tval,
-                actor_ref=_dict_val(rev, "sender_jid") or chat_ref,
+                actor_ref=actor_ref,
                 chat_ref=chat_ref,
-                summary=f"Message revoked ('Deleted for everyone'): {key_id}",
+                summary=summary,
                 source_refs=(sref_holder, sref_info),
                 confidence_score=1.0,
                 strength="deterministic",
@@ -252,6 +293,7 @@ class PureTimelineBuilder:
                     "key_id": key_id,
                     "original_timestamp_ms": orig_ts,
                     "revocation_id": rev_id,
+                    "carved_text": carved_text,
                 },
             )
             events.append(event)
@@ -261,10 +303,25 @@ class PureTimelineBuilder:
             ev_id = _dict_val(edit, "evidence_id")
             sha256 = _dict_val(edit, "evidence_sha256") or ""
             edit_id = _dict_val(edit, "id", "edit_id")
-            msg_id = _dict_val(edit, "message_id", "row_id")
-            key_id = _dict_val(edit, "key_id") or f"edit_{msg_id}"
+            msg_id = _dict_val(edit, "message_row_id", "message_id", "row_id")
+            key_id = _dict_val(edit, "original_key_id", "key_id") or (f"edit_{msg_id}" if msg_id else "edit_unknown")
+            matched_msg = wa_msg_by_row.get(msg_id) or wa_msg_by_key.get(key_id)
+
             chat_ref = _dict_val(edit, "chat_jid")
-            edit_ts = _dict_val(edit, "edit_timestamp", "edit_timestamp_ms", "timestamp_ms", "timestamp")
+            if not chat_ref and matched_msg:
+                chat_ref = _dict_val(matched_msg, "key_remote_jid", "chat_jid")
+            
+            actor_ref = _dict_val(edit, "sender_jid")
+            if not actor_ref and matched_msg:
+                actor_ref = _dict_val(matched_msg, "sender_jid", "participant_jid") or chat_ref
+
+            edit_ts = _dict_val(edit, "edited_ts", "edit_timestamp", "edit_timestamp_ms", "timestamp_ms", "timestamp")
+            if edit_ts is None and matched_msg:
+                edit_ts = _dict_val(matched_msg, "ts_utc_ms", "timestamp")
+            
+            new_text = _dict_val(edit, "edited_text", "new_text")
+            if not new_text and matched_msg:
+                new_text = _dict_val(matched_msg, "body", "text_data")
 
             ingest_ms = ingest_time_map.get(sha256)
             tval = normalize_time_value(
@@ -298,9 +355,9 @@ class PureTimelineBuilder:
                 kind="edit",
                 app="whatsapp",
                 time=tval,
-                actor_ref=_dict_val(edit, "sender_jid") or chat_ref,
+                actor_ref=actor_ref,
                 chat_ref=chat_ref,
-                summary=f"Message edited: {key_id}",
+                summary=f"Message edited to: \"{new_text}\"" if new_text else f"Message edited (Key: {key_id})",
                 source_refs=(sref_holder, sref_edit),
                 confidence_score=1.0,
                 strength="deterministic",
@@ -308,7 +365,7 @@ class PureTimelineBuilder:
                 metadata={
                     "key_id": key_id,
                     "old_text": _dict_val(edit, "old_text"),
-                    "new_text": _dict_val(edit, "new_text"),
+                    "new_text": new_text,
                 },
             )
             events.append(event)
@@ -400,12 +457,12 @@ class PureTimelineBuilder:
             ev_id = _dict_val(rec, "evidence_id")
             sha256 = _dict_val(rec, "evidence_sha256") or ""
             finding_id = _dict_val(rec, "finding_id") or f"rec_{len(events)}"
-            app_type = _dict_val(rec, "app", default="whatsapp")
+            app_type = _dict_val(rec, "source_app", "app", default="whatsapp")
             rec_fields = _dict_val(rec, "recovered_fields") or {}
             source_table = _dict_val(rec, "table_name", default="sqlite_carved")
 
-            # Extract timestamp from recovered record's own fields
-            raw_rec_ts = _dict_val(rec_fields, "timestamp", "timestamp_ms", "date", "date_s", "created_timestamp")
+            # Extract timestamp from recovered record's own fields or rec.timestamp
+            raw_rec_ts = _dict_val(rec, "timestamp") or _dict_val(rec_fields, "timestamp", "timestamp_ms", "date", "date_s", "created_timestamp")
             # If WhatsApp -> ms; if Telegram -> s
             unit = "ms" if app_type == "whatsapp" else "s"
             ingest_ms = ingest_time_map.get(sha256)
@@ -431,12 +488,34 @@ class PureTimelineBuilder:
                 evidence_id=ev_id,
                 evidence_sha256=sha256,
                 source_table=source_table,
-                source_row_id=_dict_val(rec_fields, "_id", "rowid", "id"),
+                source_row_id=_dict_val(rec_fields, "_id", "rowid", "id") or _dict_val(rec, "row_id"),
                 offset=_dict_val(rec, "byte_offset", "frame_index"),
             )
             strength = _dict_val(rec, "strength", default="strong")
             conf = _dict_val(rec, "confidence_score", default=0.90)
-            summary_text = _dict_val(rec_fields, "text_data", "body", "message") or f"Recovered Tier-{tier} record"
+            prov = _dict_val(rec, "provenance") or {}
+            rec_row_id = _dict_val(rec_fields, "_id", "rowid", "id") or _dict_val(rec, "row_id") or prov.get("row_id")
+            matched_msg = wa_msg_by_row.get(rec_row_id) if rec_row_id else None
+
+            chat_ref = _dict_val(rec, "chat_id") or _dict_val(rec_fields, "chat_jid", "dialog_id")
+            if not chat_ref and matched_msg:
+                chat_ref = _dict_val(matched_msg, "key_remote_jid", "chat_jid")
+
+            actor_ref = _dict_val(rec, "sender_id") or _dict_val(rec_fields, "sender_jid", "sender_id")
+            if not actor_ref and matched_msg:
+                actor_ref = _dict_val(matched_msg, "sender_jid", "participant_jid") or chat_ref
+
+            if raw_rec_ts is None and matched_msg:
+                raw_rec_ts = _dict_val(matched_msg, "ts_utc_ms", "timestamp")
+                if raw_rec_ts is not None and str(raw_rec_ts).strip() != "":
+                    tval = normalize_time_value(
+                        raw=raw_rec_ts,
+                        unit=unit,
+                        evidence_ingest_time_ms=ingest_ms,
+                        config=self.config,
+                    )
+
+            summary_text = _dict_val(rec, "body", "candidate_original_text") or _dict_val(rec_fields, "text_data", "body", "message") or f"Recovered Tier-{tier} record"
 
             eid = compute_canonical_event_id(
                 kind="recovered_record",
@@ -451,8 +530,8 @@ class PureTimelineBuilder:
                 kind="recovered_record",
                 app=app_type,
                 time=tval,
-                actor_ref=_dict_val(rec_fields, "sender_jid", "sender_id"),
-                chat_ref=_dict_val(rec_fields, "chat_jid", "dialog_id"),
+                actor_ref=actor_ref,
+                chat_ref=chat_ref,
                 summary=summary_text,
                 source_refs=(sref,),
                 confidence_score=float(conf),

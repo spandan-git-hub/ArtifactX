@@ -101,8 +101,14 @@ def detect_tier4_gaps(
 
     elif "message" in tables or "messages" in tables:
         target_table = "message" if "message" in tables else "messages"
-        cursor.execute(f"SELECT _id FROM {target_table} WHERE _id > 0 ORDER BY _id ASC")
-        ids = [r[0] for r in cursor.fetchall()]
+        cursor.execute(f"PRAGMA table_info({target_table})")
+        cols = {r[1] for r in cursor.fetchall()}
+        pk_col = "_id" if "_id" in cols else ("id" if "id" in cols else ("rowid" if "rowid" in cols else None))
+        if pk_col:
+            cursor.execute(f"SELECT {pk_col} FROM {target_table} WHERE {pk_col} > 0 ORDER BY {pk_col} ASC")
+            ids = [r[0] for r in cursor.fetchall()]
+        else:
+            ids = []
 
         for i in range(len(ids) - 1):
             prev_id = ids[i]

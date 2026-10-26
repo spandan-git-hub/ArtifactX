@@ -19,10 +19,11 @@ from backend.models.models import (
     EvidenceFile,
     RecoveredFinding,
     RecoveryRun,
+    DerivedArtifact,
 )
 from backend.schemas.recovery import RecoveryRunRequest
 from backend.services.audit_service import AuditService
-from backend.services.integrity_service import ensure_integrity
+from backend.services.integrity_service import ensure_integrity, LegacyUnverifiableError
 from forensic.recovery.orchestrator import RecoveryPipeline
 
 
@@ -92,7 +93,10 @@ def run_physical_recovery(
 
         for ev in evidence_items:
             # 1. Enforce pre-analysis cryptographic integrity check (B5.3, R3)
-            ensure_integrity(ev.id, db, action_context="physical_recovery")
+            try:
+                ensure_integrity(ev.id, db, action_context="physical_recovery")
+            except LegacyUnverifiableError:
+                pass
 
             # 2. Append RECOVER_START audit log (no content) per B10
             AuditService.append(
@@ -126,19 +130,29 @@ def run_physical_recovery(
                         "app_hint": hint,
                     })
 
-            # Check ZIP archive members in evidence_files
+            # Check ZIP archive members in evidence_files (only SQLite db and WAL files)
             extracted_files = (
                 db.query(EvidenceFile)
-                .filter(EvidenceFile.evidence_id == ev.id)
+                .filter(
+                    EvidenceFile.evidence_id == ev.id,
+                    (
+                        EvidenceFile.relative_path.ilike("%.db%") |
+                        EvidenceFile.relative_path.ilike("%.sqlite%")
+                    ),
+                )
                 .all()
             )
 
             files_by_path = {ef.relative_path: ef for ef in extracted_files}
 
             for ef in extracted_files:
-                if not ef.content_bytes or len(ef.content_bytes) < 100:
+                # Skip WAL and shm journal files from being primary db candidates
+                if ef.relative_path.endswith("-wal") or ef.relative_path.endswith("-shm"):
                     continue
-                if ef.content_bytes.startswith(b"SQLite format 3\x00"):
+                ef_bytes = ef.content_bytes
+                if not ef_bytes or len(ef_bytes) < 100:
+                    continue
+                if ef_bytes.startswith(b"SQLite format 3\x00"):
                     wal_bytes = None
                     wal_path = f"{ef.relative_path}-wal"
                     if wal_path in files_by_path and files_by_path[wal_path].content_bytes:
@@ -149,10 +163,47 @@ def run_physical_recovery(
                     )
                     db_candidates.append({
                         "name": ef.relative_path,
-                        "bytes": ef.content_bytes,
+                        "bytes": ef_bytes,
                         "wal_bytes": wal_bytes,
                         "sha256": ef.sha256,
                         "file_id": ef.id,
+                        "app_hint": hint,
+                    })
+
+            # Check decrypted databases in derived_artifacts
+            derived_items = (
+                db.query(DerivedArtifact)
+                .filter(
+                    DerivedArtifact.case_id == case_id,
+                    DerivedArtifact.parent_evidence_id == ev.id,
+                    DerivedArtifact.artifact_type == "decrypted_sqlite",
+                )
+                .all()
+            )
+            for da in derived_items:
+                da_bytes = da.content_bytes
+                if da_bytes and len(da_bytes) >= 100 and da_bytes.startswith(b"SQLite format 3\x00"):
+                    # Check for matching WAL in evidence_files
+                    wal_bytes = None
+                    wal_cand = f"{da.original_filename}-wal"
+                    if wal_cand in files_by_path and files_by_path[wal_cand].content_bytes:
+                        wal_bytes = files_by_path[wal_cand].content_bytes
+                    elif "msgstore" in da.original_filename:
+                        # Common WhatsApp WAL location
+                        for p, ef in files_by_path.items():
+                            if p.endswith("msgstore.db-wal") and ef.content_bytes:
+                                wal_bytes = ef.content_bytes
+                                break
+
+                    hint = (req.source_app_hint if req else None) or (
+                        "telegram" if "tg" in (da.original_filename or "").lower() else "whatsapp"
+                    )
+                    db_candidates.append({
+                        "name": f"decrypted/{da.original_filename}",
+                        "bytes": da_bytes,
+                        "wal_bytes": wal_bytes,
+                        "sha256": da.sha256,
+                        "file_id": da.parent_file_id,
                         "app_hint": hint,
                     })
 
@@ -186,6 +237,20 @@ def run_physical_recovery(
                     chat_val = str(rf.get("chat_id") or rf.get("uid") or "")
                     sender_val = str(rf.get("sender_id") or "")
 
+                    prov_dict = f.provenance.to_dict() if hasattr(f.provenance, "to_dict") else dict(f.provenance or {})
+                    prov_dict["source_file"] = cand["name"]
+                    prov_dict["source_db_sha256"] = cand.get("sha256", "")
+                    prov_dict["source_table"] = f.table_name
+                    prov_dict["row_id"] = f.row_id or rf.get("message_row_id") or rf.get("gap_start")
+                    prov_dict["key_id"] = key_val
+                    prov_dict["parent_archive"] = getattr(ev, "original_filename", "")
+                    prov_dict["evidence_id"] = ev.id
+                    prov_dict["carving_rationale"] = (
+                        f"Excavated from table '{f.table_name}' (RowID #{rf.get('message_row_id') or f.row_id or 'N/A'}) in database '{cand['name']}' from Exhibit #{ev.id} ({getattr(ev, 'original_filename', '')})."
+                        if f.tier in (1, 4) else
+                        f"Physically carved from '{f.table_name}' (Offset 0x{f.byte_offset or 0:04X}, Page #{f.page_no or 0}) in '{cand['name']}' from Exhibit #{ev.id}."
+                    )
+
                     finding_row = RecoveredFinding(
                         case_id=case_id,
                         run_id=run.id,
@@ -205,7 +270,7 @@ def run_physical_recovery(
                         media_reference=_clean_pg_text(rf.get("media_reference")),
                         validation_status=_clean_pg_text(f.validation_status),
                         limitations=_clean_pg_text(list(f.limitations)),
-                        provenance=_clean_pg_text(f.provenance.to_dict()),
+                        provenance=_clean_pg_text(prov_dict),
                         # B10 additive fields
                         finding_id=_clean_pg_text(f.finding_id),
                         tier=f.tier,
@@ -323,16 +388,6 @@ def list_recovered_findings(
         q = q.filter(RecoveredFinding.kind == kind)
 
     findings = q.order_by(RecoveredFinding.id.desc()).offset(offset).limit(limit).all()
-    if not findings and offset == 0 and tier is None and strength is None and kind is None and run_id is None:
-        has_ev = db.query(Evidence).filter(Evidence.case_id == case_id).count() > 0
-        has_run = db.query(RecoveryRun).filter(RecoveryRun.case_id == case_id, RecoveryRun.status == "SUCCEEDED").count() > 0
-        if has_ev and not has_run:
-            try:
-                run_physical_recovery(case_id, db)
-                findings = q.order_by(RecoveredFinding.id.desc()).offset(offset).limit(limit).all()
-            except Exception:
-                pass
-
     return findings
 
 

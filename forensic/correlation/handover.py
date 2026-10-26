@@ -149,9 +149,24 @@ class PlatformHandoverDetector:
                 keywords = self.detect_keywords(curr[3])
                 has_keywords = len(keywords) > 0
 
-                # Confidence strictly < 1.0; elevated if explicit keyword present
-                conf = 0.85 if has_keywords else 0.65
-                match_cert = 0.80 if has_keywords else 0.50
+                # Skip blank/empty message pairs without explicit handover keywords
+                has_text = bool((curr[3] or "").strip() or (nxt[3] or "").strip())
+                if not has_text and not has_keywords:
+                    continue
+
+                # Forensic confidence: elevated for explicit transition phrasing, moderate for continuous dialogue
+                if has_keywords:
+                    conf = 0.88
+                    match_cert = 0.85
+                    rationale = f"Explicit platform handover phrase ('{keywords[0]}') in {curr[0].title()} followed by message in {nxt[0].title()} within {delta}s."
+                elif curr[2] == nxt[2] and curr[2] not in ("whatsapp_user", "telegram_user", "me", ""):
+                    conf = 0.78
+                    match_cert = 0.75
+                    rationale = f"Same verified sender ({curr[2]}) transitioned from {curr[0].title()} to {nxt[0].title()} within {delta}s."
+                else:
+                    conf = 0.65
+                    match_cert = 0.55
+                    rationale = f"Cross-app temporal co-occurrence: {curr[0].title()} communication followed by {nxt[0].title()} activity within {delta}s."
 
                 norm_val = f"{curr[0]}->{nxt[0]}_delta_{delta}s"
                 h_id = generate_deterministic_finding_id(
@@ -190,6 +205,7 @@ class PlatformHandoverDetector:
                         "time_delta_seconds": delta,
                         "threshold_seconds": threshold,
                         "transition_keywords": keywords,
+                        "rationale": rationale,
                         "thresholds_version": self.thresholds.version,
                     },
                 ))

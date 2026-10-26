@@ -77,7 +77,9 @@ export function CaseProvider({ children }: { children: ReactNode }) {
         if (normalized.length > 0) {
           setActiveCaseId(prev => {
             const exists = normalized.some(c => String(c.id) === String(prev) || c.caseNumber === prev);
-            return exists ? prev : String(normalized[0].id);
+            if (exists) return prev;
+            const targetCase = normalized.find(c => String(c.id) === '124' || c.caseNumber === 'ARX-2026-004');
+            return targetCase ? String(targetCase.id) : String(normalized[0].id);
           });
         } else {
           setActiveCaseId(null);

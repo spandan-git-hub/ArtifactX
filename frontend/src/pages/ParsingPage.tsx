@@ -721,7 +721,7 @@ export default function ParsingPage() {
                               {inspectData.columns?.map((col) => {
                                 const val = row[col.name];
                                 const isNull = val === null || val === undefined;
-                                const isBlob = typeof val === 'string' && val.startsWith('<BLOB');
+                                const isBinary = typeof val === 'string' && val.startsWith('<') && val.endsWith('>');
 
                                 return (
                                   <td
@@ -731,12 +731,12 @@ export default function ParsingPage() {
                                   >
                                     {isNull ? (
                                       <span className="text-outline/50 italic text-[10px]">NULL</span>
-                                    ) : isBlob ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
+                                    ) : isBinary ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-outline-variant/20 text-outline border border-outline-variant/30 font-mono">
                                         {val}
                                       </span>
                                     ) : (
-                                      <span>{String(val)}</span>
+                                      <span className="truncate text-on-surface">{String(val)}</span>
                                     )}
                                   </td>
                                 );
