@@ -235,9 +235,6 @@ export default function ParsingPage() {
             <h1 className="text-headline-sm font-semibold tracking-tight text-on-surface">
               Parsing &amp; Tabular Content Inspector
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/30 uppercase tracking-wider">
-              Phase 4 Core
-            </span>
           </div>
           <p className="text-xs text-on-surface-variant mt-0.5">
             Examine underlying tabular columns and rows of accessible SQLite databases and structured exhibits identified across case evidence.

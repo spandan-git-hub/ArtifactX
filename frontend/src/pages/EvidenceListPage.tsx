@@ -169,8 +169,6 @@ export default function EvidenceListPage() {
           <span className="text-on-surface-variant">Case: <strong className="text-primary">{activeCase?.caseNumber || caseId}</strong></span>
           <span className="text-outline">|</span>
           <span className="text-on-surface-variant">Total Exhibits: <strong className="text-on-surface">{artifacts.length}</strong></span>
-          <span className="text-outline">|</span>
-          <span className="text-tertiary font-medium">CRYPTOGRAPHIC AUDIT: OK</span>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -449,7 +447,7 @@ export default function EvidenceListPage() {
                   {/* SHA-256 */}
                   <div className="p-3 rounded-lg bg-surface-container border border-outline-variant space-y-1.5">
                     <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-primary font-bold">SHA-256 DIGEST (PRIMARY NIST)</span>
+                      <span className="text-primary font-bold">SHA-256 DIGEST</span>
                       <button
                         type="button"
                         onClick={() => copyToClipboard(selectedArtifact.sha256, 'sha256')}
@@ -513,7 +511,7 @@ export default function EvidenceListPage() {
                   {selectedArtifact.sha512 && selectedArtifact.sha512 !== 'N/A' && (
                     <div className="p-3 rounded-lg bg-surface-container border border-outline-variant space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="text-on-surface-variant font-semibold">SHA-512 HIGH-SECURITY</span>
+                        <span className="text-on-surface-variant font-semibold">SHA-512 DIGEST</span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(selectedArtifact.sha512, 'sha512')}

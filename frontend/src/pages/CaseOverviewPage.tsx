@@ -277,8 +277,6 @@ export default function CaseOverviewPage() {
             </div>
             <div className="flex items-center space-x-3 text-label-mono-sm text-on-surface-variant">
               <span>CREATED: {currentCase?.createdDate || (caseDetails.created_at ? new Date(caseDetails.created_at).toLocaleDateString() : 'Today')}</span>
-              <span className="text-outline">|</span>
-              <span>HASH INTEGRITY: <strong className="text-tertiary">100% OK</strong></span>
             </div>
           </div>
 

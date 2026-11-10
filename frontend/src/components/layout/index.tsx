@@ -86,14 +86,9 @@ export function Layout({ children }: LayoutProps) {
             <div className="w-6 h-6 rounded flex items-center justify-center bg-primary/10 border border-primary/40 group-hover:border-primary transition-colors">
               <span className="material-symbols-outlined text-primary text-[15px]">terminal</span>
             </div>
-            <div className="flex items-baseline space-x-2">
-              <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface group-hover:text-primary transition-colors">
-                ArtifactX
-              </span>
-              <span className="text-[10px] font-mono tracking-wider bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded border border-outline-variant uppercase">
-                DFIR CORE
-              </span>
-            </div>
+            <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface group-hover:text-primary transition-colors">
+              ArtifactX
+            </span>
           </Link>
 
           <div className="h-4 w-[1px] bg-outline-variant" />
@@ -179,14 +174,6 @@ export function Layout({ children }: LayoutProps) {
 
           <div className="h-4 w-[1px] bg-outline-variant" />
 
-          {/* Node Airgap Status Indicator */}
-          <div className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded border border-outline-variant bg-surface-container-lowest text-on-surface-variant font-label-mono-sm text-label-mono-sm">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span>NODE: F-AIRGAP-09</span>
-          </div>
-
-          <div className="h-4 w-[1px] bg-outline-variant" />
-
           {/* Sun / Moon Theme Toggle */}
           <div className="flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg p-0.5">
             <button
@@ -219,32 +206,27 @@ export function Layout({ children }: LayoutProps) {
 
           <div className="h-4 w-[1px] bg-outline-variant" />
 
-          {/* User Profile / Examiner Menu */}
+          {/* Workstation Menu */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setExaminerMenuOpen(!examinerMenuOpen)}
-              className="flex items-center space-x-2 pl-1 cursor-pointer group hover:text-primary transition-colors"
+              className="flex items-center space-x-1.5 pl-1 cursor-pointer group hover:text-primary transition-colors"
             >
               <div className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-primary border border-outline-variant">
                 <span className="material-symbols-outlined text-[15px]">account_circle</span>
               </div>
               <span className="text-body-sm font-body-sm font-medium text-on-surface group-hover:text-primary transition-colors">
-                A. Verma (Examiner)
+                Workstation
               </span>
               <span className="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
             </button>
 
             {examinerMenuOpen && (
               <div
-                className="absolute right-0 mt-1.5 w-56 bg-surface-container border border-outline-variant rounded-lg shadow-xl py-1 z-50 text-left"
+                className="absolute right-0 mt-1.5 w-48 bg-surface-container border border-outline-variant rounded-lg shadow-xl py-1 z-50 text-left"
                 onMouseLeave={() => setExaminerMenuOpen(false)}
               >
-                <div className="px-3 py-2 border-b border-outline-variant">
-                  <div className="text-body-sm font-semibold text-on-surface">Abhishek Verma</div>
-                  <div className="text-[10px] text-on-surface-variant font-mono">Senior Forensic Analyst · ID #8942</div>
-                  <div className="text-[10px] text-primary font-mono mt-0.5">Cert: BSA-SEC63-AUTH-091</div>
-                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -254,18 +236,8 @@ export function Layout({ children }: LayoutProps) {
                   className="w-full text-left px-3 py-1.5 text-body-sm text-on-surface hover:bg-surface-container-high flex items-center space-x-2"
                 >
                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant">settings</span>
-                  <span>Workstation Settings</span>
+                  <span>Settings</span>
                 </button>
-                {/* Temporarily disabled Section 63 link in examiner menu:
-                <Link
-                  to={`/cases/${caseId}/section63`}
-                  onClick={() => setExaminerMenuOpen(false)}
-                  className="w-full text-left px-3 py-1.5 text-body-sm text-on-surface hover:bg-surface-container-high flex items-center space-x-2"
-                >
-                  <span className="material-symbols-outlined text-[16px] text-on-surface-variant">gavel</span>
-                  <span>Section 63 Credential</span>
-                </Link>
-                */}
                 <div className="border-t border-outline-variant my-1" />
                 <Link
                   to="/login"
@@ -280,26 +252,6 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </header>
-
-      {/* ================= PINNED AUDIT CHAIN VERIFICATION RIBBON ================= */}
-      <div className="w-full bg-surface-container-low/70 border-b border-outline-variant px-space-lg py-1 flex items-center justify-between text-on-surface-variant font-label-mono-sm text-label-mono-sm shrink-0">
-        <div className="flex items-center space-x-2 overflow-hidden text-ellipsis whitespace-nowrap">
-          <span className="material-symbols-outlined text-[13px] text-primary">lock</span>
-          <span className="text-tertiary flex items-center font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-tertiary mr-1 inline-block" />
-            SECURE BOOT ENCLAVE: SHA-256 INTEGRITY VALIDATED
-          </span>
-          <span className="text-outline">|</span>
-          <span>ROOT: <code className="text-on-surface">7a8f...39b1</code></span>
-          <span className="text-outline">|</span>
-          <span className="text-on-surface-variant">BLOCK: {activeCase?.blockId || '#40921-X9'}</span>
-        </div>
-        <div className="hidden md:flex items-center space-x-4">
-          <span>TIME: UTC {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
-          <span className="text-outline">|</span>
-          <span className="text-primary font-medium">ZERO EXTERNAL EGRESS ACTIVE</span>
-        </div>
-      </div>
 
       {/* ================= WORKSPACE BODY (SideNav + Content) ================= */}
       <div className="flex flex-1 overflow-hidden relative">
@@ -455,17 +407,11 @@ export function Layout({ children }: LayoutProps) {
               type="button"
               onClick={() => setSettingsModalOpen(true)}
               className="w-full flex items-center space-x-2.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface px-space-sm py-1.5 rounded transition-colors text-left"
-              title="Workstation Settings"
+              title="Settings"
             >
               <span className="material-symbols-outlined text-[17px]">settings</span>
               {!sidebarCollapsed && <span className="text-label-ui font-label-ui">Settings</span>}
             </button>
-            {!sidebarCollapsed && (
-              <div className="mt-2 pt-2 border-t border-outline-variant/40 flex items-center justify-between text-label-mono-sm text-outline px-2 text-[10px]">
-                <span>SEC-CH-ID: 0x48A</span>
-                <span>v4.1.2</span>
-              </div>
-            )}
           </div>
         </aside>
 
@@ -482,7 +428,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant">
               <div className="flex items-center space-x-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">tune</span>
-                <h3 className="text-headline-sm font-headline-sm text-on-surface">Workstation Configurations</h3>
+                <h3 className="text-headline-sm font-headline-sm text-on-surface">Settings</h3>
               </div>
               <button
                 type="button"
@@ -494,22 +440,6 @@ export function Layout({ children }: LayoutProps) {
             </div>
             <div className="py-4 space-y-4 text-body-sm text-on-surface">
               <div>
-                <label className="text-label-ui text-on-surface-variant block mb-1">Active Forensic Node</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="F-AIRGAP-09 (Air-gapped Cryptographic Workstation)"
-                  className="w-full bg-surface-container-low border border-outline-variant rounded p-2 text-label-mono-sm text-on-surface"
-                />
-              </div>
-              <div>
-                <label className="text-label-ui text-on-surface-variant block mb-1">Active Cryptographic Standard</label>
-                <div className="p-2 bg-surface-container-low border border-outline-variant rounded text-label-mono-sm text-primary flex items-center justify-between">
-                  <span>SHA-256 + BLAKE3-256 Dual Verification</span>
-                  <span className="text-[10px] bg-tertiary/20 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/30">LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <label className="text-label-ui text-on-surface-variant block mb-1">Theme Preference</label>
                 <div className="flex items-center gap-3">
                   <button
@@ -519,7 +449,7 @@ export function Layout({ children }: LayoutProps) {
                       theme === 'dark' ? 'bg-primary/20 border-primary text-primary font-semibold' : 'border-outline-variant text-on-surface-variant'
                     }`}
                   >
-                    Dark (Forensic Standard)
+                    Dark Mode
                   </button>
                   <button
                     type="button"

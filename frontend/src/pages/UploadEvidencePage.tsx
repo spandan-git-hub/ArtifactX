@@ -15,14 +15,6 @@ export default function UploadEvidencePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
-  const [metadata, setMetadata] = useState({
-    exhibitNumber: '',
-    seizingOfficer: activeCase?.examiner || '',
-    extractionType: 'Physical Chip-Off / Bit-Stream Forensic Image',
-    sourceDeviceImei: '',
-    airgapVerified: true
-  });
-
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -99,24 +91,12 @@ export default function UploadEvidencePage() {
         {/* ================= HEADER ================= */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-outline-variant">
           <div>
-            <div className="flex items-center space-x-2.5 mb-1">
-              <h1 className="text-headline-lg font-headline-lg font-semibold text-on-surface">
-                Upload Evidence
-              </h1>
-              <span className="px-2 py-0.5 rounded text-[11px] font-label-mono-sm bg-primary/10 text-primary border border-primary/30">
-                HASH-CHECKING AUTO-ENABLED
-              </span>
-            </div>
+            <h1 className="text-headline-lg font-headline-lg font-semibold text-on-surface">
+              Upload Evidence
+            </h1>
             <p className="text-body-sm text-on-surface-variant">
               Stage bit-stream physical dumps, encrypted databases, or key derivation material for {activeCase?.caseNumber || 'case'}.
             </p>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
-            <span className="font-label-mono-sm text-[11px] text-on-surface tracking-wide">
-              SECTION 63 INTEGRITY ENFORCED
-            </span>
           </div>
         </div>
 
@@ -160,83 +140,9 @@ export default function UploadEvidencePage() {
               </p>
             </div>
 
-            <div className="pt-2 flex items-center justify-center space-x-3 text-label-mono-sm text-on-surface-variant text-[11px]">
-              <span className="flex items-center space-x-1">
-                <span className="material-symbols-outlined text-[18px]">lock_open</span>
-                <span>Airgap Memory Ingest</span>
-              </span>
-              <span>•</span>
-              <span>Bit-Exact SHA-256 Calculation</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ================= METADATA SCHEDULE ================= */}
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-space-lg space-y-4 shadow-sm">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-            <div className="flex items-center space-x-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">assignment</span>
-              <h2 className="text-headline-sm font-headline-sm text-on-surface">
-                Evidentiary Custody Metadata (BSA Section 63 Schedule)
-              </h2>
-            </div>
-            <span className="text-[11px] font-label-mono-sm text-outline">Section 63 Intake Schedule</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-label-ui uppercase tracking-wider text-on-surface-variant block text-xs">
-                Exhibit / Evidence ID Number
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. EX-2026-001"
-                value={metadata.exhibitNumber}
-                onChange={(e) => setMetadata({ ...metadata, exhibitNumber: e.target.value })}
-                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface font-mono focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-label-ui uppercase tracking-wider text-on-surface-variant block text-xs">
-                Seizing Officer / Cyber Forensic Analyst
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Det. Inspector J. Doe"
-                value={metadata.seizingOfficer}
-                onChange={(e) => setMetadata({ ...metadata, seizingOfficer: e.target.value })}
-                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-label-ui uppercase tracking-wider text-on-surface-variant block text-xs">
-                Extraction Methodology
-              </label>
-              <select
-                value={metadata.extractionType}
-                onChange={(e) => setMetadata({ ...metadata, extractionType: e.target.value })}
-                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface focus:outline-none focus:border-primary"
-              >
-                <option value="Physical Chip-Off / Bit-Stream Forensic Image">Physical Chip-Off / Bit-Stream Forensic Image</option>
-                <option value="Logical File System Acquisition">Logical File System Acquisition</option>
-                <option value="Direct SQLite Application Dump">Direct SQLite Application Dump</option>
-                <option value="Encrypted Cloud Backup Payload">Encrypted Cloud Backup Payload</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-label-ui uppercase tracking-wider text-on-surface-variant block text-xs">
-                Source Device IMEI / Serial Number
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 354892019482019"
-                value={metadata.sourceDeviceImei}
-                onChange={(e) => setMetadata({ ...metadata, sourceDeviceImei: e.target.value })}
-                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface font-mono focus:outline-none focus:border-primary"
-              />
+            <div className="pt-2 flex items-center justify-center space-x-2 text-label-mono-sm text-on-surface-variant text-[11px]">
+              <span className="material-symbols-outlined text-[16px]">fingerprint</span>
+              <span>SHA-256, MD5, SHA-1, and SHA-512 computed on ingest</span>
             </div>
           </div>
         </div>
@@ -316,7 +222,7 @@ export default function UploadEvidencePage() {
               <span className={`material-symbols-outlined text-[18px] ${uploading ? 'animate-spin' : ''}`}>
                 {uploading ? 'sync' : 'verified'}
               </span>
-              <span>{uploading ? 'Ingesting Evidence...' : 'Commit Ingestion to Immutable Ledger'}</span>
+              <span>{uploading ? 'Ingesting Evidence...' : 'Upload & Ingest Evidence'}</span>
             </button>
           </div>
         </div>

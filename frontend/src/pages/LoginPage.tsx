@@ -9,7 +9,6 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = (e) => {
@@ -23,68 +22,41 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col font-body-md select-none bg-background text-on-surface">
-      {/* Top Minimalist Bar per Stitch Blueprint */}
+      {/* Top Bar */}
       <header className="h-12 w-full border-b border-outline-variant bg-surface-container-low flex items-center justify-between px-space-lg shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-6 h-6 rounded flex items-center justify-center bg-primary/10 border border-primary/40">
             <span className="material-symbols-outlined text-primary text-[15px]">terminal</span>
           </div>
-          <div className="flex items-baseline space-x-2">
-            <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface">ArtifactX</span>
-            <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant border-l border-outline-variant pl-2">
-              WS-STAGE-04
-            </span>
-          </div>
+          <span className="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface">ArtifactX</span>
         </div>
 
-        {/* Right Controls: Node status & Theme Switcher */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded border border-outline-variant bg-surface-container-lowest text-on-surface-variant font-label-mono-sm text-label-mono-sm">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
-            <span>NODE: F-AIRGAP-09</span>
-          </div>
-
-          <div className="flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg p-0.5">
-            <button
-              onClick={() => theme !== 'light' && toggleTheme()}
-              className={`p-1 rounded transition-colors ${
-                theme === 'light' ? 'bg-surface-container-highest text-primary border border-outline-variant' : 'text-on-surface-variant'
-              }`}
-              title="Light Mode"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]">light_mode</span>
-            </button>
-            <button
-              onClick={() => theme !== 'dark' && toggleTheme()}
-              className={`p-1 rounded transition-colors ${
-                theme === 'dark' ? 'bg-surface-container-highest text-primary border border-outline-variant' : 'text-on-surface-variant'
-              }`}
-              title="Dark Mode (Active)"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                dark_mode
-              </span>
-            </button>
-          </div>
+        {/* Theme Switcher */}
+        <div className="flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg p-0.5">
+          <button
+            onClick={() => theme !== 'light' && toggleTheme()}
+            className={`p-1 rounded transition-colors ${
+              theme === 'light' ? 'bg-surface-container-highest text-primary border border-outline-variant' : 'text-on-surface-variant'
+            }`}
+            title="Light Mode"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[15px]">light_mode</span>
+          </button>
+          <button
+            onClick={() => theme !== 'dark' && toggleTheme()}
+            className={`p-1 rounded transition-colors ${
+              theme === 'dark' ? 'bg-surface-container-highest text-primary border border-outline-variant' : 'text-on-surface-variant'
+            }`}
+            title="Dark Mode"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              dark_mode
+            </span>
+          </button>
         </div>
       </header>
-
-      {/* Pinned Audit Chain Verification Ribbon */}
-      <div className="w-full bg-surface-container-low/70 border-b border-outline-variant px-space-lg py-1 flex items-center justify-between text-on-surface-variant font-label-mono-sm text-label-mono-sm shrink-0">
-        <div className="flex items-center space-x-2">
-          <span className="material-symbols-outlined text-[13px] text-primary">lock</span>
-          <span>SECURE BOOT ENCLAVE: SHA-256 INTEGRITY VALIDATED</span>
-          <span className="text-outline">|</span>
-          <span className="text-on-surface">ROOT: 7a8f...39b1</span>
-        </div>
-        <div className="hidden sm:flex items-center space-x-4">
-          <span>TIME: UTC {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
-          <span className="text-outline">|</span>
-          <span>ZERO EXTERNAL EGRESS ACTIVE</span>
-        </div>
-      </div>
 
       {/* Main Canvas Centered Layout */}
       <main className="flex-1 flex flex-col items-center justify-center p-space-lg relative overflow-hidden">
@@ -101,14 +73,9 @@ export default function LoginPage() {
         <div className="w-full max-w-[440px] bg-surface-container border border-outline-variant rounded-lg relative z-10 flex flex-col shadow-2xl">
           {/* Card Header */}
           <div className="p-space-lg border-b border-outline-variant">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <span className="material-symbols-outlined text-primary text-[18px]">security</span>
-                <span className="font-headline-md text-headline-md font-semibold text-on-surface">ArtifactX</span>
-              </div>
-              <span className="font-label-mono-sm text-label-mono-sm px-1.5 py-0.5 rounded border border-outline-variant bg-surface-container-lowest text-on-surface-variant">
-                v4.12.0
-              </span>
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="material-symbols-outlined text-primary text-[18px]">security</span>
+              <span className="font-headline-md text-headline-md font-semibold text-on-surface">ArtifactX</span>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
               Digital Forensic Analysis Workstation for Android Artifacts
@@ -117,38 +84,12 @@ export default function LoginPage() {
 
           {/* Card Body */}
           <div className="p-space-lg space-y-4">
-            {showError && (
-              <div className="rounded-lg p-space-sm border border-error bg-error/15 flex items-start justify-between space-x-2">
-                <div className="flex items-start space-x-2">
-                  <span className="material-symbols-outlined text-error text-[16px] mt-0.5 shrink-0">error</span>
-                  <div className="space-y-0.5">
-                    <span className="block font-label-ui text-label-ui font-semibold text-error tracking-wide">
-                      AUTHENTICATION ERROR
-                    </span>
-                    <p className="font-body-sm text-body-sm text-error leading-tight">
-                      Sign-in failed. Check your security token or hardware PIN and try again.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowError(false)}
-                  className="shrink-0 px-2 py-1 rounded bg-error/20 hover:bg-error/30 border border-error text-error font-label-ui text-label-ui"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-
             <form className="space-y-3.5" onSubmit={handleSubmit}>
               {/* Username / Examiner ID */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="font-label-ui text-label-ui uppercase tracking-wider text-on-surface-variant" htmlFor="examiner-id">
-                    Username / Examiner ID
-                  </label>
-                  <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">PKI Validated</span>
-                </div>
+                <label className="font-label-ui text-label-ui uppercase tracking-wider text-on-surface-variant block" htmlFor="examiner-id">
+                  Username / Examiner ID
+                </label>
                 <div className="relative">
                   <input
                     id="examiner-id"
@@ -167,12 +108,9 @@ export default function LoginPage() {
 
               {/* Password Field */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="font-label-ui text-label-ui uppercase tracking-wider text-on-surface-variant" htmlFor="password-input">
-                    Password / Master Pin
-                  </label>
-                  <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">256-bit AES</span>
-                </div>
+                <label className="font-label-ui text-label-ui uppercase tracking-wider text-on-surface-variant block" htmlFor="password-input">
+                  Password / Master Pin
+                </label>
                 <div className="relative">
                   <input
                     id="password-input"
@@ -196,29 +134,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Workstation Hardware Token Status */}
-              <div className="p-2.5 rounded bg-surface-container-lowest border border-outline-variant space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-ui text-label-ui uppercase tracking-wider text-on-surface-variant">
-                    Workstation Station / Session
-                  </span>
-                  <span className="inline-flex items-center space-x-1 font-label-mono-sm text-label-mono-sm text-primary">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    <span>CRYPT-SYNC</span>
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2 text-on-surface">
-                  <span className="material-symbols-outlined text-primary text-[16px] shrink-0">key</span>
-                  <span className="font-body-sm text-body-sm text-on-surface truncate">
-                    Hardware Token / Security Key verified (YubiKey Slot 1)
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-1 border-t border-outline-variant font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  <span>SERIAL: YK-8921-X9</span>
-                  <span>SLOT: FIDO2/PIV</span>
-                </div>
-              </div>
-
               {/* Sign In Button */}
               <div className="pt-1">
                 <button
@@ -230,17 +145,6 @@ export default function LoginPage() {
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                 </button>
               </div>
-
-              <div className="flex justify-between items-center text-[11px] text-on-surface-variant pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowError(true)}
-                  className="hover:underline text-outline"
-                >
-                  Simulate Token Mismatch
-                </button>
-                <span className="font-mono text-outline">Enclave v4.12</span>
-              </div>
             </form>
           </div>
 
@@ -249,7 +153,7 @@ export default function LoginPage() {
             <div className="flex items-start space-x-2">
               <span className="material-symbols-outlined text-on-surface-variant text-[15px] mt-0.5 shrink-0">verified_user</span>
               <p className="font-body-sm text-body-sm text-on-surface-variant leading-tight">
-                Restricted Access · Authorized forensic examiners and expert reviewers only · All sessions logged to tamper-evident audit ledger
+                Restricted Access · Authorized forensic examiners and expert reviewers only
               </p>
             </div>
           </div>

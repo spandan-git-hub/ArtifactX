@@ -13,7 +13,7 @@ export default function Section63Page() {
     name: activeCase?.examiner || '',
     designation: 'Forensic Examiner & Certifier',
     agency: activeCase?.agency || 'Special Cyber Forensics Division',
-    station: 'Forensic Enclave Workstation',
+    station: 'Forensic Workstation',
     certificateRef: `BSA-2023-SEC63-${activeCase?.caseNumber || caseId || 'DRAFT'}`,
     date: new Date().toISOString().substring(0, 10),
     attested: false
@@ -188,7 +188,7 @@ export default function Section63Page() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. Abhishek Verma"
+                placeholder="Examiner full legal name"
                 value={certifier.name}
                 onChange={(e) => setCertifier({ ...certifier, name: e.target.value })}
                 className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface focus:outline-none focus:border-primary"

@@ -298,14 +298,10 @@ export default function DecryptionPage() {
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant shrink-0">
         <div>
-          <div className="flex items-center space-x-3 mb-1">
+          <div className="mb-1">
             <h1 className="text-headline-lg font-headline-lg font-bold text-on-surface">
               Cryptographic Subsystem &amp; Decryption
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-label-mono-sm bg-primary/10 text-primary border border-primary/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              HARDWARE ENCLAVE ACTIVE
-            </span>
           </div>
           <p className="text-body-sm text-on-surface-variant">
             Forensic file identification across uploaded exhibits: resolve encrypted containers and inspect directly accessible artifacts for case{' '}
@@ -1153,10 +1149,7 @@ export default function DecryptionPage() {
             </div>
 
             {/* Modal Actions Footer */}
-            <div className="pt-4 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-xs text-on-surface-variant font-mono">
-                Enclave status: <span className="text-tertiary font-semibold">READY</span> · FIPS-140-3 Mode
-              </div>
+            <div className="pt-4 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-end gap-3">
 
               <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <button

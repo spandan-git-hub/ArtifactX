@@ -14,18 +14,14 @@ export default function NewCasePage() {
     agency: '',
     examiner: '',
     deviceTarget: '',
-    priority: 'Standard Investigation',
-    incidentType: '',
     description: '',
-    section63Enacted: true,
-    intakeHash: ''
   });
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -64,7 +60,7 @@ export default function NewCasePage() {
               </span>
             </div>
             <p className="text-body-sm text-on-surface-variant">
-              Establish a new cryptographically bound evidence docket, tamper seal ledger, and pipeline staging environment.
+              Create a new forensic case docket and evidence staging workspace.
             </p>
           </div>
 
@@ -85,45 +81,24 @@ export default function NewCasePage() {
             <div className="flex items-center justify-between border-b border-outline-variant pb-2">
               <div className="flex items-center space-x-2">
                 <span className="material-symbols-outlined text-primary text-[18px]">gavel</span>
-                <h2 className="text-headline-sm font-headline-sm text-on-surface">1. Docket Identification & Authorization</h2>
+                <h2 className="text-headline-sm font-headline-sm text-on-surface">1. Docket Identification</h2>
               </div>
-              <span className="text-[11px] font-label-mono-sm text-outline">BSA 2023 §63 Compliant Form</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Case Number */}
-              <div className="space-y-1">
+              <div className="md:col-span-2 space-y-1">
                 <label className="text-label-ui font-label-ui uppercase tracking-wider text-on-surface-variant block">
                   Assigned Case Docket ID *
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="caseNumber"
-                    value={formData.caseNumber}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-label-mono-sm font-label-mono-sm text-primary font-medium focus:outline-none focus:border-primary"
-                  />
-                  <span className="material-symbols-outlined absolute right-2.5 top-2 text-outline text-[16px]">lock</span>
-                </div>
-              </div>
-
-              {/* Priority */}
-              <div className="space-y-1">
-                <label className="text-label-ui font-label-ui uppercase tracking-wider text-on-surface-variant block">
-                  Forensic Priority Level
-                </label>
-                <select
-                  name="priority"
-                  value={formData.priority}
+                <input
+                  type="text"
+                  name="caseNumber"
+                  value={formData.caseNumber}
                   onChange={handleChange}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface focus:outline-none focus:border-primary cursor-pointer"
-                >
-                  <option value="Standard">Standard Routine Intake</option>
-                  <option value="Priority Investigation">Priority Investigation (Fast Track)</option>
-                  <option value="Immediate Judicial Exigent">Immediate Judicial Exigent (High Urgency)</option>
-                </select>
+                  required
+                  className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-label-mono-sm font-label-mono-sm text-primary font-medium focus:outline-none focus:border-primary"
+                />
               </div>
 
               {/* Case Title */}
@@ -184,7 +159,7 @@ export default function NewCasePage() {
               <span className="text-[11px] font-label-mono-sm text-outline">Target Parameters</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1">
                 <label className="text-label-ui font-label-ui uppercase tracking-wider text-on-surface-variant block">
                   Target Device Spec / Model / OS
@@ -200,19 +175,6 @@ export default function NewCasePage() {
 
               <div className="space-y-1">
                 <label className="text-label-ui font-label-ui uppercase tracking-wider text-on-surface-variant block">
-                  Primary Investigation Type
-                </label>
-                <input
-                  type="text"
-                  name="incidentType"
-                  value={formData.incidentType}
-                  onChange={handleChange}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-body-sm text-on-surface focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="md:col-span-2 space-y-1">
-                <label className="text-label-ui font-label-ui uppercase tracking-wider text-on-surface-variant block">
                   Technical Objectives / Investigative Summary
                 </label>
                 <textarea
@@ -223,47 +185,6 @@ export default function NewCasePage() {
                   onChange={handleChange}
                   className="w-full bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-2 text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Statutory Certification & Chain of Custody Intake */}
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-space-lg space-y-4 shadow-sm">
-            <div className="flex items-center justify-between border-b border-outline-variant pb-2">
-              <div className="flex items-center space-x-2">
-                <span className="material-symbols-outlined text-primary text-[18px]">verified_user</span>
-                <h2 className="text-headline-sm font-headline-sm text-on-surface">3. Statutory Verification & Custodial Intake</h2>
-              </div>
-              <span className="text-[11px] font-label-mono-sm text-tertiary">Cryptographic Genesis Block</span>
-            </div>
-
-            <div className="space-y-3">
-              <label className="flex items-start space-x-3 cursor-pointer p-3 rounded bg-surface-container-low border border-outline-variant">
-                <input
-                  type="checkbox"
-                  name="section63Enacted"
-                  checked={formData.section63Enacted}
-                  onChange={handleChange}
-                  className="mt-0.5 rounded border-outline-variant text-primary focus:ring-0 cursor-pointer"
-                />
-                <div className="space-y-0.5 text-body-sm">
-                  <span className="font-semibold text-on-surface block">
-                    Statutory Attestation under Section 63 Bharatiya Sakshya Adhiniyam, 2023
-                  </span>
-                  <p className="text-on-surface-variant text-[12px]">
-                    I confirm that digital evidence ingestion will adhere to strict hash integrity tracking, dual SHA-256 / BLAKE3 verification, and immutable ledger append operations.
-                  </p>
-                </div>
-              </label>
-
-              <div className="p-3 bg-surface-container-low border border-outline-variant rounded space-y-1">
-                <div className="flex items-center justify-between text-label-mono-sm text-[11px]">
-                  <span className="text-on-surface-variant">Default Case Genesis Root Hash:</span>
-                  <span className="text-primary font-medium">ED25519 Enclave Bound</span>
-                </div>
-                <code className="text-[11px] font-mono text-on-surface block bg-surface-container-lowest p-1.5 rounded border border-outline-variant select-all">
-                  {formData.intakeHash}
-                </code>
               </div>
             </div>
           </div>

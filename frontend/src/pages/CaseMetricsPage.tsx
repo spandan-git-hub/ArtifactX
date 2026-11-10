@@ -41,13 +41,10 @@ export default function CaseMetricsPage() {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-outline-variant">
         <div>
-          <div className="flex items-center space-x-2.5 mb-1">
+          <div className="mb-1">
             <h1 className="text-headline-md font-headline-md font-semibold text-on-surface">
               Case Metrics &amp; Evidentiary Health Telemetry
             </h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-container-high border border-outline-variant text-on-surface-variant uppercase tracking-wider">
-              LIVE TELEMETRY
-            </span>
           </div>
           <p className="text-body-sm font-body-sm text-on-surface-variant">
             Statistical extraction yield, cryptographic health indicators, and pipeline performance metrics for case {activeCase?.caseNumber || 'N/A'}.

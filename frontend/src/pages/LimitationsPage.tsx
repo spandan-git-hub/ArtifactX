@@ -6,48 +6,12 @@ export default function LimitationsPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto custom-scrollbar p-space-lg space-y-5">
-      {/* Statutory Protocol Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-outline-variant text-xs text-on-surface-variant font-mono">
-        <div className="flex items-center gap-2">
-          <span className="text-tertiary flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            1. Ingest
-          </span>
-          <span className="text-outline">→</span>
-          <span className="text-tertiary flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            2. Decryption
-          </span>
-          <span className="text-outline">→</span>
-          <span className="text-tertiary flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            3. Parsing
-          </span>
-          <span className="text-outline">→</span>
-          <span className="text-tertiary flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            4. Correlation
-          </span>
-          <span className="text-outline">→</span>
-          <span className="text-primary font-semibold flex items-center gap-1 bg-surface-container-high px-2 py-0.5 rounded border border-primary/40">
-            <span className="material-symbols-outlined text-sm">verified</span>
-            5. Evidentiary Bounds
-          </span>
-        </div>
-        <span className="text-outline">Statutory Protocol: ISO/IEC 27037:2012 §6.4</span>
-      </div>
-
       {/* Page Title & Actions */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 pb-3 border-b border-outline-variant">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-label-mono-sm text-primary font-mono tracking-wider uppercase text-xs">
-              Forensic Protocol Specification
-            </span>
-            <span className="px-1.5 py-0.2 bg-surface-container text-on-surface-variant border border-outline-variant rounded text-[10px] font-mono">
-              DOC-ID: ARX-LIM-8942
-            </span>
-          </div>
+          <span className="text-label-mono-sm text-primary font-mono tracking-wider uppercase text-xs block mb-1">
+            Forensic Protocol Specification
+          </span>
           <h1 className="text-headline-lg font-headline-lg font-semibold text-on-surface tracking-tight">
             Limitations and Evidentiary Methods
           </h1>
@@ -63,15 +27,7 @@ export default function LimitationsPage() {
             className="btn-secondary text-xs"
           >
             <span className="material-symbols-outlined text-[16px]">print</span>
-            <span>Export Certificate</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => alert('Annex sealed with Ed25519 signature.')}
-            className="btn-primary text-xs"
-          >
-            <span className="material-symbols-outlined text-[16px]">file_download</span>
-            <span>Seal Methodology Annex</span>
+            <span>Print Disclosure</span>
           </button>
         </div>
       </div>
@@ -100,9 +56,6 @@ export default function LimitationsPage() {
               Threshold Calibration Matrix &amp; Confidence Criteria
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-primary bg-surface-container-high border border-outline-variant px-2.5 py-1 rounded">
-            Heuristic Engine v2.4-A
-          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

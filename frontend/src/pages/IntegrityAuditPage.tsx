@@ -67,16 +67,16 @@ export default function IntegrityAuditPage() {
       {/* Audit Chain Horizontal Banner */}
       <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2 bg-surface-container border border-outline-variant rounded-lg shrink-0">
         <div className="flex items-center space-x-2 text-label-mono-sm text-xs">
-          <span className={`inline-block w-2 h-2 rounded-full ${hasExceptions ? 'bg-error animate-ping' : 'bg-tertiary animate-pulse'}`} />
+          <span className={`inline-block w-2 h-2 rounded-full ${evidences.length === 0 ? 'bg-outline' : hasExceptions ? 'bg-error animate-ping' : 'bg-tertiary animate-pulse'}`} />
           <span className="text-on-surface-variant font-medium">Audit Ledger State:</span>
-          <span className={`font-semibold ${hasExceptions ? 'text-error' : 'text-tertiary'}`}>
-            {hasExceptions ? 'INTEGRITY FLAG DETECTED' : 'CHAIN VALID — RECOMPUTED CHECKSUMS VERIFIED'}
+          <span className={`font-semibold ${evidences.length === 0 ? 'text-on-surface-variant' : hasExceptions ? 'text-error' : 'text-tertiary'}`}>
+            {evidences.length === 0 ? 'NO EVIDENCE REGISTERED' : hasExceptions ? 'INTEGRITY FLAG DETECTED' : 'CHAIN VALID — RECOMPUTED CHECKSUMS VERIFIED'}
           </span>
           <span className="text-outline">|</span>
           <span className="text-on-surface-variant">Active Case: {activeCase?.caseNumber || 'N/A'}</span>
         </div>
         <div className="flex items-center space-x-2 text-label-mono-sm text-xs text-on-surface-variant">
-          <span>Signer: SHA-256 / BLAKE3 Cryptographic Engine</span>
+          <span>Algorithm: SHA-256</span>
         </div>
       </section>
 

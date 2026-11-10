@@ -8,7 +8,7 @@ import {
 
 const REPORT_SECTIONS = [
   { id: 'sec-01', title: '1. Official Case Details & Ingestion Manifest', desc: 'Case docket, jurisdiction, scope, target device, root SHA-256 hash, and high-level metrics', checked: true },
-  { id: 'sec-02', title: '2. Forensic Analysis Methodology & Proper Process Followed', desc: 'Methods used (Bitstream hashing, Decryption enclaves, AST SQLite parsing, Carving) and ISO/IEC 27037 5-stage SOP', checked: true },
+  { id: 'sec-02', title: '2. Forensic Analysis Methodology & Proper Process Followed', desc: 'Methods used (Bitstream hashing, In-memory decryption, AST SQLite parsing, Carving) and ISO/IEC 27037 5-stage SOP', checked: true },
   { id: 'sec-03', title: '3. Evidence Schedule & Hash Integrity Verification (with Metrics)', desc: 'Intake SHA-256 vs re-computed SHA-256 comparison table, match status, and 100% preservation verification metrics', checked: true },
   { id: 'sec-04', title: '4. Deleted Data Recovery Findings by Strength (with Metrics)', desc: '4-Tier classification breakdown (Tier 1 Explicit, Tier 2 WAL, Tier 3 Freelist/Slack, Tier 4 Gap indicators) with metrics', checked: true },
   { id: 'sec-05', title: '5. Cross-Platform Evidence Correlations Performed (with Metrics)', desc: 'Resolved person identities, platform handovers, perceptual media hashes, and shared deterministic artifacts', checked: true },
@@ -108,9 +108,11 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center space-x-3 text-label-mono-sm text-on-surface-variant text-xs">
           <span>Case: {activeCase?.caseNumber || activeCase?.name || 'Active'}</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-tertiary/10 text-tertiary border border-tertiary/30">
-            {activeCase?.integrityState || 'CHAIN ACTIVE (100%)'}
-          </span>
+          {activeCase?.integrityState && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] bg-tertiary/10 text-tertiary border border-tertiary/30">
+              {activeCase.integrityState}
+            </span>
+          )}
         </div>
       </div>
 
@@ -192,8 +194,8 @@ export default function ReportsPage() {
           </div>
         </section>
 
-        {/* Dual Column Layout: Sections Checklist (5 Cols) + Live Document Preview (7 Cols) */}
-        <div className="grid grid-cols-12 gap-4">
+        {/* Dual Column Layout: Sections Checklist (5 Cols) + Historical Reports (7 Cols) */}
+        <div className="grid grid-cols-12 gap-4 items-start">
           {/* Left Column: Sections Checklist */}
           <div className="col-span-12 lg:col-span-5 bg-surface-container border border-outline-variant rounded-lg p-4 shadow-xs space-y-3">
             <div className="pb-2 border-b border-outline-variant flex items-center justify-between">
@@ -202,7 +204,7 @@ export default function ReportsPage() {
                   Report Sections Included ({sections.filter(s => s.checked).length}/{sections.length})
                 </h3>
                 <span className="text-[11px] text-on-surface-variant">
-                  Standard forensic structure meeting legal rules of evidence
+                  Select sections to include in the generated PDF draft
                 </span>
               </div>
               <button
@@ -239,169 +241,79 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Right Column: Live Document Preview (7 Cols) */}
-          <div className="col-span-12 lg:col-span-7 bg-surface-container border border-outline-variant rounded-lg p-6 shadow-xs space-y-5">
-            {/* Document Header */}
-            <div className="text-center pb-4 border-b-2 border-outline-variant space-y-1">
-              <div className="font-mono text-xs uppercase tracking-widest text-outline">
-                FORENSIC EVIDENCE REPORT — DRAFT FOR EXPERT REVIEW
+          {/* Right Column: Historical Generated Reports Table (7 Cols) */}
+          <section className="col-span-12 lg:col-span-7 bg-surface-container border border-outline-variant rounded-lg p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-base">history</span>
+                <h3 className="font-headline-sm text-sm font-semibold text-on-surface">
+                  Generated Report History ({history.length})
+                </h3>
               </div>
-              <h2 className="text-xl font-bold font-headline-lg text-on-surface tracking-tight">
-                DIGITAL FORENSIC EVIDENCE REPORT
-              </h2>
-              <div className="font-mono text-xs text-primary font-semibold">
-                DOCKET ID: {activeCase?.caseNumber || activeCase?.name || 'CASE-001'} · ISO/IEC 27037 FORENSIC SOUNDNESS
-              </div>
+              <button
+                type="button"
+                onClick={loadHistory}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[13px]">refresh</span>
+                Refresh History
+              </button>
             </div>
 
-            {/* Case Details Box */}
-            <div className="p-3 rounded bg-surface-container-low border border-outline-variant space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Case Docket:</span>
-                <span className="text-on-surface font-semibold">#{caseId} — {activeCase?.name || 'Forensic Exhibit'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Lead Examiner:</span>
-                <span className="text-on-surface">{leadAnalyst}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Agency / Unit:</span>
-                <span className="text-on-surface">{agency}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-on-surface-variant">Bitstream Integrity:</span>
-                <span className="text-emerald-400 font-bold">100% INTACT (FIPS 180-4 SHA-256 VERIFIED)</span>
-              </div>
-            </div>
+            {loadingHistory && (
+              <div className="py-4 text-center text-xs font-mono text-outline">Loading report history...</div>
+            )}
 
-            {/* Seven Forensic Scope Modules Overview */}
-            <div className="space-y-2 text-xs">
-              <div className="font-semibold text-on-surface uppercase tracking-wider text-[11px] text-outline">
-                Report Modules Included in Downloaded PDF:
+            {!loadingHistory && history.length === 0 && (
+              <div className="py-6 text-center text-xs font-mono text-outline">
+                No reports have been generated yet for this case. Click "Download PDF Report" above to generate a draft forensic report.
               </div>
-              <div className="space-y-1.5 text-on-surface-variant leading-relaxed">
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>1. Case Details &amp; Scope:</b> Evidence containers, targets, examiner details, docket manifest.</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>2. Analysis Methodology &amp; Proper Process:</b> Bitstream hashing, decryption enclaves, AST SQLite traversal, and ISO/IEC 27037 5-stage SOP.</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>3. Hash Integrity Verification (with Metrics):</b> Intake hash vs extraction hash comparison, 100% preservation rate.</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>4. Recovery Findings by Strength (with Metrics):</b> 4-tier classification (Tier 1 Explicit, Tier 2 WAL, Tier 3 Freelist/Slack, Tier 4 Gaps).</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>5. Cross-Platform Correlations (with Metrics):</b> Resolved identities, platform handovers, perceptual media hashes, and shared deterministic artifacts.</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>6. Chronological Conversation Timeline:</b> Multi-device conversation dialogue in strict chronological order.</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="material-symbols-outlined text-[14px] text-primary">check_circle</span>
-                  <span><b>7. Limitations &amp; Set Rules:</b> Immutable architectural rules (R3, R4, R8, R10, R12) and sequence gap disclosures.</span>
-                </div>
-              </div>
-            </div>
+            )}
 
-            {/* Signature & Seal Block */}
-            <div className="pt-4 border-t border-outline-variant flex justify-between items-end text-xs font-mono">
-              <div>
-                <span className="text-outline block text-[10px]">VERIFICATION ENGINE:</span>
-                <span className="text-primary font-semibold">ArtifactX Forensic Pure Engine</span>
-                <span className="text-outline block text-[10px] mt-1">STATUS: DRAFT — PENDING EXAMINER ATTESTATION</span>
-              </div>
-
-              <div className="text-right">
-                <div className="w-36 border-b border-on-surface pb-1 mb-1 font-serif text-sm italic text-on-surface text-center">
-                  {leadAnalyst}
-                </div>
-                <span className="text-[10px] text-outline uppercase block">Lead Forensic Examiner Signature</span>
-                <span className="text-[10px] text-primary">{new Date().toISOString().substring(0, 10)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Historical Generated Reports Table */}
-        <section className="bg-surface-container border border-outline-variant rounded-lg p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-base">history</span>
-              <h3 className="font-headline-sm text-sm font-semibold text-on-surface">
-                Generated Report History &amp; Immutable Audit Signatures ({history.length})
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={loadHistory}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[13px]">refresh</span>
-              Refresh History
-            </button>
-          </div>
-
-          {loadingHistory && (
-            <div className="py-4 text-center text-xs font-mono text-outline">Loading report history...</div>
-          )}
-
-          {!loadingHistory && history.length === 0 && (
-            <div className="py-6 text-center text-xs font-mono text-outline">
-              No reports have been generated yet for this case. Click "Download PDF Report" above to generate and sign the first official forensic manifest.
-            </div>
-          )}
-
-          {!loadingHistory && history.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-outline-variant text-outline uppercase text-[10px]">
-                    <th className="pb-2">Generated Timestamp</th>
-                    <th className="pb-2">Report Filename</th>
-                    <th className="pb-2">Examiner</th>
-                    <th className="pb-2">Pages</th>
-                    <th className="pb-2">SHA-256 Digest</th>
-                    <th className="pb-2 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/40">
-                  {history.map((rep) => (
-                    <tr key={rep.report_id} className="hover:bg-surface-container-high transition-colors">
-                      <td className="py-2 text-on-surface">
-                        {rep.created_at ? rep.created_at.replace('T', ' ').substring(0, 19) : '—'}
-                      </td>
-                      <td className="py-2 text-on-surface font-semibold max-w-[200px] truncate" title={rep.filename}>
-                        {rep.filename}
-                      </td>
-                      <td className="py-2 text-on-surface-variant">{rep.lead_analyst || 'Examiner'}</td>
-                      <td className="py-2 text-on-surface">{rep.total_pages || 1}</td>
-                      <td className="py-2 text-primary font-mono text-[11px]" title={rep.sha256}>
-                        {rep.sha256 ? `${rep.sha256.substring(0, 16)}...` : '—'}
-                      </td>
-                      <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => downloadHistoricalReport(caseId, rep.report_id, rep.filename)}
-                          className="px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold cursor-pointer"
-                        >
-                          Re-Download
-                        </button>
-                      </td>
+            {!loadingHistory && history.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-outline-variant text-outline uppercase text-[10px]">
+                      <th className="pb-2">Generated Timestamp</th>
+                      <th className="pb-2">Report Filename</th>
+                      <th className="pb-2">Examiner</th>
+                      <th className="pb-2">Pages</th>
+                      <th className="pb-2">SHA-256 Digest</th>
+                      <th className="pb-2 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/40">
+                    {history.map((rep) => (
+                      <tr key={rep.report_id} className="hover:bg-surface-container-high transition-colors">
+                        <td className="py-2 text-on-surface">
+                          {rep.created_at ? rep.created_at.replace('T', ' ').substring(0, 19) : '—'}
+                        </td>
+                        <td className="py-2 text-on-surface font-semibold max-w-[200px] truncate" title={rep.filename}>
+                          {rep.filename}
+                        </td>
+                        <td className="py-2 text-on-surface-variant">{rep.lead_analyst || 'Examiner'}</td>
+                        <td className="py-2 text-on-surface">{rep.total_pages || 1}</td>
+                        <td className="py-2 text-primary font-mono text-[11px]" title={rep.sha256}>
+                          {rep.sha256 ? `${rep.sha256.substring(0, 16)}...` : '—'}
+                        </td>
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => downloadHistoricalReport(caseId, rep.report_id, rep.filename)}
+                            className="px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold cursor-pointer"
+                          >
+                            Re-Download
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
