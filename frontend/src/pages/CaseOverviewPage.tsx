@@ -563,7 +563,7 @@ export default function CaseOverviewPage() {
           >
             <span className="material-symbols-outlined text-red-400 text-[24px] group-hover:scale-110 transition-transform">description</span>
             <span className="text-body-sm font-semibold text-on-surface">Reports</span>
-            <span className="text-[10px] text-outline font-mono">Court PDF</span>
+            <span className="text-[10px] text-outline font-mono">Forensic PDF</span>
           </Link>
         </div>
 

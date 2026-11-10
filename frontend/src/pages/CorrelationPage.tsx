@@ -726,7 +726,7 @@ const CorrelationPage = () => {
                   <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div className="text-xs font-mono text-on-surface">
-                      <span className="font-bold text-amber-700 dark:text-amber-300">Forensic Admissibility Rule: </span>
+                      <span className="font-bold text-amber-700 dark:text-amber-300">Forensic Integrity Rule: </span>
                       {ambiguousEdges.length} ambiguous name candidate(s) detected. Identities are NEVER clustered solely on display name similarity without E.164 phone or cryptographic corroboration.
                     </div>
                   </div>

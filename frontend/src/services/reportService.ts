@@ -114,14 +114,14 @@ export const getDeletedSummary = async (caseId: any) => {
 
 // Backward-compatibility aliases
 export const generateReport = generateReportStream;
-export const generateCourtReportStream = generateReportStream;
+export const generateForensicReportStream = generateReportStream;
 export const downloadReport = (caseId: any, filename: string) => {
   window.open(`${API_BASE}/reports/download/${caseId}/${filename}`, '_blank');
 };
 
 export default {
   generateReportStream,
-  generateCourtReportStream,
+  generateForensicReportStream,
   generateReport,
   downloadReport,
   getReportHistory,

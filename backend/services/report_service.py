@@ -941,8 +941,9 @@ class ReportService:
         elements.append(PageBreak())
         elements.append(Paragraph("6. Technical Limitations & Application Set Rules", section_h1))
         elements.append(Paragraph(
-            "To uphold rigorous courtroom admissibility and eliminate speculative bias, the ArtifactX forensic engine "
-            "operates under immutable architectural rules and explicitly declares technical limitations.",
+            "To eliminate speculative bias and maintain scientific rigour, the ArtifactX forensic engine "
+            "operates under immutable architectural rules and explicitly declares technical limitations. "
+            "All outputs are drafts requiring independent expert verification.",
             body_text
         ))
         elements.append(Spacer(1, 8))

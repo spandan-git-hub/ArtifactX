@@ -82,22 +82,22 @@ export default function LimitationsPage() {
           <span className="material-symbols-outlined text-amber-500 text-[22px] mt-0.5 shrink-0">warning</span>
           <div className="space-y-1">
             <span className="text-label-ui font-label-ui text-amber-400 uppercase tracking-wider block font-semibold text-xs">
-              Mandatory Judicial &amp; Laboratory Disclosure
+              Mandatory Expert &amp; Laboratory Disclosure
             </span>
             <p className="text-body-md font-body-md text-on-surface leading-relaxed text-sm">
-              <strong className="text-amber-200">Scores are heuristic orderings, not probabilities.</strong> A score of <code className="font-mono text-primary bg-surface-container px-1 py-0.5 rounded text-xs">0.85</code> indicates that an item satisfied 85% of qualifying heuristic rules; it does <span className="underline decoration-amber-500 underline-offset-2 font-medium">NOT</span> represent an 85% mathematical probability of human truth or event occurrence in reality. Courts and counsel must treat these indexes as triage rankings rather than absolute empirical frequencies.
+              <strong className="text-amber-200">Scores are heuristic orderings, not probabilities.</strong> A score of <code className="font-mono text-primary bg-surface-container px-1 py-0.5 rounded text-xs">0.85</code> indicates that an item satisfied 85% of qualifying heuristic rules; it does <span className="underline decoration-amber-500 underline-offset-2 font-medium">NOT</span> represent an 85% mathematical probability of human truth or event occurrence in reality.               Reviewing examiners and counsel must treat these indexes as triage rankings rather than absolute empirical frequencies.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Threshold Calibration Matrix & Admissibility Criteria */}
+      {/* Threshold Calibration Matrix & Confidence Criteria */}
       <section className="bg-surface-container border border-outline-variant rounded-lg p-space-lg space-y-4 shadow-xs">
         <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">rule_settings</span>
             <h2 className="text-headline-sm font-headline-sm font-semibold text-on-surface">
-              Threshold Calibration Matrix &amp; Admissibility Criteria
+              Threshold Calibration Matrix &amp; Confidence Criteria
             </h2>
           </div>
           <span className="text-[11px] font-mono text-primary bg-surface-container-high border border-outline-variant px-2.5 py-1 rounded">

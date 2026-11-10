@@ -137,7 +137,7 @@ export default function ReportsPage() {
                 onChange={(e) => setReportType(e.target.value)}
                 className="bg-surface-container-lowest border border-outline-variant rounded text-on-surface text-body-sm px-3 py-1.5 focus:outline-none focus:border-primary cursor-pointer"
               >
-                <option value="full">Forensic Evidence Report (Complete Court &amp; Technical Manifest)</option>
+                <option value="full">Forensic Evidence Report (Complete Technical Manifest — Draft for Expert Review)</option>
                 <option value="summary">Forensic Summary Report (Executive Brief with Hash Metrics)</option>
               </select>
             </div>
@@ -244,7 +244,7 @@ export default function ReportsPage() {
             {/* Document Header */}
             <div className="text-center pb-4 border-b-2 border-outline-variant space-y-1">
               <div className="font-mono text-xs uppercase tracking-widest text-outline">
-                COURT OF JUDICIAL MAGISTRATE / FORENSIC TRIBUNAL
+                FORENSIC EVIDENCE REPORT — DRAFT FOR EXPERT REVIEW
               </div>
               <h2 className="text-xl font-bold font-headline-lg text-on-surface tracking-tight">
                 DIGITAL FORENSIC EVIDENCE REPORT
@@ -316,7 +316,7 @@ export default function ReportsPage() {
               <div>
                 <span className="text-outline block text-[10px]">VERIFICATION ENGINE:</span>
                 <span className="text-primary font-semibold">ArtifactX Forensic Pure Engine</span>
-                <span className="text-outline block text-[10px] mt-1">STATUS: CERTIFIED ADMISSIBLE (BSA §63 FORM B)</span>
+                <span className="text-outline block text-[10px] mt-1">STATUS: DRAFT — PENDING EXAMINER ATTESTATION</span>
               </div>
 
               <div className="text-right">
