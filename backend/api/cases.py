@@ -1,5 +1,7 @@
 """Case management API endpoints."""
 
+from datetime import datetime
+import hashlib
 import re
 import traceback
 from pathlib import Path
@@ -24,9 +26,10 @@ from backend.models.models import (
     PipelineRun, PipelineStageRun,
     ActivityLog, ErrorLog, AnalysisLog, GeneratedReport
 )
-from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead
+from backend.schemas.case import CaseCreate, CaseRead, CaseUpdate, CaseWorkspaceRead, Section63AttestRequest
 from backend.schemas.metrics import CaseMetricsResponse
 from backend.services.audit_service import AuditService
+from backend.services.integrity_service import compute_case_integrity_rollup
 from backend.services.log_service import get_log_service
 from backend.utils.file_storage import delete_file, cleanup_case_disk_data
 
@@ -94,7 +97,14 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
 def get_cases(db: Session = Depends(get_db)):
     cases = db.query(Case).all()
     for c in cases:
-        c.evidence_count = db.query(Evidence).filter(Evidence.case_id == c.id).count()
+        rollup = compute_case_integrity_rollup(c.id, db)
+        c.evidence_count = rollup["total_exhibits"]
+        c.total_exhibits = rollup["total_exhibits"]
+        c.verified_exhibits = rollup["verified_exhibits"]
+        c.mismatched_exhibits = rollup["mismatched_exhibits"]
+        c.unverified_exhibits = rollup["unverified_exhibits"]
+        c.hash_integrity_percentage = rollup["hash_integrity_percentage"]
+        c.integrity_state = rollup["integrity_state"]
     return cases
 
 
@@ -103,6 +113,15 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    rollup = compute_case_integrity_rollup(case_id, db)
+    case.evidence_count = rollup["total_exhibits"]
+    case.total_exhibits = rollup["total_exhibits"]
+    case.verified_exhibits = rollup["verified_exhibits"]
+    case.mismatched_exhibits = rollup["mismatched_exhibits"]
+    case.unverified_exhibits = rollup["unverified_exhibits"]
+    case.hash_integrity_percentage = rollup["hash_integrity_percentage"]
+    case.integrity_state = rollup["integrity_state"]
 
     evidence_items = db.query(Evidence).filter(Evidence.case_id == case_id).all()
     evidence_summaries = []
@@ -129,7 +148,7 @@ def get_case_workspace(case_id: int, db: Session = Depends(get_db)):
             "analyzed_at": ev.analyzed_at
         })
 
-    hash_integrity_score = 100.0 if total_evidence_files == 0 else round((valid_hash_count / total_evidence_files) * 100.0, 1)
+    hash_integrity_score = rollup["hash_integrity_percentage"] if rollup["hash_integrity_percentage"] is not None else 100.0
 
     evidence_ids = [ev.id for ev in evidence_items]
     wa_msgs = db.query(WhatsAppMessage).filter(WhatsAppMessage.evidence_id.in_(evidence_ids)).count() if evidence_ids else 0
@@ -188,7 +207,14 @@ def get_case(case_id: int, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    case.evidence_count = db.query(Evidence).filter(Evidence.case_id == case.id).count()
+    rollup = compute_case_integrity_rollup(case.id, db)
+    case.evidence_count = rollup["total_exhibits"]
+    case.total_exhibits = rollup["total_exhibits"]
+    case.verified_exhibits = rollup["verified_exhibits"]
+    case.mismatched_exhibits = rollup["mismatched_exhibits"]
+    case.unverified_exhibits = rollup["unverified_exhibits"]
+    case.hash_integrity_percentage = rollup["hash_integrity_percentage"]
+    case.integrity_state = rollup["integrity_state"]
     return case
 
 
@@ -202,6 +228,9 @@ def update_case(case_id: int, data: CaseUpdate, db: Session = Depends(get_db)):
         for key, value in data.model_dump(exclude_unset=True).items():
             setattr(case, key, value)
 
+        if data.section63_attested and not case.section63_attested_at:
+            case.section63_attested_at = datetime.utcnow()
+
         db.commit()
         db.refresh(case)
 
@@ -212,6 +241,30 @@ def update_case(case_id: int, data: CaseUpdate, db: Session = Depends(get_db)):
             action="update_case",
             description=f"Case updated: {case.name}"
         )
+
+        if data.section63_attested is not None:
+            try:
+                evidences = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+                evidence_hashes = [ev.sha256 for ev in evidences if ev.sha256]
+                schedule_digest = hashlib.sha256("".join(sorted(evidence_hashes)).encode("utf-8")).hexdigest() if evidence_hashes else ""
+                AuditService.append(
+                    db=db,
+                    action="SECTION_63_ATTESTATION_SAVED",
+                    actor=case.examiner_name or case.investigator or "examiner",
+                    case_id=case.id,
+                    details={
+                        "examiner_name": case.examiner_name,
+                        "examiner_designation": case.examiner_designation,
+                        "agency": case.agency,
+                        "section63_ref": case.section63_ref,
+                        "section63_attested": case.section63_attested,
+                        "attested_at": case.section63_attested_at.isoformat() if case.section63_attested_at else None,
+                        "evidence_schedule_hashes": evidence_hashes,
+                        "merkle_root": schedule_digest,
+                    },
+                )
+            except Exception:
+                pass
 
         return case
     except Exception as e:
@@ -227,6 +280,56 @@ def update_case(case_id: int, data: CaseUpdate, db: Session = Depends(get_db)):
             method="PUT"
         )
         raise
+
+
+@router.post("/{case_id}/section63/attest", response_model=CaseRead)
+def attest_section63(case_id: int, req: Section63AttestRequest, db: Session = Depends(get_db)):
+    """Save statutory Section 63 certifier attestation and append immutable audit log."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if req.examiner_name is not None:
+        case.examiner_name = req.examiner_name
+    if req.examiner_designation is not None:
+        case.examiner_designation = req.examiner_designation
+    if req.agency is not None:
+        case.agency = req.agency
+    if req.section63_ref is not None:
+        case.section63_ref = req.section63_ref
+    case.section63_attested = req.section63_attested
+    case.section63_attested_at = datetime.utcnow()
+
+    # Collect evidence schedule hashes
+    evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+    evidence_hashes = [ev.sha256 for ev in evidences if ev.sha256]
+    schedule_digest = hashlib.sha256("".join(sorted(evidence_hashes)).encode("utf-8")).hexdigest() if evidence_hashes else ""
+
+    db.commit()
+    db.refresh(case)
+
+    # Append immutable statutory audit log entry
+    try:
+        AuditService.append(
+            db=db,
+            action="SECTION_63_ATTESTATION_SAVED",
+            actor=case.examiner_name or case.investigator or "examiner",
+            case_id=case.id,
+            details={
+                "examiner_name": case.examiner_name,
+                "examiner_designation": case.examiner_designation,
+                "agency": case.agency,
+                "section63_ref": case.section63_ref,
+                "section63_attested": case.section63_attested,
+                "attested_at": case.section63_attested_at.isoformat() if case.section63_attested_at else None,
+                "evidence_schedule_hashes": evidence_hashes,
+                "merkle_root": schedule_digest,
+            },
+        )
+    except Exception:
+        pass
+
+    return case
 
 
 @router.delete("/{case_id}")

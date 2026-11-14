@@ -21,6 +21,44 @@ export default function CaseListPage() {
     return Array.from(new Set(cases.map((c) => c.examiner).filter(Boolean)));
   }, [cases]);
 
+  // Genuine Cryptographic Hash Audit Rollup across all cases & exhibits
+  const auditRollup = useMemo(() => {
+    let total = 0;
+    let verified = 0;
+    let mismatched = 0;
+    let unverified = 0;
+
+    for (const c of cases) {
+      total += c.totalExhibits ?? c.evidenceCount ?? 0;
+      verified += c.verifiedExhibits ?? 0;
+      mismatched += c.mismatchedExhibits ?? 0;
+      unverified += c.unverifiedExhibits ?? 0;
+    }
+
+    if (total === 0) {
+      return { status: 'NO_EVIDENCE', badgeText: 'NO EVIDENCE', color: 'neutral' };
+    }
+    if (mismatched > 0) {
+      return {
+        status: 'FLAGGED_EXCEPTION',
+        badgeText: `HASH MISMATCH DETECTED (${mismatched} Exceptions)`,
+        color: 'error'
+      };
+    }
+    if (unverified > 0 || verified < total) {
+      return {
+        status: 'PENDING_VERIFICATION',
+        badgeText: 'PENDING VERIFICATION',
+        color: 'amber'
+      };
+    }
+    return {
+      status: 'ALL_VERIFIED',
+      badgeText: `100% VALID (${verified}/${total} Exhibits Verified)`,
+      color: 'success'
+    };
+  }, [cases]);
+
   const filteredCases = useMemo(() => {
     return cases.filter((c) => {
       const matchesSearch =
@@ -30,7 +68,13 @@ export default function CaseListPage() {
 
       const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
       const matchesExaminer = examinerFilter === 'All' || c.examiner.includes(examinerFilter);
-      const matchesIntegrity = integrityFilter === 'All' || c.integrityState === integrityFilter;
+
+      const normFilter = integrityFilter.toUpperCase().replace(/\s+/g, '_');
+      const normCaseState = (c.integrityState || '').toUpperCase().replace(/\s+/g, '_');
+      const matchesIntegrity =
+        integrityFilter === 'All' ||
+        normCaseState === normFilter ||
+        c.integrityState === integrityFilter;
 
       return matchesSearch && matchesStatus && matchesExaminer && matchesIntegrity;
     });
@@ -74,6 +118,34 @@ export default function CaseListPage() {
           <div className="bg-surface-container border border-outline-variant rounded px-2.5 py-1 flex items-center space-x-2">
             <span className="text-outline uppercase text-[10px]">TOTAL CASES:</span>
             <span className="text-on-surface font-semibold">{cases.length}</span>
+          </div>
+
+          <div className="bg-surface-container border border-outline-variant rounded px-2.5 py-1 flex items-center space-x-2">
+            <span className="text-outline uppercase text-[10px]">HASH AUDIT:</span>
+            {auditRollup.color === 'success' && (
+              <span className="text-tertiary font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">verified</span>
+                {auditRollup.badgeText}
+              </span>
+            )}
+            {auditRollup.color === 'error' && (
+              <span className="text-error font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">warning</span>
+                {auditRollup.badgeText}
+              </span>
+            )}
+            {auditRollup.color === 'amber' && (
+              <span className="text-amber-500 font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">hourglass_empty</span>
+                {auditRollup.badgeText}
+              </span>
+            )}
+            {auditRollup.color === 'neutral' && (
+              <span className="text-on-surface-variant font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">folder_off</span>
+                {auditRollup.badgeText}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -129,9 +201,10 @@ export default function CaseListPage() {
             className="bg-surface-container-lowest border border-outline-variant text-on-surface px-2.5 py-1.5 rounded text-body-sm focus:outline-none focus:border-primary cursor-pointer"
           >
             <option value="All">Integrity: All States</option>
-            <option value="All verified">All verified</option>
-            <option value="Flagged Exception">Flagged Exception</option>
-            <option value="Pending Ingestion">Pending Ingestion</option>
+            <option value="ALL_VERIFIED">All verified</option>
+            <option value="FLAGGED_EXCEPTION">Flagged Exception</option>
+            <option value="PENDING_VERIFICATION">Pending Verification</option>
+            <option value="NO_EVIDENCE">No Evidence</option>
           </select>
         </div>
 
@@ -207,22 +280,28 @@ export default function CaseListPage() {
                     </td>
 
                     <td className="py-3 px-3">
-                      {c.integrityState === 'All verified' && (
+                      {(c.integrityState === 'ALL_VERIFIED' || c.integrityState === 'All verified') && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-tertiary/10 text-tertiary border border-tertiary/30">
                           <span className="material-symbols-outlined text-[13px]">verified</span>
                           All verified
                         </span>
                       )}
-                      {c.integrityState === 'Flagged Exception' && (
+                      {(c.integrityState === 'FLAGGED_EXCEPTION' || c.integrityState === 'Flagged Exception') && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-error/10 text-error border border-error/30">
                           <span className="material-symbols-outlined text-[13px]">warning</span>
                           Flagged Exception
                         </span>
                       )}
-                      {c.integrityState === 'Pending Ingestion' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">
+                      {(c.integrityState === 'PENDING_VERIFICATION' || c.integrityState === 'Pending Ingestion' || c.integrityState === 'PENDING') && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/30">
                           <span className="material-symbols-outlined text-[13px]">hourglass_empty</span>
-                          Pending
+                          Pending Verification
+                        </span>
+                      )}
+                      {(c.integrityState === 'NO_EVIDENCE' || !c.integrityState || c.evidenceCount === 0) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">
+                          <span className="material-symbols-outlined text-[13px]">folder_off</span>
+                          No Evidence
                         </span>
                       )}
                     </td>

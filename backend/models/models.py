@@ -53,6 +53,11 @@ class Case(Base):
     legal_authority = Column(Text, nullable=True)
     jurisdiction = Column(String(255), nullable=True)
 
+    # Statutory Section 63 Attestation fields
+    section63_ref = Column(String(255), nullable=True)
+    section63_attested = Column(Boolean, default=False, nullable=True)
+    section63_attested_at = Column(DateTime, nullable=True)
+
     evidence_items = relationship(
         "Evidence", back_populates="case", cascade="all, delete-orphan"
     )
@@ -549,7 +554,9 @@ class TimelineEvent(Base):
     time_flags = Column(JSON, default=list)
     raw_timestamp = Column(Text, nullable=True)
     actor_ref = Column(String(255), nullable=True)
+    actor_name = Column(String(255), nullable=True)
     chat_ref = Column(String(255), nullable=True)
+    chat_title = Column(String(512), nullable=True)
     summary = Column(Text, nullable=True)
     source_refs = Column(JSON, default=list)
     confidence_score = Column(Float, default=1.0)
@@ -919,6 +926,21 @@ class PipelineStageRun(Base):
     errors_json = Column(JSON, nullable=True)
 
     pipeline_run = relationship("PipelineRun", back_populates="stage_runs")
+
+
+class Examiner(Base):
+    """Examiner credential and identification record."""
+
+    __tablename__ = "examiners"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    username = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
+    agency = Column(String(255), nullable=False)
+    designation = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 

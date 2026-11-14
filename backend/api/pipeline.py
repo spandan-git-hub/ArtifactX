@@ -4,6 +4,7 @@ Forensic Pipeline Orchestration API Controller (spec 11_PIPELINE_AND_E2E.md §B1
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
@@ -17,6 +18,27 @@ from backend.services.pipeline_service import ConcurrentPipelineRunError, Pipeli
 
 case_pipeline_router = APIRouter(prefix="/cases/{case_id}/pipeline", tags=["pipeline"])
 global_pipeline_router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+
+
+@case_pipeline_router.get(
+    "/stream",
+)
+def stream_case_pipeline(
+    case_id: int,
+):
+    """
+    Stream live end-to-end analysis pipeline execution via Server-Sent Events (SSE).
+    Emits microsecond timestamps, actual stage metrics, output hashes, and counts.
+    """
+    return StreamingResponse(
+        PipelineService.stream_pipeline_execution(case_id=case_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @case_pipeline_router.post(

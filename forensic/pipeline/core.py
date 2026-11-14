@@ -87,6 +87,7 @@ def run_pipeline(
     keys: Sequence[KeyMaterial] = (),
     cfg: Optional[PipelineConfig] = None,
     run_id: Optional[str] = None,
+    stage_callback: Optional[Any] = None,
 ) -> PipelineResult:
     """
     Execute the deterministic pure forensic analysis pipeline.
@@ -96,6 +97,7 @@ def run_pipeline(
         keys: Sequence of cryptographic key material (radioactive, never persisted).
         cfg: Optional pipeline configuration and thresholds.
         run_id: Optional identifier for this execution run.
+        stage_callback: Optional callable invoked with StageResult as each stage completes.
 
     Returns:
         PipelineResult with structured stages, findings, timeline, and cryptographic content hash.
@@ -105,7 +107,16 @@ def run_pipeline(
     config = cfg or PipelineConfig()
     actual_run_id = run_id or f"run_{int(start_wall_time * 1000)}"
 
-    stages: List[StageResult] = []
+    class StageList(list):
+        def append(self, item):
+            super().append(item)
+            if stage_callback is not None:
+                try:
+                    stage_callback(item)
+                except Exception:
+                    pass
+
+    stages: List[StageResult] = StageList()
     failed_evidence_ids: Set[str] = set()
     skipped_downstream_evidence_ids: Set[str] = set()
 

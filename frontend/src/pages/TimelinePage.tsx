@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useActiveCase } from '../context/CaseContext';
 import { timelineService } from '../services/timelineService';
+import { chatService } from '../services/chatService';
 
 // --- Helper Formatter Functions ---
 
-/** Formats contact references and raw JIDs into clean human-readable names */
-export const formatContactLabel = (rawRef: any): string => {
+/** Formats contact references and raw JIDs into clean human-readable names dynamically without mock identities */
+export const formatContactLabel = (rawRef: any, contactsMap?: Record<string, string>): string => {
   if (!rawRef) return 'System / Unassigned';
   const str = String(rawRef).trim();
   if (
@@ -20,47 +21,17 @@ export const formatContactLabel = (rawRef: any): string => {
   if (str === 'status@broadcast') return 'WhatsApp Status';
   if (str === '-1') return 'Unassigned Contact';
 
-  // Resolved Case Interlocutors & Known Dialogs
-  if (str === '120363024888888@g.us') return 'Titan Operations Group';
-  if (
-    str === '15550199001@s.whatsapp.net' ||
-    str === '15550199001' ||
-    str === 'tg_dialog_2002' ||
-    str === 'tg_user_2002' ||
-    str === '2002'
-  ) {
-    return 'Alice Smith (+1 555-019-9001)';
-  }
-  if (
-    str === '15559876543@s.whatsapp.net' ||
-    str === '15559876543' ||
-    str === 'tg_dialog_2003' ||
-    str === 'tg_user_2003' ||
-    str === '2003'
-  ) {
-    return 'Bob Jones (+1 555-987-6543)';
-  }
-  if (
-    str === '15554567890@s.whatsapp.net' ||
-    str === '15554567890' ||
-    str === 'tg_dialog_2005' ||
-    str === 'tg_user_2005' ||
-    str === '2005'
-  ) {
-    return 'Charlie Vance (+1 555-456-7890)';
-  }
-  if (str === '15550001111@s.whatsapp.net' || str === '15550001111') {
-    return 'Decoy Persona (+1 555-000-1111)';
-  }
-  if (str === 'tg_dialog_-3001' || str === 'tg_user_-3001' || str === '-3001') {
-    return 'Titan Investigation TG Group';
+  // 1. Dynamic Contact Database Resolution
+  if (contactsMap) {
+    if (contactsMap[str]) return contactsMap[str];
+    const strippedTg = str.replace(/^tg_(dialog|user)_/, '');
+    if (contactsMap[strippedTg]) return contactsMap[strippedTg];
+    const strippedWa = str.replace('@s.whatsapp.net', '');
+    if (contactsMap[strippedWa]) return contactsMap[strippedWa];
   }
 
-  if (str.startsWith('tg_dialog_')) return str.replace('tg_dialog_', '');
-  if (str.startsWith('tg_user_')) return str.replace('tg_user_', '');
-
-  // Format WhatsApp numbers: e.g. 19195790479@s.whatsapp.net -> +1 (919) 579-0479
-  if (str.endsWith('@s.whatsapp.net')) {
+  // 2. Forensically Neutral Formatting (E.164 phone numbers, never fabricating identities)
+  if (str.endsWith('@s.whatsapp.net') || (/^\d{7,15}$/.test(str) && !str.startsWith('1001'))) {
     const digits = str.replace('@s.whatsapp.net', '');
     if (digits.length === 11 && digits.startsWith('1')) {
       return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
@@ -68,12 +39,31 @@ export const formatContactLabel = (rawRef: any): string => {
     if (digits.length === 12 && digits.startsWith('91')) {
       return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
     }
-    return `+${digits}`;
+    if (digits.length > 5) {
+      return `+${digits}`;
+    }
   }
+
+  // 3. Forensically Neutral WhatsApp Group
   if (str.includes('@g.us')) {
-    const base = str.replace('@g.us', '');
-    return `Group Chat (${base.slice(0, 8)}...)`;
+    const base = str.split('@')[0];
+    return `Group (${base})`;
   }
+
+  // 4. Forensically Neutral Telegram Identifiers
+  if (str.startsWith('tg_user_')) {
+    return `User ${str.replace('tg_user_', '')}`;
+  }
+  if (str.startsWith('tg_dialog_')) {
+    return `Dialog ${str.replace('tg_dialog_', '')}`;
+  }
+  if (str.startsWith('@')) {
+    return str;
+  }
+  if (/^-?\d+$/.test(str) && str.length > 3) {
+    return `User ${str}`;
+  }
+
   return str;
 };
 
@@ -169,6 +159,44 @@ export default function TimelinePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
+  const [contactsMap, setContactsMap] = useState<Record<string, string>>({});
+
+  // Dynamic Contact Resolution
+  useEffect(() => {
+    if (!caseId) {
+      setContactsMap({});
+      return;
+    }
+    let isMounted = true;
+    const fetchChats = async () => {
+      try {
+        const chats = await chatService.getChats(caseId);
+        if (Array.isArray(chats)) {
+          const map: Record<string, string> = {};
+          for (const c of chats) {
+            const label = c.name || c.title || c.subject || c.jid;
+            if (c.jid) {
+              map[c.jid] = label;
+              const num = String(c.jid).split('@')[0];
+              map[num] = label;
+            }
+            if (c.id) {
+              map[String(c.id)] = label;
+              map[`tg_dialog_${c.id}`] = label;
+              map[`tg_user_${c.id}`] = label;
+            }
+          }
+          if (isMounted) setContactsMap(map);
+        }
+      } catch (err) {
+        console.warn('Failed to load chat contact mappings for timeline:', err);
+      }
+    };
+    fetchChats();
+    return () => {
+      isMounted = false;
+    };
+  }, [caseId]);
 
   // --- View Switcher: 'whatsapp' | 'telegram' | 'ledger' ---
   const [activePlatform, setActivePlatform] = useState<'whatsapp' | 'telegram' | 'ledger'>('whatsapp');
@@ -277,7 +305,7 @@ export default function TimelinePage() {
       const isWa = isWhatsAppEvent(e);
       const platform = isWa ? 'whatsapp' : 'telegram';
       const threadKey = e.chat_ref || e.actor_ref || 'unknown';
-      const formattedName = formatContactLabel(threadKey);
+      const formattedName = e.chat_title || e.actor_name || formatContactLabel(threadKey, contactsMap);
 
       if (!threadMap.has(threadKey)) {
         threadMap.set(threadKey, {
@@ -310,7 +338,7 @@ export default function TimelinePage() {
     });
 
     return Array.from(threadMap.values()).sort((a, b) => b.latestMs - a.latestMs);
-  }, [platformEvents]);
+  }, [platformEvents, contactsMap]);
 
   // Filter threads by search query
   const visibleThreads = useMemo(() => {
@@ -770,7 +798,7 @@ export default function TimelinePage() {
                                 </div>
                               )}
                               <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1 border-t border-outline-variant">
-                                <span>Sender: {formatContactLabel(item.actor_ref)}</span>
+                                <span>Sender: {item.actor_name || formatContactLabel(item.actor_ref, contactsMap)}</span>
                                 <div className="flex items-center gap-2">
                                   <span>{dt.time} UTC</span>
                                   <button
@@ -804,7 +832,7 @@ export default function TimelinePage() {
                                 {content}
                               </div>
                               <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
-                                <span>Thread: {formatContactLabel(item.chat_ref)}</span>
+                                <span>Thread: {item.chat_title || formatContactLabel(item.chat_ref, contactsMap)}</span>
                                 <button
                                   type="button"
                                   onClick={() => setSelectedAuditItem(item)}
@@ -835,7 +863,7 @@ export default function TimelinePage() {
                               <div className={`text-[11px] font-bold mb-1 ${
                                 isWa ? 'text-emerald-700 dark:text-emerald-400' : 'text-blue-700 dark:text-blue-400'
                               }`}>
-                                {formatContactLabel(item.actor_ref)}
+                                {item.actor_name || formatContactLabel(item.actor_ref, contactsMap)}
                               </div>
                             )}
 
@@ -952,11 +980,11 @@ export default function TimelinePage() {
                           </td>
                           <td className="py-2 px-3 font-sans">
                             <span className={outgoing ? 'text-primary font-semibold' : 'text-on-surface'}>
-                              {outgoing ? 'Me (Device Owner)' : formatContactLabel(item.actor_ref)}
+                              {outgoing ? 'Me (Device Owner)' : (item.actor_name || formatContactLabel(item.actor_ref, contactsMap))}
                             </span>
                           </td>
                           <td className="py-2 px-3 font-sans truncate max-w-[160px]" title={item.chat_ref}>
-                            {formatContactLabel(item.chat_ref)}
+                            {item.chat_title || formatContactLabel(item.chat_ref, contactsMap)}
                           </td>
                           <td className="py-2 px-3 font-sans text-on-surface max-w-sm truncate" title={item.summary || item.description}>
                             {item.summary || item.description || '[No payload]'}
@@ -1055,7 +1083,9 @@ export default function TimelinePage() {
                 {selectedAuditItem.actor_ref && (
                   <div className="flex items-center justify-between">
                     <span className="text-on-surface-variant">Actor Reference:</span>
-                    <span className="font-semibold text-on-surface">{formatContactLabel(selectedAuditItem.actor_ref)}</span>
+                    <span className="font-semibold text-on-surface">
+                      {selectedAuditItem.actor_name || formatContactLabel(selectedAuditItem.actor_ref, contactsMap)}
+                    </span>
                   </div>
                 )}
               </div>

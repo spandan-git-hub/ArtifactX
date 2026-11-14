@@ -1,6 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useActiveCase } from '../context/CaseContext';
+import { pipelineService, StageEventData } from '../services/pipelineService';
+
+const formatStageLog = (stage: any): string => {
+  const ts = stage.timestamp || new Date().toISOString();
+  const timeStr = ts.substring(11, 23);
+  const stageName = (stage.stage || 'STAGE').toUpperCase();
+  const status = (stage.status || 'SUCCESS').toUpperCase();
+  const dur = stage.duration_ms !== undefined && stage.duration_ms !== null
+    ? ` (${Number(stage.duration_ms).toFixed(2)} ms)`
+    : '';
+  const hash = stage.output_hash
+    ? ` [sha256:${stage.output_hash.substring(0, 12)}...]`
+    : '';
+
+  let countsStr = '';
+  const rawCounts = stage.counts_json || stage.counts;
+  if (rawCounts && typeof rawCounts === 'object') {
+    const entries = Object.entries(rawCounts).map(([k, v]) => `${k}=${v}`);
+    if (entries.length > 0) countsStr = ` {${entries.join(', ')}}`;
+  }
+
+  const rawErrors = stage.errors_json || stage.errors;
+  const errs = Array.isArray(rawErrors) ? rawErrors : [];
+  const errStr = errs.length > 0 ? ` [ERRORS: ${errs.join('; ')}]` : '';
+
+  return `[${timeStr} UTC] [${stageName}] [${status}]${dur}${countsStr}${hash}${errStr}`;
+};
 
 export default function PipelinePage() {
   const { activeCase, refreshCases } = useActiveCase();
@@ -47,33 +74,79 @@ export default function PipelinePage() {
 
     setTerminalLogs(prev => [
       ...prev,
-      `[${now()} UTC] [START] Initiating automated forensic pipeline for case ${activeCase?.caseNumber || caseId}...`,
-      `[${now()} UTC] [STAGE 1] Validating Merkle tree and SHA-256 integrity on BYTEA evidence buffers...`
+      `[${now()} UTC] [INIT] Connecting to live SSE pipeline stream for case ${activeCase?.caseNumber || caseId}...`
     ]);
 
+    let streamSucceeded = false;
     try {
-      const response = await axios.post(`/api/cases/${caseId}/pipeline/run`);
-      const result = response.data;
-      
-      setTerminalLogs(prev => [
-        ...prev,
-        `[${now()} UTC] [STAGE 2] Pre-gate integrity checks passed.`,
-        `[${now()} UTC] [STAGE 3] Decryption and format detection finished.`,
-        `[${now()} UTC] [STAGE 4] SQLite table parsers executed.`,
-        `[${now()} UTC] [STAGE 5] Unallocated cell recovery completed.`,
-        `[${now()} UTC] [STAGE 6] Timeline and cross-app correlation graph committed.`,
-        `[${now()} UTC] [SUCCESS] Pipeline execution run #${result.id || 'COMPLETE'} finalized with status: ${result.status || 'SUCCESS'}.`
-      ]);
-
+      await pipelineService.streamPipeline(
+        caseId,
+        (event: StageEventData) => {
+          streamSucceeded = true;
+          setTerminalLogs(prev => [...prev, formatStageLog(event)]);
+        },
+        async (streamErr: any) => {
+          console.warn('SSE streaming encountered error, attempting synchronous fallback:', streamErr);
+          if (!streamSucceeded) {
+            setTerminalLogs(prev => [
+              ...prev,
+              `[${now()} UTC] [FALLBACK] Direct streaming unavailable. Invoking synchronous pipeline execution...`
+            ]);
+            try {
+              const res = await pipelineService.runPipeline(caseId);
+              if (res?.stage_runs && Array.isArray(res.stage_runs)) {
+                const logs = res.stage_runs.map((st: any) => formatStageLog(st));
+                setTerminalLogs(p => [...p, ...logs]);
+              }
+              setTerminalLogs(p => [
+                ...p,
+                `[${now()} UTC] [SUMMARY] [${res.status || 'COMPLETED'}] Run #${res.id} finalized with content hash ${res.content_hash || 'N/A'}`
+              ]);
+            } catch (postErr: any) {
+              const msg = postErr.response?.data?.detail || postErr.message || 'Execution error';
+              setTerminalLogs(p => [...p, `[${now()} UTC] [ERROR] Pipeline execution halted: ${msg}`]);
+            }
+          }
+        },
+        async () => {
+          setTerminalLogs(prev => [
+            ...prev,
+            `[${now()} UTC] [COMPLETE] Streaming execution finalized. Case telemetry synchronized.`
+          ]);
+          if (refreshCases) await refreshCases();
+          if (activeTab === 'history') await loadHistoricalRuns();
+        }
+      );
       if (refreshCases) await refreshCases();
       if (activeTab === 'history') await loadHistoricalRuns();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Pipeline execution failed:', err);
       const errMsg = err.response?.data?.detail || err.message || 'Execution error encountered.';
       setTerminalLogs(prev => [
         ...prev,
         `[${now()} UTC] [ERROR] Pipeline execution halted: ${errMsg}`
       ]);
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
+
+  const handleInspectHistoricalRun = async (runId: string) => {
+    try {
+      setPipelineRunning(true);
+      const data = await pipelineService.getRunDetails(runId);
+      const now = () => new Date().toISOString().substring(11, 23);
+      if (data?.stage_runs && Array.isArray(data.stage_runs)) {
+        const parsedLogs = data.stage_runs.map((st: any) => formatStageLog(st));
+        setTerminalLogs([
+          `[${now()} UTC] [HISTORY] Loaded historical run RUN-#${data.id} (Status: ${data.status})`,
+          ...parsedLogs,
+          `[${now()} UTC] [DIGEST] Master Content Hash: ${data.content_hash || 'N/A'}`
+        ]);
+        setActiveTab('pipeline');
+      }
+    } catch (err) {
+      console.error('Failed to load run details:', err);
     } finally {
       setPipelineRunning(false);
     }
@@ -251,8 +324,15 @@ export default function PipelinePage() {
                         {run.status}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-right text-outline">
-                      {run.stages_completed ? `${run.stages_completed} Stages` : 'Full Cycle'}
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleInspectHistoricalRun(run.id)}
+                        className="px-2 py-0.5 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-primary border border-outline-variant text-[11px] transition-colors"
+                        title="Load Run Telemetry in Terminal"
+                      >
+                        Inspect Telemetry
+                      </button>
                     </td>
                   </tr>
                 ))}

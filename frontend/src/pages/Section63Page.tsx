@@ -1,34 +1,66 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useActiveCase } from '../context/CaseContext';
 import { evidenceService } from '../services/evidenceService';
+import { caseService } from '../services/caseService';
 
 export default function Section63Page() {
-  const { activeCase } = useActiveCase();
+  const { activeCase, refreshCases } = useActiveCase();
   const caseId = activeCase?.id;
 
   const [artifacts, setArtifacts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const [certifier, setCertifier] = useState({
-    name: activeCase?.examiner || '',
-    designation: 'Forensic Examiner & Certifier',
+    name: activeCase?.examiner_name || activeCase?.examiner || '',
+    designation: activeCase?.examinerDesignation || 'Forensic Examiner & Certifier',
     agency: activeCase?.agency || 'Special Cyber Forensics Division',
     station: 'Forensic Workstation',
-    certificateRef: `BSA-2023-SEC63-${activeCase?.caseNumber || caseId || 'DRAFT'}`,
-    date: new Date().toISOString().substring(0, 10),
-    attested: false
+    certificateRef: activeCase?.section63Ref || `BSA-2023-SEC63-${activeCase?.caseNumber || caseId || 'DRAFT'}`,
+    date: activeCase?.section63AttestedAt
+      ? new Date(activeCase.section63AttestedAt).toISOString().substring(0, 10)
+      : new Date().toISOString().substring(0, 10),
+    attested: Boolean(activeCase?.section63Attested)
   });
 
   useEffect(() => {
     if (activeCase) {
       setCertifier(prev => ({
         ...prev,
-        name: prev.name || activeCase.examiner || '',
-        agency: prev.agency || activeCase.agency || 'Special Cyber Forensics Division',
-        certificateRef: `BSA-2023-SEC63-${activeCase.caseNumber || caseId || 'DRAFT'}`
+        name: activeCase.examiner_name || activeCase.examiner || prev.name,
+        designation: activeCase.examinerDesignation || prev.designation,
+        agency: activeCase.agency || prev.agency,
+        certificateRef: activeCase.section63Ref || prev.certificateRef || `BSA-2023-SEC63-${activeCase.caseNumber || caseId || 'DRAFT'}`,
+        attested: activeCase.section63Attested !== undefined ? Boolean(activeCase.section63Attested) : prev.attested,
+        date: activeCase.section63AttestedAt
+          ? new Date(activeCase.section63AttestedAt).toISOString().substring(0, 10)
+          : prev.date
       }));
     }
   }, [activeCase, caseId]);
+
+  const handleSaveAttestation = async () => {
+    if (!caseId) return;
+    setSaving(true);
+    try {
+      await caseService.attestSection63(caseId, {
+        examiner_name: certifier.name,
+        examiner_designation: certifier.designation,
+        agency: certifier.agency,
+        section63_ref: certifier.certificateRef,
+        section63_attested: certifier.attested
+      });
+      if (refreshCases) await refreshCases();
+      setSuccessToast('Section 63 Attestation Saved to Case Docket');
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to save Section 63 attestation:', err);
+      alert('Failed to save attestation: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadArtifacts = useCallback(async () => {
     if (!caseId) {
@@ -65,6 +97,23 @@ export default function Section63Page() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
+      {/* Success Notification Toast */}
+      {successToast && (
+        <div className="bg-tertiary/10 border-b border-tertiary/40 px-space-lg py-2 flex items-center justify-between text-xs text-tertiary shrink-0 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">verified</span>
+            <span className="font-semibold">{successToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessToast(null)}
+            className="hover:opacity-80 text-on-surface-variant text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 1. Amber Warning Banner at Top */}
       <section className="bg-amber-950/30 border-b border-amber-600/40 px-space-lg py-2.5 flex items-start gap-3 shrink-0">
         <span className="material-symbols-outlined text-amber-400 text-lg shrink-0 mt-0.5">warning</span>
@@ -247,14 +296,29 @@ export default function Section63Page() {
               </span>
             </label>
 
-            <button
-              type="button"
-              onClick={() => window.print()}
-              disabled={artifacts.length === 0}
-              className="btn-primary text-xs"
-            >
-              Export Section 63 Schedule PDF
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSaveAttestation}
+                disabled={saving}
+                className="btn-primary text-xs flex items-center gap-1.5"
+              >
+                <span className={`material-symbols-outlined text-[15px] ${saving ? 'animate-spin' : ''}`}>
+                  {saving ? 'sync' : 'save'}
+                </span>
+                <span>{saving ? 'Saving...' : 'Save Attestation'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                disabled={artifacts.length === 0}
+                className="px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[15px]">print</span>
+                <span>Export Section 63 Schedule PDF</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

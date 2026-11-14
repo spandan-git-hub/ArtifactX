@@ -1,24 +1,69 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, login, loginAsGuest } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e) => {
+
+  const handleGuestLogin = () => {
+    loginAsGuest();
+    const from = (location.state as any)?.from?.pathname || '/cases';
+    navigate(from, { replace: true });
+  };
+
+  // Direct auth skip: auto-redirect if already authenticated or URL contains ?guest=true / ?skip=true
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const guestParam = searchParams.get('guest');
+    const skipParam = searchParams.get('skip');
+
+    if (guestParam === 'true' || searchParams.has('guest') || skipParam === 'true' || searchParams.has('skip')) {
+      handleGuestLogin();
+      return;
+    }
+
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/cases';
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, location.search]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    try {
+      await login(username, password);
+      const from = (location.state as any)?.from?.pathname || '/cases';
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      console.error('Authentication error:', err);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setErrorMessage(
+          err.response?.data?.detail || 'Invalid Examiner ID or authorization credentials'
+        );
+      } else {
+        setErrorMessage(
+          err.response?.data?.detail || err.message || 'Workstation authorization service unavailable'
+        );
+      }
+    } finally {
       setLoading(false);
-      navigate('/cases');
-    }, 400);
+    }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col font-body-md select-none bg-background text-on-surface">
@@ -84,6 +129,12 @@ export default function LoginPage() {
 
           {/* Card Body */}
           <div className="p-space-lg space-y-4">
+            {errorMessage && (
+              <div className="p-2.5 rounded bg-error/10 border border-error/30 text-error flex items-start gap-2 text-xs">
+                <span className="material-symbols-outlined text-base shrink-0">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
             <form className="space-y-3.5" onSubmit={handleSubmit}>
               {/* Username / Examiner ID */}
               <div className="space-y-1">
@@ -143,6 +194,26 @@ export default function LoginPage() {
                 >
                   <span>{loading ? 'Authenticating...' : 'Sign in to Workstation'}</span>
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-outline-variant"></div>
+                <span className="flex-shrink mx-3 text-[11px] font-label-ui uppercase tracking-wider text-outline">or</span>
+                <div className="flex-grow border-t border-outline-variant"></div>
+              </div>
+
+              {/* Login as Guest (Demo) Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  disabled={loading}
+                  className="w-full h-8 rounded-lg bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-body-md text-body-md font-medium flex items-center justify-center space-x-1.5 transition-all shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-tertiary">person</span>
+                  <span>Login as Guest (Demo)</span>
                 </button>
               </div>
             </form>

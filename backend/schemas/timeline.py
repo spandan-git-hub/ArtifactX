@@ -25,7 +25,9 @@ class TimelineEventBase(BaseModel):
     time_flags: Optional[List[str]] = Field(default_factory=list)
     raw_timestamp: Optional[str] = None
     actor_ref: Optional[str] = None
+    actor_name: Optional[str] = None
     chat_ref: Optional[str] = None
+    chat_title: Optional[str] = None
     summary: Optional[str] = None
     source_refs: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     confidence_score: Optional[float] = 1.0

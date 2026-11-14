@@ -16,6 +16,9 @@ class CaseBase(BaseModel):
     agency: Optional[str] = None
     legal_authority: Optional[str] = None
     jurisdiction: Optional[str] = None
+    section63_ref: Optional[str] = None
+    section63_attested: Optional[bool] = False
+    section63_attested_at: Optional[datetime] = None
 
 
 class CaseCreate(CaseBase):
@@ -33,6 +36,17 @@ class CaseUpdate(BaseModel):
     legal_authority: Optional[str] = None
     jurisdiction: Optional[str] = None
     status: Optional[str] = None
+    section63_ref: Optional[str] = None
+    section63_attested: Optional[bool] = None
+    section63_attested_at: Optional[datetime] = None
+
+
+class Section63AttestRequest(BaseModel):
+    examiner_name: Optional[str] = None
+    examiner_designation: Optional[str] = None
+    agency: Optional[str] = None
+    section63_ref: Optional[str] = None
+    section63_attested: bool = True
 
 
 class CaseRead(CaseBase):
@@ -41,6 +55,12 @@ class CaseRead(CaseBase):
     evidence_count: int = 0
     created_at: datetime
     updated_at: datetime
+    integrity_state: Optional[str] = "NO_EVIDENCE"
+    total_exhibits: int = 0
+    verified_exhibits: int = 0
+    mismatched_exhibits: int = 0
+    unverified_exhibits: int = 0
+    hash_integrity_percentage: Optional[float] = None
 
     class Config:
         from_attributes = True

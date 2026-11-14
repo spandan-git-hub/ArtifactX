@@ -10,8 +10,12 @@ from backend.models.models import (
     DerivedArtifact,
     MediaItem,
     RecoveredFinding,
+    TelegramContact,
+    TelegramGroup,
     TelegramMessage,
+    WhatsAppContact,
     WhatsAppEdit,
+    WhatsAppGroup,
     WhatsAppMessage,
     WhatsAppRevocation,
 )
@@ -209,6 +213,39 @@ class TimelineService:
             # 7. Replace timeline events for case in one transaction (Rule R11 idempotent rebuild)
             self.timeline_repo.delete_events_by_case_id(db, case_id)
 
+            # Build contacts and groups lookup for dynamic identity resolution
+            wa_contacts_map: Dict[str, str] = {}
+            if evidence_ids:
+                for c in db.query(WhatsAppContact).filter(WhatsAppContact.evidence_id.in_(evidence_ids)).all():
+                    if c.jid:
+                        display = c.display_name or (f"+{c.phone_number}" if c.phone_number else None) or c.jid
+                        wa_contacts_map[c.jid] = display
+                        wa_contacts_map[c.jid.split("@")[0]] = display
+
+            wa_groups_map: Dict[str, str] = {}
+            if evidence_ids:
+                for g in db.query(WhatsAppGroup).filter(WhatsAppGroup.evidence_id.in_(evidence_ids)).all():
+                    if g.group_jid:
+                        wa_groups_map[g.group_jid] = g.subject or f"Group ({g.group_jid.split('@')[0]})"
+
+            tg_contacts_map: Dict[str, str] = {}
+            if evidence_ids:
+                for c in db.query(TelegramContact).filter(TelegramContact.evidence_id.in_(evidence_ids)).all():
+                    name = f"{c.first_name or ''} {c.last_name or ''}".strip() or (f"@{c.username}" if c.username else None) or (f"+{c.phone}" if c.phone else str(c.user_id))
+                    if c.user_id:
+                        tg_contacts_map[str(c.user_id)] = name
+                        tg_contacts_map[f"tg_user_{c.user_id}"] = name
+                        tg_contacts_map[f"tg_dialog_{c.user_id}"] = name
+
+            tg_groups_map: Dict[str, str] = {}
+            if evidence_ids:
+                for g in db.query(TelegramGroup).filter(TelegramGroup.evidence_id.in_(evidence_ids)).all():
+                    if g.group_id:
+                        title = g.title or f"Group ({g.group_id})"
+                        tg_groups_map[str(g.group_id)] = title
+                        tg_groups_map[f"tg_dialog_{g.group_id}"] = title
+                        tg_groups_map[f"tg_user_{g.group_id}"] = title
+
             db_event_dicts = []
             for ev in result.events:
                 norm_dt = None
@@ -220,6 +257,30 @@ class TimelineService:
 
                 primary_ev_id = ev.source_refs[0].evidence_id if ev.source_refs else None
 
+                # Dynamic resolution of actor_name and chat_title
+                actor_ref = ev.actor_ref
+                actor_name = None
+                if actor_ref in ("me", "from_me", "self", "1001", "tg_user_1001"):
+                    actor_name = "Me (Device Owner)"
+                elif actor_ref:
+                    actor_name = wa_contacts_map.get(actor_ref) or tg_contacts_map.get(actor_ref)
+
+                chat_ref = ev.chat_ref
+                chat_title = None
+                if chat_ref:
+                    chat_title = (
+                        wa_groups_map.get(chat_ref)
+                        or wa_contacts_map.get(chat_ref)
+                        or tg_groups_map.get(chat_ref)
+                        or tg_contacts_map.get(chat_ref)
+                    )
+
+                event_metadata = dict(ev.metadata or {})
+                if actor_name:
+                    event_metadata["actor_name"] = actor_name
+                if chat_title:
+                    event_metadata["chat_title"] = chat_title
+
                 db_event_dicts.append({
                     "case_id": case_id,
                     "evidence_id": primary_ev_id,
@@ -230,7 +291,7 @@ class TimelineService:
                     "entity_id": ev.actor_ref or ev.chat_ref or str(primary_ev_id or ""),
                     "entity_type": ev.kind,
                     "description": ev.summary,
-                    "metadata_": ev.metadata,
+                    "metadata_": event_metadata,
                     # Additive forensic fields
                     "event_id": ev.event_id,
                     "utc_ms": ev.time.utc_ms,
@@ -239,7 +300,9 @@ class TimelineService:
                     "time_flags": list(ev.time.flags),
                     "raw_timestamp": str(ev.time.raw),
                     "actor_ref": ev.actor_ref,
+                    "actor_name": actor_name,
                     "chat_ref": ev.chat_ref,
+                    "chat_title": chat_title,
                     "summary": ev.summary,
                     "source_refs": [ref.to_dict() for ref in ev.source_refs],
                     "confidence_score": ev.confidence_score,
@@ -323,7 +386,9 @@ class TimelineService:
                 "time_flags": e.time_flags or [],
                 "raw_timestamp": e.raw_timestamp,
                 "actor_ref": e.actor_ref,
+                "actor_name": getattr(e, "actor_name", None) or (e.metadata_ or {}).get("actor_name"),
                 "chat_ref": e.chat_ref,
+                "chat_title": getattr(e, "chat_title", None) or (e.metadata_ or {}).get("chat_title"),
                 "summary": e.summary,
                 "source_refs": e.source_refs or [],
                 "confidence_score": e.confidence_score if e.confidence_score is not None else 1.0,
@@ -389,7 +454,9 @@ class TimelineService:
                 "time_flags": e.time_flags or [],
                 "raw_timestamp": e.raw_timestamp,
                 "actor_ref": e.actor_ref,
+                "actor_name": getattr(e, "actor_name", None) or (e.metadata_ or {}).get("actor_name"),
                 "chat_ref": e.chat_ref,
+                "chat_title": getattr(e, "chat_title", None) or (e.metadata_ or {}).get("chat_title"),
                 "summary": e.summary,
                 "source_refs": e.source_refs or [],
                 "confidence_score": e.confidence_score if e.confidence_score is not None else 1.0,

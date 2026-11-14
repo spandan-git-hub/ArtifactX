@@ -19,6 +19,15 @@ export interface CaseData {
   blockId: string;
   description: string;
   deviceTarget: string;
+  section63Ref?: string;
+  section63Attested?: boolean;
+  section63AttestedAt?: string | null;
+  examinerDesignation?: string;
+  totalExhibits?: number;
+  verifiedExhibits?: number;
+  mismatchedExhibits?: number;
+  unverifiedExhibits?: number;
+  hashIntegrityPercentage?: number | null;
   [key: string]: any;
 }
 
@@ -57,7 +66,16 @@ function normalizeCase(c: any): CaseData | null {
     sha256Root: c.sha256_root || c.sha256Root || '',
     blockId: c.block_id || c.blockId || '',
     description: c.description || '',
-    deviceTarget: c.device_target || c.deviceTarget || 'Mobile Device'
+    deviceTarget: c.device_target || c.deviceTarget || 'Mobile Device',
+    section63Ref: c.section63_ref || c.section63Ref || '',
+    section63Attested: Boolean(c.section63_attested ?? c.section63Attested),
+    section63AttestedAt: c.section63_attested_at || c.section63AttestedAt || null,
+    examinerDesignation: c.examiner_designation || c.examinerDesignation || 'Senior Forensic Analyst & Certifier',
+    totalExhibits: c.total_exhibits ?? c.evidence_count ?? 0,
+    verifiedExhibits: c.verified_exhibits ?? 0,
+    mismatchedExhibits: c.mismatched_exhibits ?? 0,
+    unverifiedExhibits: c.unverified_exhibits ?? 0,
+    hashIntegrityPercentage: c.hash_integrity_percentage ?? null
   };
 }
 

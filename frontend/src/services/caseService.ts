@@ -36,5 +36,11 @@ export const caseService = {
   getCaseWorkspace: async (id) => {
     const response = await axios.get(`${API_BASE}/cases/${id}/workspace`);
     return response.data;
+  },
+
+  // Save Section 63 statutory attestation
+  attestSection63: async (id, certifierData) => {
+    const response = await axios.post(`${API_BASE}/cases/${id}/section63/attest`, certifierData);
+    return response.data;
   }
 };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useActiveCase } from '../../context/CaseContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface NavTab {
   name: string;
@@ -24,6 +25,7 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { cases, activeCaseId, activeCase, switchCase } = useActiveCase();
+  const { examiner, isGuest, logout } = useAuth();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [caseMenuOpen, setCaseMenuOpen] = useState(false);
@@ -206,7 +208,7 @@ export function Layout({ children }: LayoutProps) {
 
           <div className="h-4 w-[1px] bg-outline-variant" />
 
-          {/* Workstation Menu */}
+          {/* Workstation / Examiner Menu */}
           <div className="relative">
             <button
               type="button"
@@ -217,16 +219,25 @@ export function Layout({ children }: LayoutProps) {
                 <span className="material-symbols-outlined text-[15px]">account_circle</span>
               </div>
               <span className="text-body-sm font-body-sm font-medium text-on-surface group-hover:text-primary transition-colors">
-                Workstation
+                {examiner?.name || 'Workstation'}
               </span>
+              {isGuest && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-label-ui uppercase tracking-wider bg-tertiary/20 text-tertiary border border-tertiary/40">
+                  Guest
+                </span>
+              )}
               <span className="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
             </button>
 
             {examinerMenuOpen && (
               <div
-                className="absolute right-0 mt-1.5 w-48 bg-surface-container border border-outline-variant rounded-lg shadow-xl py-1 z-50 text-left"
+                className="absolute right-0 mt-1.5 w-52 bg-surface-container border border-outline-variant rounded-lg shadow-xl py-1 z-50 text-left"
                 onMouseLeave={() => setExaminerMenuOpen(false)}
               >
+                <div className="px-3 py-2 border-b border-outline-variant">
+                  <p className="text-xs font-semibold text-on-surface truncate">{examiner?.name || 'Forensic Examiner'}</p>
+                  <p className="text-[11px] text-on-surface-variant font-mono truncate">{examiner?.designation || examiner?.agency || 'Guest Session'}</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -239,14 +250,18 @@ export function Layout({ children }: LayoutProps) {
                   <span>Settings</span>
                 </button>
                 <div className="border-t border-outline-variant my-1" />
-                <Link
-                  to="/login"
-                  onClick={() => setExaminerMenuOpen(false)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExaminerMenuOpen(false);
+                    logout();
+                    navigate('/login');
+                  }}
                   className="w-full text-left px-3 py-1.5 text-body-sm text-error hover:bg-surface-container-high flex items-center space-x-2"
                 >
-                  <span className="material-symbols-outlined text-[16px]">lock</span>
-                  <span>Lock Workstation</span>
-                </Link>
+                  <span className="material-symbols-outlined text-[16px]">logout</span>
+                  <span>Sign Out / Lock</span>
+                </button>
               </div>
             )}
           </div>

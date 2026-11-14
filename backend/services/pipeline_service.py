@@ -14,7 +14,11 @@ from __future__ import annotations
 import base64
 from datetime import datetime, timezone
 import io
-from typing import Any, Dict, List, Optional
+import json
+import queue
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional
 import uuid
 import zipfile
 
@@ -71,6 +75,7 @@ class PipelineService:
         self,
         case_id: int,
         req: Optional[PipelineRunRequest] = None,
+        stage_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> PipelineRun:
         """
         Execute end-to-end analysis pipeline for a case and persist findings.
@@ -79,6 +84,7 @@ class PipelineService:
             ConcurrentPipelineRunError: if another run is currently IN_PROGRESS for this case.
             ValueError: if case is not found or has no evidence.
         """
+        start_wall_time = time.time()
         case = self.db.query(Case).filter(Case.id == case_id).first()
         if not case:
             raise ValueError(f"Case {case_id} not found")
@@ -92,6 +98,17 @@ class PipelineService:
 
         payload = req or PipelineRunRequest()
         run_id = f"pipe_{uuid.uuid4().hex[:16]}"
+
+        if stage_callback:
+            stage_callback({
+                "stage": "init",
+                "status": "STARTED",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "duration_ms": 0.0,
+                "counts": {},
+                "output_hash": "",
+                "errors": [],
+            })
 
         # 2. Initialize PipelineRun record
         run = self.repo.create_run(
@@ -243,12 +260,25 @@ class PipelineService:
                 custom_keywords=tuple((payload.config or {}).get("custom_keywords", ())),
             )
 
+            def _on_core_stage(st: Any) -> None:
+                if stage_callback:
+                    stage_callback({
+                        "stage": getattr(st, "stage", "stage"),
+                        "status": getattr(st, "status", "SUCCESS"),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "duration_ms": getattr(st, "duration_ms", 0.0) or 0.0,
+                        "counts": getattr(st, "counts", {}) or {},
+                        "output_hash": getattr(st, "output_hash", "") or "",
+                        "errors": list(getattr(st, "errors", []) or []),
+                    })
+
             # 6. Execute pure core pipeline
             pipeline_result = run_pipeline(
                 inputs=evidence_inputs,
                 keys=key_materials,
                 cfg=cfg,
                 run_id=run_id,
+                stage_callback=_on_core_stage,
             )
 
             # 7. Record each stage in DB and audit log
@@ -401,6 +431,21 @@ class PipelineService:
                 },
             )
 
+            if stage_callback:
+                stage_callback({
+                    "stage": "summary",
+                    "status": "SUCCESS" if pipeline_result.status == "COMPLETED" else pipeline_result.status,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "duration_ms": round((time.time() - start_wall_time) * 1000, 2),
+                    "counts": {
+                        "stages": len(pipeline_result.stages),
+                        "findings": len(pipeline_result.findings),
+                    },
+                    "output_hash": pipeline_result.content_hash or "",
+                    "errors": [],
+                    "run_id": run_id,
+                })
+
             return self.repo.get_run_with_stages(run_id) or run
 
         except Exception as e:
@@ -420,4 +465,55 @@ class PipelineService:
                 case_id=case_id,
                 details={"run_id": run_id, "error": str(e)},
             )
+            if stage_callback:
+                stage_callback({
+                    "stage": "error",
+                    "status": "FAILED_HONEST",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "duration_ms": 0.0,
+                    "counts": {},
+                    "output_hash": "",
+                    "errors": [str(e)],
+                    "run_id": run_id,
+                })
             raise
+
+    @staticmethod
+    def stream_pipeline_execution(case_id: int, req: Optional[PipelineRunRequest] = None):
+        """Yield Server-Sent Events (SSE) representing real stage telemetry during execution."""
+        event_queue = queue.Queue()
+        sentinel = object()
+
+        def worker():
+            from backend.app.database import SessionLocal
+            db = SessionLocal()
+            try:
+                svc = PipelineService(db)
+                def on_event(ev: Dict[str, Any]):
+                    event_queue.put(ev)
+                svc.execute_pipeline(case_id=case_id, req=req, stage_callback=on_event)
+            except Exception as exc:
+                event_queue.put({
+                    "stage": "pipeline",
+                    "status": "FAILED_HONEST",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "duration_ms": 0.0,
+                    "counts": {},
+                    "output_hash": "",
+                    "errors": [str(exc)],
+                })
+            finally:
+                db.close()
+                event_queue.put(sentinel)
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+        while True:
+            try:
+                item = event_queue.get(timeout=30)
+                if item is sentinel:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+            except queue.Empty:
+                yield ": keepalive\n\n"

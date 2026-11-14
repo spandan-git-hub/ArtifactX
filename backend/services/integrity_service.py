@@ -135,3 +135,47 @@ def ensure_integrity(
         hashes=hashes,
         details={"size_bytes": len(evidence.content_bytes)},
     )
+
+
+def compute_case_integrity_rollup(case_id: int, db: Session) -> Dict[str, Any]:
+    """
+    Compute real cryptographic aggregate verification state across Evidence exhibits for a case.
+    """
+    evidences = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+    total_exhibits = len(evidences)
+    verified_exhibits = 0
+    mismatched_exhibits = 0
+    unverified_exhibits = 0
+
+    for ev in evidences:
+        st = (ev.integrity_state or "PENDING").upper()
+        if st in ("VERIFIED_INTACT", "OK"):
+            verified_exhibits += 1
+        elif st == "HASH_MISMATCH":
+            mismatched_exhibits += 1
+        elif st in ("PENDING", "LEGACY_UNVERIFIABLE"):
+            unverified_exhibits += 1
+        else:
+            unverified_exhibits += 1
+
+    if total_exhibits == 0:
+        rollup_status = "NO_EVIDENCE"
+        percentage = None
+    elif mismatched_exhibits > 0:
+        rollup_status = "FLAGGED_EXCEPTION"
+        percentage = round((verified_exhibits / total_exhibits) * 100.0, 1)
+    elif unverified_exhibits > 0:
+        rollup_status = "PENDING_VERIFICATION"
+        percentage = round((verified_exhibits / total_exhibits) * 100.0, 1)
+    else:
+        rollup_status = "ALL_VERIFIED"
+        percentage = 100.0
+
+    return {
+        "total_exhibits": total_exhibits,
+        "verified_exhibits": verified_exhibits,
+        "mismatched_exhibits": mismatched_exhibits,
+        "unverified_exhibits": unverified_exhibits,
+        "hash_integrity_percentage": percentage,
+        "integrity_state": rollup_status,
+    }
